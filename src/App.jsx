@@ -695,6 +695,24 @@ const PracticeLog = ({ players, coaches }) => {
 
   useEffect(() => { saveStore("pirates-practices-unified-2026v1", list); }, [list]);
 
+  // Cleanup stopwatch interval on unmount or modal close
+  useEffect(() => {
+    return () => {
+      if (stopwatchInterval.current) {
+        clearInterval(stopwatchInterval.current);
+      }
+    };
+  }, []);
+
+  // Clear stopwatch when closing modal
+  useEffect(() => {
+    if (!show && stopwatchRunning) {
+      setStopwatchRunning(false);
+      clearInterval(stopwatchInterval.current);
+      setStopwatchTime(0);
+    }
+  }, [show, stopwatchRunning]);
+
   const cats = ["all", ...new Set(DRILL_LIBRARY.map(d => d.category))];
   const fd = df === "all" ? DRILL_LIBRARY : DRILL_LIBRARY.filter(d => d.category === df);
   const tt = form.drills?.reduce((s, d) => s + d.duration, 0) || 0;
@@ -708,10 +726,17 @@ const PracticeLog = ({ players, coaches }) => {
   };
 
   const startPractice = (practice) => {
-    setForm(emptyActive(practice));
-    setEd(practice.id);
-    setMode("active");
-    setShow(true);
+    try {
+      const activeForm = emptyActive(practice);
+      console.log("Active form created:", activeForm);
+      setForm(activeForm);
+      setEd(practice.id);
+      setMode("active");
+      setShow(true);
+    } catch (error) {
+      console.error("Error starting practice:", error);
+      alert("Error starting practice: " + error.message);
+    }
   };
 
   const finishPractice = (practice) => {
@@ -1150,7 +1175,7 @@ const PracticeLog = ({ players, coaches }) => {
               Assign players to color groups for station rotations. Leave unassigned if doing whole-team drills.
             </div>
             <div style={{ display: "grid", gap: 8 }}>
-              {filteredPlayers.map(p => {
+              {players.filter(p => (form.attendance || {})[p.id]).map(p => {
                 const currentGroup = (form.groups || {})[p.id];
                 const GROUP_COLORS = {
                   red: { bg: "rgba(231,76,60,0.2)", border: "#e74c3c", text: "#e74c3c" },
