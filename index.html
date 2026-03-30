@@ -3775,7 +3775,7 @@ const Reports = ({ players }) => {
                       </div>
                       <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ color: THEME.gold, fontWeight: 700 }}>.{Math.round(stat.avg * 1000)}</div>
+                          <div style={{ color: THEME.gold, fontWeight: 700 }}>{stat.avg.toFixed(3)}</div>
                           <div style={{ color: THEME.gray, fontSize: 10 }}>AVG</div>
                         </div>
                         <div style={{ textAlign: "center" }}>
