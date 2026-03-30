@@ -432,6 +432,7 @@ const GameLog = ({ players }) => {
   const [defenseMode, setDefenseMode] = useState("offense"); // "defense" or "offense"
   const [currentPitcher, setCurrentPitcher] = useState(null);
   const [pitchCount, setPitchCount] = useState({ pitches: 0, strikes: 0, balls: 0 });
+  const [inningPitchers, setInningPitchers] = useState({}); // { inning: [{ playerId, pitches, strikes, balls }] }
 
   const empty = () => ({
     id: Date.now().toString(), date: "", opponent: "", result: "", homeAway: "home",
@@ -461,6 +462,35 @@ const GameLog = ({ players }) => {
   const activeBattingOrder = (form.battingOrder || []).filter(id => form.attendance[id]);
   const getPlayer = (id) => players.find(p => p.id === id);
   const pLine = (abs) => { const codes = abs.map(a => typeof a === "string" ? a : a.code); const h = codes.filter(a => isHit(a)).length; const ab = codes.filter(a => !["BB", "HBP", "SAC"].includes(a)).length; return `${h}-${ab}`; };
+
+  // Save current pitcher's stats (for mid-inning pitcher changes)
+  const savePitcherStats = () => {
+    if (!currentPitcher || pitchCount.pitches === 0) return;
+
+    // Save to defensive stats
+    setForm(prev => ({
+      ...prev,
+      defensiveStats: {
+        ...prev.defensiveStats,
+        [currentPitcher]: {
+          ...(prev.defensiveStats?.[currentPitcher] || { putouts: 0, assists: 0, errors: 0, pitches: 0 }),
+          pitches: (prev.defensiveStats?.[currentPitcher]?.pitches || 0) + pitchCount.pitches
+        }
+      }
+    }));
+
+    // Track this pitcher in this inning
+    setInningPitchers(prev => ({
+      ...prev,
+      [form.inning]: [
+        ...(prev[form.inning] || []),
+        { playerId: currentPitcher, pitches: pitchCount.pitches, strikes: pitchCount.strikes, balls: pitchCount.balls }
+      ]
+    }));
+
+    // Reset pitch count
+    setPitchCount({ pitches: 0, strikes: 0, balls: 0 });
+  };
 
   const resetCount = () => setCount({ balls: 0, strikes: 0, fouls: 0 });
 
@@ -679,6 +709,10 @@ const GameLog = ({ players }) => {
               }).map(pid => {
                 const p = getPlayer(pid);
                 return <button key={pid} onClick={() => {
+                  // Save previous pitcher's stats if switching mid-inning
+                  if (currentPitcher && currentPitcher !== pid) {
+                    savePitcherStats();
+                  }
                   setCurrentPitcher(pid);
                   setPitchCount({ pitches: 0, strikes: 0, balls: 0 });
                 }} style={{ padding: "10px 12px", background: currentPitcher === pid ? THEME.gold : THEME.charcoal, color: currentPitcher === pid ? THEME.black : THEME.white, border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
@@ -715,22 +749,25 @@ const GameLog = ({ players }) => {
                 <button onClick={() => setPitchCount({ ...pitchCount, pitches: pitchCount.pitches + 1, strikes: pitchCount.strikes + 1 })} style={{ padding: "14px 0", fontSize: 15, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: "#2ECC71", color: THEME.black, border: "none", fontFamily: "'Oswald',sans-serif" }}>Strike</button>
                 <button onClick={() => setPitchCount({ ...pitchCount, pitches: pitchCount.pitches + 1, balls: pitchCount.balls + 1 })} style={{ padding: "14px 0", fontSize: 15, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: "#E74C3C", color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif" }}>Ball</button>
               </div>
-              <button onClick={() => {
-                // Save this inning's pitch count
-                setForm({
-                  ...form,
-                  defensiveStats: {
-                    ...form.defensiveStats,
-                    [currentPitcher]: {
-                      ...(form.defensiveStats?.[currentPitcher] || { putouts: 0, assists: 0, errors: 0, pitches: 0 }),
-                      pitches: (form.defensiveStats?.[currentPitcher]?.pitches || 0) + pitchCount.pitches
-                    }
-                  }
-                });
-                setPitchCount({ pitches: 0, strikes: 0, balls: 0 });
-              }} style={{ width: "100%", padding: "10px 0", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer", background: THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif" }}>
-                End Inning (Save Pitch Count)
-              </button>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                <button onClick={savePitcherStats} style={{ width: "100%", padding: "10px 0", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer", background: THEME.gold, color: THEME.black, border: "none", fontFamily: "'Oswald',sans-serif" }}>
+                  💾 Save & Switch Pitcher
+                </button>
+                <button onClick={savePitcherStats} style={{ width: "100%", padding: "10px 0", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer", background: THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif" }}>
+                  End Inning (Save Stats)
+                </button>
+              </div>
+              {inningPitchers[form.inning] && inningPitchers[form.inning].length > 0 && (
+                <div style={{ marginTop: 12, padding: "8px 10px", background: THEME.black, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: THEME.gray, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Inning {form.inning} Pitchers:</div>
+                  {inningPitchers[form.inning].map((p, i) => {
+                    const pitcher = getPlayer(p.playerId);
+                    return <div key={i} style={{ fontSize: 12, color: THEME.white, padding: "2px 0" }}>
+                      {pitcher?.name.split(" ")[0]}: {p.pitches} pitches ({p.strikes}S / {p.balls}B)
+                    </div>;
+                  })}
+                </div>
+              )}
             </Card>;
           })()}
 
