@@ -1126,6 +1126,35 @@ const PracticeLog = ({ players, coaches }) => {
             </div>
           </div>
 
+          {/* Practice Agenda */}
+          {form.drills && form.drills.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <SL>📋 Practice Agenda</SL>
+              <div style={{ marginTop: 8, maxHeight: 300, overflowY: "auto", border: `1px solid ${THEME.charcoal}`, borderRadius: 6, padding: 8 }}>
+                {form.drills.map((d, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 6px", borderBottom: i < form.drills.length - 1 ? `1px solid ${THEME.charcoal}` : "none" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ color: THEME.gray, fontSize: 11, fontWeight: 700, minWidth: 20 }}>#{i+1}</span>
+                        <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{d.name}</span>
+                      </div>
+                      {d.description && (
+                        <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2, marginLeft: 26 }}>{d.description}</div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      <Badge>{d.duration}min</Badge>
+                      <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{d.assignedCoach || d.coach}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, color: THEME.gray, fontSize: 11, textAlign: "right" }}>
+                Total: {form.drills.reduce((sum, d) => sum + (d.duration || 0), 0)} minutes
+              </div>
+            </div>
+          )}
+
           <div style={{ marginTop: 16 }}>
             <SL>Attendance (mark who showed up)</SL>
             <ToggleChips
