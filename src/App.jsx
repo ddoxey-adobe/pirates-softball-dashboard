@@ -603,7 +603,7 @@ const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
 const PracticeLog = ({ players, coaches }) => {
   const [list, setList] = useState([]);
   const [show, setShow] = useState(false);
-  const [mode, setMode] = useState("plan"); // "plan" or "complete"
+  const [mode, setMode] = useState("plan"); // "plan", "active", or "complete"
   const [form, setForm] = useState({});
   const [ed, setEd] = useState(null);
   const [df, setDf] = useState("all");
@@ -615,7 +615,8 @@ const PracticeLog = ({ players, coaches }) => {
     id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned",
     attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {})
   });
-  const emptyComplete = (practice) => {
+
+  const emptyActive = (practice) => {
     // Initialize drill tracking for trackable drills in this practice
     const trackableDrillsInPractice = (practice.drills || []).filter(d => TRACKABLE_DRILLS[d.id]);
     const drillTracking = {};
@@ -633,12 +634,18 @@ const PracticeLog = ({ players, coaches }) => {
 
     return {
       ...practice,
+      status: "active",
+      drillTracking: drillTracking,
+      observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {})
+    };
+  };
+
+  const emptyComplete = (practice) => {
+    return {
+      ...practice,
       status: "completed",
       drillsRun: practice.drills?.map(d => d.name).join(", ") || "",
-      attendance: practice.attendance || players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
-      observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
-      coachNotes: "",
-      drillTracking
+      coachNotes: practice.coachNotes || ""
     };
   };
 
@@ -678,7 +685,14 @@ const PracticeLog = ({ players, coaches }) => {
     setMode("plan");
   };
 
-  const markComplete = (practice) => {
+  const startPractice = (practice) => {
+    setForm(emptyActive(practice));
+    setEd(practice.id);
+    setMode("active");
+    setShow(true);
+  };
+
+  const finishPractice = (practice) => {
     setForm(emptyComplete(practice));
     setEd(practice.id);
     setMode("complete");
@@ -691,12 +705,13 @@ const PracticeLog = ({ players, coaches }) => {
     setShowTemplates(false);
   };
 
-  const planned = list.filter(p => p.status !== "completed").sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  const planned = list.filter(p => p.status === "planned").sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  const active = list.filter(p => p.status === "active").sort((a,b) => (a.date||"").localeCompare(b.date||""));
   const completed = list.filter(p => p.status === "completed").sort((a,b) => (b.date||"").localeCompare(a.date||""));
 
   return <div>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-      <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>{list.length} practice{list.length !== 1 ? "s" : ""} ({planned.length} planned, {completed.length} completed)</p>
+      <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>{list.length} practice{list.length !== 1 ? "s" : ""} ({planned.length} planned, {active.length} active, {completed.length} completed)</p>
       <Button onClick={() => { setForm(emptyPlan()); setEd(null); setMode("plan"); setShow(true); }}>+ Plan Practice</Button>
     </div>
 
@@ -728,7 +743,7 @@ const PracticeLog = ({ players, coaches }) => {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <Button small onClick={e => { e.stopPropagation(); markComplete(p); }}>Mark Complete</Button>
+                      <Button small onClick={e => { e.stopPropagation(); startPractice(p); }}>Start Practice</Button>
                       <Button small variant="ghost" onClick={e => { e.stopPropagation(); setForm({ ...p }); setEd(p.id); setMode("plan"); setShow(true); }}>Edit</Button>
                       <Button small variant="danger" onClick={e => { e.stopPropagation(); if (confirm("Delete this practice?")) setList(x => x.filter(q => q.id !== p.id)); }}>✕</Button>
                     </div>
@@ -747,6 +762,59 @@ const PracticeLog = ({ players, coaches }) => {
                       {p.attendance && (
                         <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${THEME.charcoal}` }}>
                           <span style={{ color: THEME.gray, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Expected: </span>
+                          <span style={{ color: THEME.white, fontSize: 12 }}>
+                            {players.filter(pl => p.attendance[pl.id]).map(pl => pl.name.split(" ")[0]).join(", ")}
+                          </span>
+                        </div>
+                      )}
+                      {p.notes && <p style={{ color: THEME.gray, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{p.notes}</p>}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {active.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ color: THEME.blue, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", marginBottom: 12, textTransform: "uppercase" }}>🏃 Active Practice</h3>
+            <div style={{ display: "grid", gap: 10 }}>
+              {active.map(p => (
+                <Card key={p.id} style={{ padding: 14, cursor: "pointer", border: `2px solid ${THEME.blue}` }} onClick={() => setExp(exp === p.id ? null : p.id)}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: THEME.white, fontSize: 15 }}>
+                        {p.date ? new Date(p.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "TBD"}
+                        {p.time && ` at ${p.time}`}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                        <Badge color={THEME.blue} bg="rgba(52,152,219,0.25)">IN PROGRESS</Badge>
+                        {p.duration && <Badge>{p.duration}min</Badge>}
+                        {p.drills && p.drills.length > 0 && <Badge color={THEME.white} bg="rgba(255,255,255,0.1)">{p.drills.length} drills</Badge>}
+                        {p.focus && <Badge color={THEME.green} bg="rgba(46,204,113,0.15)">{p.focus}</Badge>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <Button small onClick={e => { e.stopPropagation(); setForm({ ...p }); setEd(p.id); setMode("active"); setShow(true); }}>Continue</Button>
+                      <Button small variant="primary" onClick={e => { e.stopPropagation(); finishPractice(p); }}>Finish Practice</Button>
+                      <Button small variant="danger" onClick={e => { e.stopPropagation(); if (confirm("Delete this practice?")) setList(x => x.filter(q => q.id !== p.id)); }}>✕</Button>
+                    </div>
+                  </div>
+                  {exp === p.id && (
+                    <div style={{ marginTop: 12, borderTop: `1px solid ${THEME.charcoal}`, paddingTop: 12 }}>
+                      {p.drills && p.drills.length > 0 && p.drills.map((d, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${THEME.charcoal}` }}>
+                          <span style={{ color: THEME.white, fontSize: 13 }}>{d.name}</span>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <Badge>{d.duration}min</Badge>
+                            <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{d.assignedCoach || d.coach}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {p.attendance && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${THEME.charcoal}` }}>
+                          <span style={{ color: THEME.gray, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Attending: </span>
                           <span style={{ color: THEME.white, fontSize: 12 }}>
                             {players.filter(pl => p.attendance[pl.id]).map(pl => pl.name.split(" ")[0]).join(", ")}
                           </span>
@@ -855,7 +923,7 @@ const PracticeLog = ({ players, coaches }) => {
         )}
       </div>
     )}
-    <Modal open={show} onClose={() => { setShow(false); setEd(null); setMode("plan"); }} title={mode === "plan" ? (ed ? "Edit Practice Plan" : "Plan Practice") : "Complete Practice"} wide>
+    <Modal open={show} onClose={() => { setShow(false); setEd(null); setMode("plan"); }} title={mode === "plan" ? (ed ? "Edit Practice Plan" : "Plan Practice") : mode === "active" ? "Active Practice - Record Data" : "Complete Practice"} wide>
       {mode === "plan" ? (
         <div>
       {/* Template Loader */}
@@ -1003,40 +1071,39 @@ const PracticeLog = ({ players, coaches }) => {
       </div>
       <TextArea label="Notes" value={form.notes||""} onChange={e => setForm({...form, notes: e.target.value})} style={{ marginTop: 12 }} placeholder="General notes about this practice..." />
         </div>
-      ) : (
+      ) : mode === "active" ? (
         <div>
-          {/* Completion Mode UI */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Input label="Date" type="date" value={form.date||""} onChange={e => setForm({ ...form, date: e.target.value })} />
-            <Input label="Focus" value={form.focus || ""} onChange={e => setForm({ ...form, focus: e.target.value })} placeholder="Hitting, Defense..." />
+          {/* Active Practice Mode - Record data during practice */}
+          <div style={{ marginBottom: 16, padding: 12, background: THEME.blackLight, borderRadius: 6, border: `1px solid ${THEME.blue}` }}>
+            <div style={{ color: THEME.blue, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🏃 Practice In Progress</div>
+            <div style={{ color: THEME.gray, fontSize: 12 }}>Record attendance, drill tracking, and player observations as you go.</div>
           </div>
-          <TextArea label="Drills We Ran" value={form.drillsRun || ""} onChange={e => setForm({ ...form, drillsRun: e.target.value })} style={{ marginTop: 12 }} placeholder="Warm-up, BP on machine, ground balls..." />
-          <div style={{ marginTop: 16 }}>
-            <SL>Who Actually Came (adjust from plan)</SL>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-              {players.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => setForm({ ...form, attendance: { ...(form.attendance || {}), [p.id]: !(form.attendance || {})[p.id] } })}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    border: `1px solid ${(form.attendance || {})[p.id] ? THEME.green : THEME.charcoal}`,
-                    background: (form.attendance || {})[p.id] ? "rgba(46,204,113,0.15)" : THEME.black,
-                    color: (form.attendance || {})[p.id] ? THEME.green : THEME.gray,
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 600
-                  }}
-                >
-                  {p.name}
-                </button>
-              ))}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontWeight: 700, color: THEME.white, fontSize: 15, marginBottom: 4 }}>
+                {form.date ? new Date(form.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "No date set"}
+              </div>
+              {form.time && <div style={{ color: THEME.gray, fontSize: 13 }}>Time: {form.time}</div>}
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: THEME.gray, fontSize: 13 }}>Duration: {form.duration}min</div>
+              {form.focus && <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 600 }}>Focus: {form.focus}</div>}
             </div>
           </div>
+
           <div style={{ marginTop: 16 }}>
-            <SL>One Observation Per Player</SL>
-            <div style={{ maxHeight: 300, overflowY: "auto", marginTop: 8 }}>
+            <SL>Attendance (mark who showed up)</SL>
+            <ToggleChips
+              players={players}
+              selected={form.attendance || {}}
+              onToggle={id => setForm({ ...form, attendance: { ...(form.attendance || {}), [id]: !(form.attendance || {})[id] } })}
+            />
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <SL>Quick Observations (one per player)</SL>
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
               {players.filter(p => (form.attendance || {})[p.id]).map(p => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600, minWidth: 90, flexShrink: 0 }}>
@@ -1211,13 +1278,108 @@ const PracticeLog = ({ players, coaches }) => {
               </div>
             );
           })()}
+        </div>
+      ) : (
+        <div>
+          {/* Completion Mode UI */}
+          <div style={{ marginBottom: 16, padding: 12, background: THEME.blackLight, borderRadius: 6, border: `1px solid ${THEME.green}` }}>
+            <div style={{ color: THEME.green, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>✅ Review & Complete</div>
+            <div style={{ color: THEME.gray, fontSize: 12 }}>Review your data and add final coach notes before marking complete.</div>
+          </div>
 
-          <TextArea label="Coach Notes" value={form.coachNotes || ""} onChange={e => setForm({ ...form, coachNotes: e.target.value })} style={{ marginTop: 12 }} placeholder="What went well, what to work on..." />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontWeight: 700, color: THEME.white, fontSize: 15, marginBottom: 4 }}>
+                {form.date ? new Date(form.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "No date set"}
+              </div>
+              {form.time && <div style={{ color: THEME.gray, fontSize: 13 }}>Time: {form.time}</div>}
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: THEME.gray, fontSize: 13 }}>Duration: {form.duration}min</div>
+              {form.focus && <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 600 }}>Focus: {form.focus}</div>}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <SL>Attendance</SL>
+            <div style={{ color: THEME.white, fontSize: 13 }}>
+              {players.filter(p => (form.attendance || {})[p.id]).map(p => p.name.split(" ")[0]).join(", ") || "No attendance recorded"}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <SL>Player Observations</SL>
+            <div style={{ maxHeight: 200, overflowY: "auto" }}>
+              {players.filter(p => (form.attendance || {})[p.id] && (form.observations || {})[p.id]).map(p => (
+                <div key={p.id} style={{ padding: "4px 0", borderBottom: `1px solid ${THEME.charcoal}`, fontSize: 12 }}>
+                  <span style={{ color: THEME.white, fontWeight: 600 }}>{p.name.split(" ")[0]}:</span>{" "}
+                  <span style={{ color: THEME.gray }}>{(form.observations || {})[p.id]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Show Drill Tracking Summary */}
+          {(() => {
+            const trackableDrills = (form.drills || []).filter(d => TRACKABLE_DRILLS[d.id]);
+            if (trackableDrills.length === 0 || !form.drillTracking) return null;
+
+            return (
+              <div style={{ marginTop: 16 }}>
+                <SL>📊 Drill Metrics Summary</SL>
+                <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+                  {trackableDrills.map(drill => {
+                    const config = TRACKABLE_DRILLS[drill.id];
+                    const tracking = (form.drillTracking || {})[drill.id];
+                    if (!tracking) return null;
+
+                    return (
+                      <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 10, border: `1px solid ${THEME.charcoal}` }}>
+                        <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{drill.name}</div>
+                        {config.perPlayer ? (
+                          <div style={{ fontSize: 11, color: THEME.gray, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {players.filter(p => (form.attendance || {})[p.id] && tracking[p.id]).map(p => {
+                              const value = tracking[p.id];
+                              let displayValue = "";
+                              if (config.type === "strikes-balls") {
+                                displayValue = `${value.strikes || 0}/${value.balls || 0}`;
+                              } else if (config.type === "time") {
+                                displayValue = `${value}s`;
+                              } else if (config.type === "level") {
+                                displayValue = `Lvl ${value}`;
+                              } else {
+                                displayValue = `${value} pts`;
+                              }
+                              return (
+                                <span key={p.id}>
+                                  {p.name.split(" ")[0]}: <span style={{ color: THEME.white }}>{displayValue}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: THEME.white }}>
+                            Team: {tracking} consecutive outs
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          <TextArea label="Coach Notes" value={form.coachNotes || ""} onChange={e => setForm({ ...form, coachNotes: e.target.value })} style={{ marginTop: 16 }} placeholder="What went well, what to work on..." />
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-        <Button variant="ghost" onClick={() => { setShow(false); setEd(null); setMode("plan"); }}>Cancel</Button>
-        <Button onClick={save}>{ed ? "Save" : (mode === "plan" ? "Plan Practice" : "Complete")}</Button>
+        <Button variant="ghost" onClick={() => { setShow(false); setEd(null); setMode("plan"); }}>
+          {mode === "active" ? "Save & Close" : "Cancel"}
+        </Button>
+        <Button onClick={save}>
+          {mode === "plan" ? (ed ? "Save Plan" : "Create Plan") : mode === "active" ? "Save Progress" : "Mark Complete"}
+        </Button>
       </div>
     </Modal>
   </div>;
