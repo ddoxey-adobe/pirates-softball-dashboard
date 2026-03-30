@@ -633,6 +633,378 @@ const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
   </div>;
 };
 
+// ─── PRINT/EXPORT UTILITIES ─────────────────────────────────────
+const printPracticePlan = (practice, players) => {
+  const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
+  const drillsByPhase = {};
+
+  (practice.drills || []).forEach(drill => {
+    const phase = drill.phase || "Other";
+    if (!drillsByPhase[phase]) drillsByPhase[phase] = [];
+    drillsByPhase[phase].push(drill);
+  });
+
+  const printWindow = window.open('', '', 'width=800,height=600');
+  printWindow.document.write(`
+    <html>
+    <head>
+      <title>Practice Plan - ${practice.date || 'TBD'}</title>
+      <style>
+        @media print {
+          @page { margin: 0.5in; }
+        }
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          color: #000;
+          background: #fff;
+        }
+        h1 {
+          font-size: 24px;
+          border-bottom: 3px solid #FDB515;
+          padding-bottom: 8px;
+          margin-bottom: 20px;
+        }
+        .meta {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-bottom: 20px;
+          background: #f5f5f5;
+          padding: 12px;
+          border-radius: 4px;
+        }
+        .meta-item { font-size: 14px; }
+        .meta-label { font-weight: bold; color: #666; }
+        .section {
+          margin-bottom: 24px;
+          page-break-inside: avoid;
+        }
+        .section-title {
+          font-size: 18px;
+          font-weight: bold;
+          color: #FDB515;
+          margin-bottom: 12px;
+          text-transform: uppercase;
+        }
+        .drill {
+          margin-bottom: 16px;
+          padding: 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          page-break-inside: avoid;
+        }
+        .drill-name {
+          font-size: 16px;
+          font-weight: bold;
+          margin-bottom: 4px;
+        }
+        .drill-meta {
+          font-size: 13px;
+          color: #666;
+          margin-bottom: 8px;
+        }
+        .drill-desc {
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .players-list {
+          columns: 3;
+          font-size: 13px;
+          list-style: none;
+          padding: 0;
+        }
+        .players-list li {
+          padding: 2px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>🏴‍☠️ Pirates Softball Practice Plan</h1>
+      <div class="meta">
+        <div class="meta-item">
+          <div class="meta-label">Date:</div>
+          ${practice.date ? new Date(practice.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Time:</div>
+          ${practice.time || "TBD"}
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Duration:</div>
+          ${practice.duration || "TBD"} minutes
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Focus:</div>
+          ${practice.focus || "General Practice"}
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Expected Attendance:</div>
+          ${attendingPlayers.length} players
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Total Drills:</div>
+          ${(practice.drills || []).length}
+        </div>
+      </div>
+
+      ${practice.notes ? `
+        <div class="section">
+          <div class="section-title">📝 Notes</div>
+          <p style="font-size: 14px; line-height: 1.6;">${practice.notes}</p>
+        </div>
+      ` : ''}
+
+      <div class="section">
+        <div class="section-title">👥 Expected Players (${attendingPlayers.length})</div>
+        <ul class="players-list">
+          ${attendingPlayers.map(p => `<li>✓ ${p.name}</li>`).join('')}
+        </ul>
+      </div>
+
+      ${Object.entries(drillsByPhase).map(([phase, drills]) => `
+        <div class="section">
+          <div class="section-title">${phase}</div>
+          ${drills.map(drill => {
+            const drillInfo = DRILL_LIBRARY.find(d => d.id === drill.id) || {};
+            return `
+              <div class="drill">
+                <div class="drill-name">${drill.name}</div>
+                <div class="drill-meta">
+                  ⏱️ ${drill.duration} min
+                  ${drill.assignedCoach ? ` | 👤 ${drill.assignedCoach}` : ''}
+                  ${drill.station ? ` | 📍 Station ${drill.station}` : ''}
+                </div>
+                ${drillInfo.description ? `<div class="drill-desc">${drillInfo.description}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `).join('')}
+
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
+const printPracticeReport = (practice, players) => {
+  const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
+
+  const printWindow = window.open('', '', 'width=800,height=600');
+  printWindow.document.write(`
+    <html>
+    <head>
+      <title>Practice Report - ${practice.date || 'No date'}</title>
+      <style>
+        @media print {
+          @page { margin: 0.5in; }
+        }
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          color: #000;
+          background: #fff;
+        }
+        h1 {
+          font-size: 24px;
+          border-bottom: 3px solid #2ECC71;
+          padding-bottom: 8px;
+          margin-bottom: 20px;
+        }
+        .meta {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-bottom: 20px;
+          background: #f5f5f5;
+          padding: 12px;
+          border-radius: 4px;
+        }
+        .meta-item { font-size: 14px; }
+        .meta-label { font-weight: bold; color: #666; }
+        .section {
+          margin-bottom: 24px;
+          page-break-inside: avoid;
+        }
+        .section-title {
+          font-size: 18px;
+          font-weight: bold;
+          color: #2ECC71;
+          margin-bottom: 12px;
+          text-transform: uppercase;
+        }
+        .drill-results {
+          margin-bottom: 16px;
+          padding: 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          page-break-inside: avoid;
+        }
+        .drill-name {
+          font-size: 16px;
+          font-weight: bold;
+          margin-bottom: 8px;
+        }
+        .player-result {
+          display: grid;
+          grid-template-columns: 200px 1fr;
+          padding: 4px 0;
+          border-bottom: 1px solid #eee;
+          font-size: 13px;
+        }
+        .player-name { font-weight: bold; }
+        .observation {
+          font-size: 13px;
+          padding: 8px;
+          background: #f9f9f9;
+          border-left: 3px solid #3498DB;
+          margin-bottom: 6px;
+          page-break-inside: avoid;
+        }
+        .observation-player { font-weight: bold; color: #3498DB; }
+        .players-list {
+          columns: 3;
+          font-size: 13px;
+          list-style: none;
+          padding: 0;
+        }
+        .players-list li {
+          padding: 2px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>✅ Pirates Softball Practice Report</h1>
+      <div class="meta">
+        <div class="meta-item">
+          <div class="meta-label">Date:</div>
+          ${practice.date ? new Date(practice.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "No date"}
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Focus:</div>
+          ${practice.focus || "General Practice"}
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Attendance:</div>
+          ${attendingPlayers.length} / ${players.length} players
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">👥 Players Present (${attendingPlayers.length})</div>
+        <ul class="players-list">
+          ${attendingPlayers.map(p => `<li>✓ ${p.name}</li>`).join('')}
+        </ul>
+      </div>
+
+      ${practice.drillsRun ? `
+        <div class="section">
+          <div class="section-title">🏃 Drills Completed</div>
+          <p style="font-size: 14px; line-height: 1.6;">${practice.drillsRun}</p>
+        </div>
+      ` : ''}
+
+      ${practice.drillTracking && Object.keys(practice.drillTracking).length > 0 ? `
+        <div class="section">
+          <div class="section-title">📊 Drill Metrics</div>
+          ${Object.entries(practice.drillTracking).map(([drillId, data]) => {
+            const drill = DRILL_LIBRARY.find(d => d.id === drillId);
+            const config = TRACKABLE_DRILLS[drillId];
+            if (!drill || !config) return '';
+
+            return `
+              <div class="drill-results">
+                <div class="drill-name">${drill.name}</div>
+                ${config.perPlayer ? `
+                  ${players.filter(p => practice.attendance?.[p.id] && data[p.id]).map(p => {
+                    const value = data[p.id];
+                    let displayValue = "";
+                    if (config.type === "strikes-balls") {
+                      displayValue = \`\${value.strikes || 0}/\${value.balls || 0} (S/B)\`;
+                    } else if (config.type === "time") {
+                      displayValue = \`\${value}s\`;
+                    } else if (config.type === "level") {
+                      displayValue = \`Level \${value}\`;
+                    } else {
+                      displayValue = \`\${value} pts\`;
+                    }
+                    return \`
+                      <div class="player-result">
+                        <div class="player-name">\${p.name}</div>
+                        <div>\${displayValue}</div>
+                      </div>
+                    \`;
+                  }).join('')}
+                ` : `
+                  <div class="player-result">
+                    <div class="player-name">Team Result:</div>
+                    <div>${data} consecutive outs</div>
+                  </div>
+                `}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      ${practice.observations && Object.values(practice.observations).some(o => o) ? `
+        <div class="section">
+          <div class="section-title">👀 Player Observations</div>
+          ${players.filter(p => practice.attendance?.[p.id] && practice.observations[p.id]).map(p => `
+            <div class="observation">
+              <span class="observation-player">${p.name}:</span>
+              ${practice.observations[p.id]}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${practice.coachNotes ? `
+        <div class="section">
+          <div class="section-title">💭 Coach Notes</div>
+          <p style="font-size: 14px; line-height: 1.6;">${practice.coachNotes}</p>
+        </div>
+      ` : ''}
+
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
+const exportToCSV = (data, filename) => {
+  const csv = data.map(row => row.map(cell => {
+    // Escape quotes and wrap in quotes if contains comma
+    const str = String(cell);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }).join(',')).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // ─── UNIFIED PRACTICE LOG ───────────────────────────────────────
 const PracticeLog = ({ players, coaches }) => {
   const [list, setList] = useState([]);
@@ -824,6 +1196,7 @@ const PracticeLog = ({ players, coaches }) => {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
+                      <Button small onClick={e => { e.stopPropagation(); printPracticePlan(p, players); }}>🖨️ Print</Button>
                       <Button small onClick={e => { e.stopPropagation(); startPractice(p); }}>Start Practice</Button>
                       <Button small variant="ghost" onClick={e => { e.stopPropagation(); setForm({ ...p }); setEd(p.id); setMode("plan"); setShow(true); }}>Edit</Button>
                       <Button small variant="danger" onClick={e => { e.stopPropagation(); if (confirm("Delete this practice?")) setList(x => x.filter(q => q.id !== p.id)); }}>✕</Button>
@@ -932,6 +1305,7 @@ const PracticeLog = ({ players, coaches }) => {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
+                      <Button small onClick={e => { e.stopPropagation(); printPracticeReport(l, players); }}>🖨️ Print</Button>
                       <Button small variant="ghost" onClick={e => { e.stopPropagation(); setForm({ ...l }); setEd(l.id); setMode("complete"); setShow(true); }}>Edit</Button>
                       <Button small variant="danger" onClick={e => { e.stopPropagation(); if (confirm("Delete this practice log?")) setList(x => x.filter(q => q.id !== l.id)); }}>✕</Button>
                     </div>
@@ -3177,7 +3551,24 @@ const Reports = ({ players }) => {
                       <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>{drill.name}</div>
                       <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>{drill.config.description}</div>
                     </div>
-                    <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">{leaderboard.length} players</Badge>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <Button small onClick={(e) => {
+                        e.stopPropagation();
+                        const csvData = [
+                          ['Rank', 'Player', 'Best', 'Average', 'Attempts', 'Improvement'],
+                          ...leaderboard.map((stat, idx) => [
+                            idx + 1,
+                            stat.player.name,
+                            formatValue(stat.bestValue, drill.config),
+                            formatValue(stat.avgValue, drill.config),
+                            stat.attempts,
+                            stat.improvement !== null ? (stat.trend === "up" ? "↗" : stat.trend === "down" ? "↘" : "→") : "N/A"
+                          ])
+                        ];
+                        exportToCSV(csvData, `${drill.name.replace(/\s+/g, '_')}_leaderboard.csv`);
+                      }}>📥 Export CSV</Button>
+                      <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">{leaderboard.length} players</Badge>
+                    </div>
                   </div>
 
                   <div style={{ display: "grid", gap: 8 }}>
@@ -3317,7 +3708,20 @@ const Reports = ({ players }) => {
         })()}
 
         {/* Attendance Summary */}
-        <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", marginBottom: 12, marginTop: 32, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, marginTop: 32 }}>
+          <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
+          <Button small onClick={() => {
+            const csvData = [
+              ['Player', 'Practices Attended', 'Total Practices', 'Attendance %'],
+              ...players.map(player => {
+                const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+                const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
+                return [player.name, attended, totalPractices, percentage + '%'];
+              })
+            ];
+            exportToCSV(csvData, 'attendance_summary.csv');
+          }}>📥 Export CSV</Button>
+        </div>
         <Card style={{ padding: 16 }}>
           <div style={{ display: "grid", gap: 8 }}>
             {players.map(player => {
