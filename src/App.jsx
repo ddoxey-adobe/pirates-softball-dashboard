@@ -3434,7 +3434,12 @@ const Reports = ({ players }) => {
 
         {/* Attendance Summary */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, marginTop: 32 }}>
-          <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
+            <span style={{ color: THEME.gray, fontSize: 13, fontWeight: 600, background: THEME.charcoal, padding: "4px 10px", borderRadius: 12 }}>
+              {players.length} {players.length === 1 ? 'player' : 'players'}
+            </span>
+          </div>
           <Button small onClick={() => {
             const csvData = [
               ['Player', 'Practices Attended', 'Total Practices', 'Attendance %'],
