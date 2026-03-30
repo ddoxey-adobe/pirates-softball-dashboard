@@ -679,10 +679,17 @@ const GameLog = ({ players }) => {
       {/* LIVE SCORER */}
       {mode === "score" && <div>
         {/* Defense/Offense Toggle */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setDefenseMode("defense")} style={{ flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: defenseMode === "defense" ? THEME.red : THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>🛡️ Defense (Top)</button>
-          <button onClick={() => setDefenseMode("offense")} style={{ flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: defenseMode === "offense" ? THEME.green : THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>⚾ Offense (Bottom)</button>
-        </div>
+        {(() => {
+          // Dynamic labels based on home/away
+          const isHome = form.homeAway === "home";
+          const defenseLabel = isHome ? "🛡️ Defense (Top)" : "🛡️ Defense (Bottom)";
+          const offenseLabel = isHome ? "⚾ Offense (Bottom)" : "⚾ Offense (Top)";
+
+          return <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button onClick={() => setDefenseMode("defense")} style={{ flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: defenseMode === "defense" ? THEME.red : THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>{defenseLabel}</button>
+            <button onClick={() => setDefenseMode("offense")} style={{ flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: "pointer", background: defenseMode === "offense" ? THEME.green : THEME.charcoal, color: THEME.white, border: "none", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>{offenseLabel}</button>
+          </div>;
+        })()}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: THEME.black, borderRadius: 8, marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -690,6 +697,14 @@ const GameLog = ({ players }) => {
             <button onClick={() => setForm({ ...form, inning: Math.max(1, form.inning - 1), outs: 0 })} style={{ background: THEME.charcoal, border: "none", color: THEME.white, width: 28, height: 28, borderRadius: 4, cursor: "pointer", fontSize: 14 }}>−</button>
             <span style={{ color: THEME.gold, fontWeight: 700, fontFamily: "'Oswald',sans-serif", fontSize: 24, minWidth: 28, textAlign: "center" }}>{form.inning}</span>
             <button onClick={() => setForm({ ...form, inning: form.inning + 1, outs: 0 })} style={{ background: THEME.charcoal, border: "none", color: THEME.white, width: 28, height: 28, borderRadius: 4, cursor: "pointer", fontSize: 14 }}>+</button>
+            {(() => {
+              const isHome = form.homeAway === "home";
+              const inDefense = defenseMode === "defense";
+              // Home team: defense = top, offense = bottom
+              // Away team: defense = bottom, offense = top
+              const currentHalf = (isHome && inDefense) || (!isHome && !inDefense) ? "TOP" : "BOT";
+              return <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: THEME.gold, fontFamily: "'Oswald',sans-serif" }}>({currentHalf})</span>;
+            })()}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ color: THEME.gray, fontSize: 13 }}>Outs</span>
