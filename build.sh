@@ -1,22 +1,54 @@
 #!/bin/bash
-# Extract everything before <script type="text/babel">
-head -n 35 index.html > index.html.tmp
 
-# Add the script tag
-echo '<script type="text/babel">' >> index.html.tmp
-echo 'const { useState, useEffect, useRef } = React;' >> index.html.tmp
-echo '' >> index.html.tmp
+# Start with the HTML structure
+cat > index.html << 'HTMLHEAD'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Pirates Softball 2026 Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
 
-# Add the App.jsx content
-cat src/App.jsx >> index.html.tmp
+<script>
+// localStorage-based storage API
+window.storage = {
+  get: async (key) => {
+    const value = localStorage.getItem(key);
+    return value ? { value } : null;
+  },
+  set: async (key, value) => {
+    localStorage.setItem(key, value);
+  }
+};
+</script>
 
-# Add ReactDOM render and closing tags
-echo '' >> index.html.tmp
-echo 'ReactDOM.render(<App />, document.getElementById("root"));' >> index.html.tmp
-echo '</script>' >> index.html.tmp
-echo '</body>' >> index.html.tmp
-echo '</html>' >> index.html.tmp
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
 
-# Replace original
-mv index.html.tmp index.html
+HTMLHEAD
+
+# Add App.jsx content (skip first line which has import statement)
+tail -n +2 src/App.jsx >> index.html
+
+# Close the HTML
+cat >> index.html << 'HTMLFOOT'
+
+ReactDOM.render(<App />, document.getElementById("root"));
+</script>
+</body>
+</html>
+HTMLFOOT
+
 echo "✅ Built index.html from src/App.jsx"
