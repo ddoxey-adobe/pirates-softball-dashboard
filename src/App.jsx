@@ -1016,37 +1016,6 @@ const GameLog = ({ players }) => {
 };
 
 // ─── PRACTICE LOG ───────────────────────────────────────────────
-const PracticeLog = ({ players }) => {
-  const [logs, setLogs] = useState([]); const [show, setShow] = useState(false); const [ed, setEd] = useState(null); const [expId, setExpId] = useState(null);
-  const empty = () => ({ id: Date.now().toString(), date:"", focus:"", drillsRun:"", attendance: players.reduce((a,p)=>({...a,[p.id]:true}),{}), observations: players.reduce((a,p)=>({...a,[p.id]:""}),{}), coachNotes:"" });
-  const [form, setForm] = useState(empty());
-  useEffect(() => { loadStore(STORAGE_KEYS.PRACTICELOGS, []).then(setLogs); }, []); useEffect(() => { saveStore(STORAGE_KEYS.PRACTICELOGS, logs); }, [logs]);
-  const save = () => { if (ed) setLogs(p => p.map(x => x.id===ed?{...form}:x)); else setLogs(p => [...p, {...form, id: Date.now().toString()}]); setShow(false); setEd(null); };
-
-  return <div>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>{logs.length} logged</p><Button onClick={() => { setForm(empty()); setEd(null); setShow(true); }}>+ Log Practice</Button></div>
-    {logs.length===0 ? <Card style={{ textAlign: "center", padding: 40 }}><div style={{ fontSize: 40, marginBottom: 8 }}>📝</div><p style={{ color: THEME.gray, margin: 0 }}>No practices logged. Log after each practice!</p></Card> :
-    <div style={{ display: "grid", gap: 10 }}>{logs.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(l => <Card key={l.id} style={{ padding: 14, cursor: "pointer" }} onClick={() => setExpId(expId===l.id?null:l.id)}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontWeight: 700, color: THEME.white, fontSize: 15 }}>{l.date ? new Date(l.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : "No date"}</div><div style={{ display: "flex", gap: 6, marginTop: 4 }}>{l.focus&&<Badge color={THEME.green} bg="rgba(46,204,113,0.15)">{l.focus}</Badge>}<Badge color={THEME.gray} bg="rgba(142,142,142,0.1)">{Object.values(l.attendance||{}).filter(Boolean).length} present</Badge></div></div>
-        <div style={{ display: "flex", gap: 4 }}><Button small variant="ghost" onClick={e => { e.stopPropagation(); setForm({...empty(),...l}); setEd(l.id); setShow(true); }}>Edit</Button><Button small variant="danger" onClick={e => { e.stopPropagation(); setLogs(x => x.filter(q => q.id!==l.id)); }}>✕</Button></div></div>
-      {expId===l.id && <div style={{ marginTop: 12, borderTop: `1px solid ${THEME.charcoal}`, paddingTop: 12 }}>
-        {l.drillsRun&&<p style={{ color: THEME.white, fontSize: 12, marginBottom: 8 }}>Drills: {l.drillsRun}</p>}
-        {players.filter(p => l.attendance?.[p.id]).map(p => { const obs = l.observations?.[p.id]; if (!obs) return null; return <div key={p.id} style={{ padding: "4px 0", borderBottom: `1px solid ${THEME.charcoal}`, fontSize: 12 }}><span style={{ color: THEME.white, fontWeight: 600 }}>{p.name}:</span> <span style={{ color: THEME.gray, fontStyle: "italic" }}>{obs}</span></div>; })}
-        {l.coachNotes&&<p style={{ color: THEME.gray, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>Coach: {l.coachNotes}</p>}
-      </div>}
-    </Card>)}</div>}
-
-    <Modal open={show} onClose={() => { setShow(false); setEd(null); }} title={ed?"Edit Practice Log":"Log a Practice"} wide>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Input label="Date" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} /><Input label="Focus" value={form.focus} onChange={e => setForm({...form, focus: e.target.value})} placeholder="Hitting, Defense..." /></div>
-      <TextArea label="Drills We Ran" value={form.drillsRun||""} onChange={e => setForm({...form, drillsRun: e.target.value})} style={{ marginTop: 12 }} placeholder="Warm-up, BP on machine, ground balls, situation ball..." />
-      <div style={{ marginTop: 16 }}><SL>Attendance</SL><ToggleChips players={players} selected={form.attendance} onToggle={id => setForm({...form, attendance: {...form.attendance, [id]: !form.attendance[id]}})} /></div>
-      <div style={{ marginTop: 16 }}><SL>One Observation Per Player</SL><div style={{ maxHeight: 300, overflowY: "auto" }}>{players.filter(p => form.attendance[p.id]).map(p => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}><span style={{ color: THEME.white, fontSize: 12, fontWeight: 600, minWidth: 90, flexShrink: 0 }}>{p.name.split(" ")[0]}</span><input value={form.observations[p.id]||""} onChange={e => setForm({...form, observations: {...form.observations, [p.id]: e.target.value}})} placeholder="One thing you noticed..." style={{ flex: 1, padding: "6px 8px", background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 12, outline: "none" }} /></div>)}</div></div>
-      <TextArea label="Coach Notes" value={form.coachNotes} onChange={e => setForm({...form, coachNotes: e.target.value})} style={{ marginTop: 12 }} placeholder="What went well, what to work on, energy level..." />
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}><Button variant="ghost" onClick={() => { setShow(false); setEd(null); }}>Cancel</Button><Button onClick={save}>{ed?"Save":"Log Practice"}</Button></div>
-    </Modal>
-  </div>;
-};
-
 // ─── COMMS ──────────────────────────────────────────────────────
 const Comms = ({ players }) => {
   const [sel, setSel] = useState(null); const [body, setBody] = useState(""); const [sent, setSent] = useState([]);
