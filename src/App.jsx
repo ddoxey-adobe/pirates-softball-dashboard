@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const STORAGE_KEYS = {
   PLAYERS: "pirates-players-2026v3",
+  COACHES: "pirates-coaches-2026v1",
   PRACTICES: "pirates-practices-2026v3",
   MESSAGES: "pirates-messages-2026v3",
   GAMELOGS: "pirates-gamelogs-2026v1",
@@ -424,6 +425,12 @@ const SEED_PLAYERS = [
   { id: "new8", name: "Kynzlee Miller", nickname: "", grade: "7th", returning: false, yearsExp: 0, positions: [], preferredPosition: "", parentName: "Amanda & Curtis Miller", parentPhone: "(702) 358-3371", parentEmail: "", school: "Viewpoint", jersey: "", skills: { Hitting: 0, Fielding: 0, Throwing: 0, Baserunning: 0, Pitching: 0, Attitude: 0 }, notes: "Not in scored tryouts. Assess at first practice.", isPitcher: false },
 ];
 
+const SEED_COACHES = [
+  { id: "c1", name: "Devin Doxey", role: "Head Coach", phone: "(801) 361-7966", email: "", specialties: ["Strategy", "Hitting"] },
+  { id: "c2", name: "Ken", role: "Assistant Coach", phone: "", email: "", specialties: ["Infield", "Defense"] },
+  { id: "c3", name: "Shari", role: "Pitching Coach", phone: "", email: "", specialties: ["Pitching", "Throwing"] },
+];
+
 // ─── Storage ────────────────────────────────────────────────────
 const loadStore = async (key, fb) => { try { const r = await window.storage.get(key); return r?.value ? JSON.parse(r.value) : fb; } catch { return fb; } };
 const saveStore = async (key, d) => { try { await window.storage.set(key, JSON.stringify(d)); } catch {} };
@@ -446,12 +453,20 @@ const ToggleChips = ({ players, selected, onToggle }) => <div style={{ display: 
 
 // ─── ROSTER ─────────────────────────────────────────────────────
 const emptyPlayer = () => ({ id: Date.now().toString(), name: "", nickname: "", grade: "7th", returning: false, yearsExp: 0, positions: [], parentName: "", parentPhone: "", parentEmail: "", school: "", jersey: "", skills: { Hitting: 0, Fielding: 0, Throwing: 0, Baserunning: 0, Pitching: 0, Attitude: 0 }, notes: "", isPitcher: false });
+const emptyCoach = () => ({ id: Date.now().toString(), name: "", role: "Assistant Coach", phone: "", email: "", specialties: [] });
 
-const RosterPanel = ({ players, setPlayers }) => {
+const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
   const [editing, setEditing] = useState(null); const [show, setShow] = useState(false); const [form, setForm] = useState(emptyPlayer()); const [filter, setFilter] = useState("all");
+  const [editingCoach, setEditingCoach] = useState(null); const [showCoach, setShowCoach] = useState(false); const [coachForm, setCoachForm] = useState(emptyCoach());
+
   const save = () => { if (!form.name.trim()) return; if (editing) setPlayers(p => p.map(x => x.id === editing ? { ...form } : x)); else setPlayers(p => [...p, { ...form, id: Date.now().toString() }]); setShow(false); setEditing(null); setForm(emptyPlayer()); };
+  const saveCoach = () => { if (!coachForm.name.trim()) return; if (editingCoach) setCoaches(p => p.map(x => x.id === editingCoach ? { ...coachForm } : x)); else setCoaches(p => [...p, { ...coachForm, id: Date.now().toString() }]); setShowCoach(false); setEditingCoach(null); setCoachForm(emptyCoach()); };
+
   const filtered = filter === "all" ? players : filter === "returning" ? players.filter(p => p.returning) : players.filter(p => !p.returning);
   const avg = p => { const v = Object.values(p.skills).filter(x => x > 0); return v.length ? (v.reduce((a,b) => a+b,0)/v.length).toFixed(1) : "—"; };
+
+  const COACH_ROLES = ["Head Coach", "Assistant Coach", "Pitching Coach", "Hitting Coach", "Base Coach"];
+  const COACH_SPECIALTIES = ["Hitting", "Pitching", "Throwing", "Infield", "Outfield", "Defense", "Strategy", "Baserunning", "Conditioning"];
 
   return <div>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
@@ -469,6 +484,43 @@ const RosterPanel = ({ players, setPlayers }) => {
       <div style={{ color: THEME.gold, fontWeight: 700, fontFamily: "'Oswald',sans-serif", fontSize: 16 }}>{avg(p)}</div>
       <div style={{ display: "flex", gap: 4 }}><Button small variant="ghost" onClick={() => { setForm({...p}); setEditing(p.id); setShow(true); }}>Edit</Button><Button small variant="danger" onClick={() => setPlayers(x => x.filter(q => q.id !== p.id))}>✕</Button></div>
     </Card>)}</div>}
+
+    {/* Coaching Staff Section */}
+    <div style={{ marginTop: 40, paddingTop: 24, borderTop: `2px solid ${THEME.charcoal}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h3 style={{ color: THEME.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>Coaching Staff</h3>
+        <Button onClick={() => { setCoachForm(emptyCoach()); setEditingCoach(null); setShowCoach(true); }}>+ Add Coach</Button>
+      </div>
+      {coaches.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 40 }}><p style={{ color: THEME.gray }}>No coaches added yet.</p></Card>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {coaches.map(c => (
+            <Card key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 14, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: THEME.blue, color: THEME.white, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                  {c.name?.charAt(0) || "C"}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: THEME.white, fontSize: 15 }}>{c.name}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                    <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{c.role}</Badge>
+                    {(c.specialties||[]).map(spec => (
+                      <Badge key={spec} color={THEME.gray} bg="rgba(142,142,142,0.1)">{spec}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <Button small variant="ghost" onClick={() => { setCoachForm({...c}); setEditingCoach(c.id); setShowCoach(true); }}>Edit</Button>
+                <Button small variant="danger" onClick={() => setCoaches(x => x.filter(q => q.id !== c.id))}>✕</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+
     <Modal open={show} onClose={() => { setShow(false); setEditing(null); }} title={editing ? "Edit Player" : "Add Player"} wide>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <Input label="Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /><Input label="Nickname" value={form.nickname||""} onChange={e => setForm({...form, nickname: e.target.value})} /><Select label="Grade" value={form.grade} onChange={e => setForm({...form, grade: e.target.value})}>{GRADES.map(g => <option key={g} value={g}>{g}</option>)}</Select>
@@ -481,11 +533,52 @@ const RosterPanel = ({ players, setPlayers }) => {
       <TextArea label="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} style={{ marginTop: 12 }} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}><Button variant="ghost" onClick={() => { setShow(false); setEditing(null); }}>Cancel</Button><Button onClick={save}>{editing?"Save":"Add"}</Button></div>
     </Modal>
+
+    <Modal open={showCoach} onClose={() => { setShowCoach(false); setEditingCoach(null); }} title={editingCoach ? "Edit Coach" : "Add Coach"}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Input label="Name" value={coachForm.name} onChange={e => setCoachForm({...coachForm, name: e.target.value})} />
+        <Select label="Role" value={coachForm.role} onChange={e => setCoachForm({...coachForm, role: e.target.value})}>
+          {COACH_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+        </Select>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+        <Input label="Phone" value={coachForm.phone||""} onChange={e => setCoachForm({...coachForm, phone: e.target.value})} />
+        <Input label="Email" value={coachForm.email||""} onChange={e => setCoachForm({...coachForm, email: e.target.value})} />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <SL>Specialties</SL>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {COACH_SPECIALTIES.map(spec => (
+            <button
+              key={spec}
+              onClick={() => setCoachForm({...coachForm, specialties: (coachForm.specialties||[]).includes(spec) ? coachForm.specialties.filter(x=>x!==spec) : [...(coachForm.specialties||[]), spec]})}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: "'Oswald',sans-serif",
+                cursor: "pointer",
+                background: (coachForm.specialties||[]).includes(spec)?THEME.gold:THEME.black,
+                color: (coachForm.specialties||[]).includes(spec)?THEME.black:THEME.gray,
+                border: `1px solid ${(coachForm.specialties||[]).includes(spec)?THEME.gold:THEME.charcoal}`
+              }}
+            >
+              {spec}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+        <Button variant="ghost" onClick={() => { setShowCoach(false); setEditingCoach(null); }}>Cancel</Button>
+        <Button onClick={saveCoach}>{editingCoach?"Save":"Add"}</Button>
+      </div>
+    </Modal>
   </div>;
 };
 
 // ─── UNIFIED PRACTICE LOG ───────────────────────────────────────
-const PracticeLog = ({ players }) => {
+const PracticeLog = ({ players, coaches }) => {
   const [list, setList] = useState([]);
   const [show, setShow] = useState(false);
   const [mode, setMode] = useState("plan"); // "plan" or "complete"
@@ -754,12 +847,42 @@ const PracticeLog = ({ players }) => {
               </div>}
               <div style={{ background: THEME.black, borderRadius: 6, marginBottom: 3, overflow: "hidden", borderLeft: d.station ? `3px solid ${THEME.gold}` : "3px solid transparent" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, cursor: "pointer" }} onClick={() => setExpandedDrill(expandedDrill === `plan-${i}` ? null : `plan-${i}`)}>
-                    {d.station && <span style={{ color: THEME.gold, fontWeight: 700, fontSize: 11, fontFamily: "'Oswald',sans-serif", background: "rgba(253,181,21,0.15)", padding: "2px 7px", borderRadius: 3 }}>{d.station}</span>}
-                    <span style={{ color: THEME.white, fontSize: 13 }}>{d.name}</span>
-                    <Badge>{d.duration}min</Badge>
-                    <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{d.assignedCoach || d.coach}</Badge>
-                    <span style={{ color: THEME.gray, fontSize: 10 }}>{expandedDrill === `plan-${i}` ? "▲" : "▼"}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, cursor: "pointer" }} onClick={() => setExpandedDrill(expandedDrill === `plan-${i}` ? null : `plan-${i}`)}>
+                      {d.station && <span style={{ color: THEME.gold, fontWeight: 700, fontSize: 11, fontFamily: "'Oswald',sans-serif", background: "rgba(253,181,21,0.15)", padding: "2px 7px", borderRadius: 3 }}>{d.station}</span>}
+                      <span style={{ color: THEME.white, fontSize: 13 }}>{d.name}</span>
+                      <Badge>{d.duration}min</Badge>
+                      <span style={{ color: THEME.gray, fontSize: 10 }}>{expandedDrill === `plan-${i}` ? "▲" : "▼"}</span>
+                    </div>
+                    <select
+                      value={d.assignedCoach || d.coach || "Any"}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const arr = [...(form.drills||[])];
+                        arr[i] = { ...arr[i], assignedCoach: e.target.value };
+                        setForm({...form, drills: arr});
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        padding: "4px 8px",
+                        background: THEME.black,
+                        border: `1px solid ${THEME.blue}40`,
+                        borderRadius: 4,
+                        color: THEME.blue,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fontFamily: "'Oswald',sans-serif",
+                        textTransform: "uppercase",
+                        cursor: "pointer",
+                        outline: "none"
+                      }}
+                    >
+                      <option value="Any">Any</option>
+                      <option value="All">All</option>
+                      {coaches.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <button disabled={i === 0} onClick={() => { const arr = [...(form.drills||[])]; [arr[i], arr[i-1]] = [arr[i-1], arr[i]]; setForm({...form, drills: arr}); }} style={{ background: "none", border: "none", color: i === 0 ? THEME.charcoal : THEME.gold, cursor: i === 0 ? "default" : "pointer", fontSize: 14, padding: "2px" }}>▲</button>
@@ -1462,10 +1585,30 @@ const TABS = [
 function App() {
   const [tab, setTab] = useState("roster");
   const [players, setPlayers] = useState(SEED_PLAYERS);
+  const [coaches, setCoaches] = useState(SEED_COACHES);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => { (async () => { try { const r = await window.storage.get(STORAGE_KEYS.PLAYERS); if (r?.value) { const p = JSON.parse(r.value); if (Array.isArray(p) && p.length > 0) setPlayers(p); } } catch {} setLoaded(true); })(); }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get(STORAGE_KEYS.PLAYERS);
+        if (r?.value) {
+          const p = JSON.parse(r.value);
+          if (Array.isArray(p) && p.length > 0) setPlayers(p);
+        }
+      } catch {}
+      try {
+        const r = await window.storage.get(STORAGE_KEYS.COACHES);
+        if (r?.value) {
+          const c = JSON.parse(r.value);
+          if (Array.isArray(c) && c.length > 0) setCoaches(c);
+        }
+      } catch {}
+      setLoaded(true);
+    })();
+  }, []);
   useEffect(() => { if (loaded) { try { window.storage.set(STORAGE_KEYS.PLAYERS, JSON.stringify(players)); } catch{} } }, [players, loaded]);
+  useEffect(() => { if (loaded) { try { window.storage.set(STORAGE_KEYS.COACHES, JSON.stringify(coaches)); } catch{} } }, [coaches, loaded]);
 
   return <div style={{ minHeight: "100vh", background: THEME.black, color: THEME.white, fontFamily: "'Source Sans 3',sans-serif", padding: "0 0 40px 0" }}>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -1483,8 +1626,8 @@ function App() {
     </div>
     <div style={{ padding: "0 24px", marginTop: 16 }}>
       <Tabs tabs={TABS} active={tab} onSelect={setTab} />
-      {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} />}
-      {tab==="practicelog" && <PracticeLog players={players} />}
+      {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} coaches={coaches} setCoaches={setCoaches} />}
+      {tab==="practicelog" && <PracticeLog players={players} coaches={coaches} />}
       {tab==="gamelog" && <GameLog players={players} />}
       {tab==="comms" && <Comms players={players} />}
     </div>
