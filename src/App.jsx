@@ -171,7 +171,7 @@ const PRACTICE_TEMPLATES = [
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
         { ...D("f1"), assignedCoach: "Ken", station: "A", notes: "Ground ball fundamentals — charge, field, throw" },
         { ...D("f4"), assignedCoach: "Shari", station: "B", notes: "Fly ball tracking — drop step, read the ball" },
-        { ...D("h4"), assignedCoach: "Head Coach", station: "C", notes: "Soft toss — timing and contact" },
+        { ...D("f10"), assignedCoach: "Head Coach", station: "C", notes: "Lateral shuffle box — defensive positioning" },
       ]},
       { name: "Full Team Throwing", type: "together", time: "15 min", drills: [
         { ...D("t3"), assignedCoach: "Any", notes: "Long toss — distance challenge" },
@@ -201,6 +201,7 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Baserunning Assessment", type: "together", time: "15 min", drills: [
         { ...D("b1"), assignedCoach: "Any", notes: "Time every player — record for tracking" },
+        { ...D("b6"), assignedCoach: "Any", notes: "Four corners box — assess explosive first-step" },
         { ...D("b2"), assignedCoach: "Any", notes: "Assess rounding technique" },
       ]},
       { name: "Hitting Competition", type: "together", time: "25 min", drills: [
@@ -221,7 +222,7 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
         { ...D("h6"), assignedCoach: "Head Coach", station: "A", notes: "Machine BP — vary speeds" },
-        { ...D("f2"), assignedCoach: "Ken", station: "B", notes: "Rapid fire grounders to all infield positions" },
+        { ...D("f9"), assignedCoach: "Ken", station: "B", notes: "Cone weave grounders — lateral movement while fielding" },
         { ...D("p1"), assignedCoach: "Shari", station: "C", notes: "Rose, Kaizley, Jayden + catchers" },
       ]},
       { name: "Full Team — Game Situations", type: "together", time: "35 min", drills: [
@@ -239,6 +240,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Outfield Work", type: "together", time: "20 min", drills: [
+        { ...D("f10"), assignedCoach: "Any", notes: "Lateral shuffle box — defensive positioning" },
         { ...D("f4"), assignedCoach: "Any", notes: "Fly ball tracking — read off the bat" },
         { ...D("t4"), assignedCoach: "Ken", notes: "Relay & cutoff — through vs. do-or-die" },
       ]},
@@ -310,6 +312,7 @@ const PRACTICE_TEMPLATES = [
       { name: "Warm-Up", type: "together", time: "15 min", drills: [
         { ...D("w1"), assignedCoach: "Any" },
         { ...D("w2"), assignedCoach: "Any", notes: "Pitchers especially" },
+        { ...D("c5"), assignedCoach: "Any", notes: "Ladder-hurdle combo — dynamic warm-up" },
       ]},
       { name: "Pre-Game Hitting", type: "together", time: "25 min", drills: [
         { ...D("h4"), assignedCoach: "Any", notes: "Soft toss — feel-good swings" },
@@ -360,10 +363,11 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Baserunning Races", type: "together", time: "20 min", drills: [
         { ...D("b5"), assignedCoach: "Any", notes: "Race to 2nd and race home — bracket style" },
+        { ...D("b7"), assignedCoach: "Any", notes: "Star drill — multi-direction competition" },
         { ...D("b1"), assignedCoach: "Any", notes: "Home to first — final season times" },
       ]},
       { name: "Conditioning Challenge", type: "together", time: "10 min", drills: [
-        { ...D("c1"), assignedCoach: "Any", notes: "Agility ladder race" },
+        { ...D("c5"), assignedCoach: "Any", notes: "Ladder-hurdle combo — advanced challenge race" },
       ]},
       { name: "Team Celebration", type: "together", time: "10 min", drills: [
         { ...D("m1"), assignedCoach: "Head Coach", notes: "Season reflection — shoutouts, favorite memories, what we accomplished" },
@@ -377,7 +381,7 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
         { ...D("h7"), assignedCoach: "Head Coach", station: "A", notes: "Speed changes — timing mastery" },
-        { ...D("f2"), assignedCoach: "Ken", station: "B", notes: "Rapid fire — game speed" },
+        { ...D("c4"), assignedCoach: "Ken", station: "B", notes: "Hurdle hops — explosive power for tournament prep" },
         { ...D("p3"), assignedCoach: "Shari", station: "C", notes: "Simulated innings — pitch count management" },
       ]},
       { name: "Advanced Game Situations", type: "together", time: "35 min", drills: [
