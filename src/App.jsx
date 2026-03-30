@@ -584,7 +584,7 @@ const Tabs = ({ tabs, active, onSelect }) => <div style={{ display: "flex", gap:
 const ToggleChips = ({ players, selected, onToggle }) => <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{players.map(p => <button key={p.id} onClick={() => onToggle(p.id)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 12, fontWeight: 700, fontFamily: "'Oswald',sans-serif", cursor: "pointer", background: selected[p.id] ? THEME.gold : THEME.black, color: selected[p.id] ? THEME.black : THEME.gray, border: `1px solid ${selected[p.id] ? THEME.gold : THEME.charcoal}` }}>{p.name.split(" ")[0]}</button>)}</div>;
 
 // ─── ROSTER ─────────────────────────────────────────────────────
-const emptyPlayer = () => ({ id: Date.now().toString(), name: "", nickname: "", grade: "7th", returning: false, yearsExp: 0, positions: [], parentName: "", parentPhone: "", parentEmail: "", school: "", jersey: "", skills: { Hitting: 0, Fielding: 0, Throwing: 0, Baserunning: 0, Pitching: 0, Attitude: 0 }, notes: "", isPitcher: false });
+const emptyPlayer = () => ({ id: Date.now().toString(), name: "", nickname: "", grade: "7th", returning: false, yearsExp: 0, positions: [], primaryPosition: "", secondaryPositions: [], parentName: "", parentPhone: "", parentEmail: "", school: "", jersey: "", skills: { Hitting: 0, Fielding: 0, Throwing: 0, Baserunning: 0, Pitching: 0, Attitude: 0 }, notes: "", isPitcher: false, status: "active" });
 const emptyCoach = () => ({ id: Date.now().toString(), name: "", role: "Assistant Coach", phone: "", email: "", specialties: [] });
 
 const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
@@ -612,7 +612,11 @@ const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
         <div><div style={{ fontWeight: 700, color: THEME.white, fontSize: 15 }}>{p.name}{p.nickname ? ` "${p.nickname}"` : ""}</div>
           <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}><Badge>{p.grade}</Badge>{p.returning && <Badge color={THEME.green} bg="rgba(46,204,113,0.15)">Returning</Badge>}{p.isPitcher && <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">Pitcher</Badge>}{p.school && <Badge color={THEME.gray} bg="rgba(142,142,142,0.1)">{p.school}</Badge>}</div></div>
       </div>
-      <div style={{ display: "flex", gap: 4 }}>{(p.positions||[]).map(pos => <span key={pos} style={{ padding: "2px 6px", background: THEME.black, borderRadius: 4, fontSize: 11, color: THEME.goldLight, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{pos}</span>)}</div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {p.primaryPosition && <span style={{ padding: "2px 6px", background: THEME.gold, borderRadius: 4, fontSize: 11, color: THEME.black, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{p.primaryPosition}</span>}
+        {(p.secondaryPositions||[]).map(pos => <span key={pos} style={{ padding: "2px 6px", background: THEME.blue, borderRadius: 4, fontSize: 11, color: THEME.white, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{pos}</span>)}
+        {(p.positions||[]).length > 0 && !p.primaryPosition && (p.positions||[]).map(pos => <span key={pos} style={{ padding: "2px 6px", background: THEME.black, borderRadius: 4, fontSize: 11, color: THEME.goldLight, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{pos}</span>)}
+      </div>
       <div style={{ color: THEME.gold, fontWeight: 700, fontFamily: "'Oswald',sans-serif", fontSize: 16 }}>{avg(p)}</div>
       <div style={{ display: "flex", gap: 4 }}><Button small variant="ghost" onClick={() => { setForm({...p}); setEditing(p.id); setShow(true); }}>Edit</Button><Button small variant="danger" onClick={() => setPlayers(x => x.filter(q => q.id !== p.id))}>✕</Button></div>
     </Card>)}</div>}
@@ -659,7 +663,21 @@ const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
         <Input label="School" value={form.school||""} onChange={e => setForm({...form, school: e.target.value})} /><Input label="Jersey #" value={form.jersey||""} onChange={e => setForm({...form, jersey: e.target.value})} /><Input label="Years Exp" type="number" min={0} value={form.yearsExp} onChange={e => setForm({...form, yearsExp: parseInt(e.target.value)||0})} />
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 12 }}><label style={{ color: THEME.white, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><input type="checkbox" checked={form.returning} onChange={e => setForm({...form, returning: e.target.checked})} /> Returning</label><label style={{ color: THEME.white, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><input type="checkbox" checked={form.isPitcher} onChange={e => setForm({...form, isPitcher: e.target.checked})} /> Pitcher</label></div>
-      <div style={{ marginTop: 12 }}><SL>Positions</SL><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{POSITIONS.filter(x=>x!=="Bench").map(pos => <button key={pos} onClick={() => setForm({...form, positions: (form.positions||[]).includes(pos) ? form.positions.filter(x=>x!==pos) : [...(form.positions||[]), pos]})} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 12, fontWeight: 700, fontFamily: "'Oswald',sans-serif", cursor: "pointer", background: (form.positions||[]).includes(pos)?THEME.gold:THEME.black, color: (form.positions||[]).includes(pos)?THEME.black:THEME.gray, border: `1px solid ${(form.positions||[]).includes(pos)?THEME.gold:THEME.charcoal}` }}>{pos}</button>)}</div></div>
+      <div style={{ marginTop: 12 }}>
+        <SL>Primary Position</SL>
+        <Select value={form.primaryPosition||""} onChange={e => setForm({...form, primaryPosition: e.target.value})}>
+          <option value="">Select primary position...</option>
+          {POSITIONS.filter(x=>x!=="Bench").map(pos => <option key={pos} value={pos}>{pos}</option>)}
+        </Select>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <SL>Secondary Positions (Can Also Play)</SL>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {POSITIONS.filter(x=>x!=="Bench" && x!==form.primaryPosition).map(pos => (
+            <button key={pos} onClick={() => setForm({...form, secondaryPositions: ((form.secondaryPositions||[]).includes(pos) ? (form.secondaryPositions||[]).filter(x=>x!==pos) : [...(form.secondaryPositions||[]), pos])})} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 12, fontWeight: 700, fontFamily: "'Oswald',sans-serif", cursor: "pointer", background: (form.secondaryPositions||[]).includes(pos)?THEME.blue:THEME.black, color: (form.secondaryPositions||[]).includes(pos)?THEME.white:THEME.gray, border: `1px solid ${(form.secondaryPositions||[]).includes(pos)?THEME.blue:THEME.charcoal}` }}>{pos}</button>
+          ))}
+        </div>
+      </div>
       <div style={{ marginTop: 12 }}><SL>Skills</SL><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{SKILL_AREAS.map(sk => <div key={sk} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: THEME.black, borderRadius: 6 }}><span style={{ color: THEME.white, fontSize: 13 }}>{sk}</span><StarRating value={form.skills[sk]} onChange={v => setForm({...form, skills: {...form.skills, [sk]: v}})} /></div>)}</div></div>
       <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Input label="Parent Name" value={form.parentName} onChange={e => setForm({...form, parentName: e.target.value})} /><Input label="Parent Phone" value={form.parentPhone} onChange={e => setForm({...form, parentPhone: e.target.value})} /></div>
       <TextArea label="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} style={{ marginTop: 12 }} />
@@ -3892,6 +3910,170 @@ const Reports = ({ players }) => {
               })}
             </div>
           </Card>
+        </CollapsibleSection>
+
+        {/* Playing Time & Attendance Equity */}
+        <CollapsibleSection
+          id="playing-time"
+          title="Playing Time & Attendance Equity"
+          icon="⏱️"
+          badge={`${players.length} players`}
+          isCollapsed={collapsedSections["playing-time"]}
+          onToggle={toggleSection}
+        >
+          {(() => {
+            // Calculate practice attendance (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const recentPractices = completedPractices.filter(p => {
+              if (!p.date) return false;
+              const practiceDate = new Date(p.date + "T12:00:00");
+              return practiceDate >= thirtyDaysAgo;
+            });
+
+            // Calculate innings played from games (estimate: each game = 7 innings, divide by lineup size)
+            const playerPlayingTime = players.map(player => {
+              // Practice attendance
+              const practicesAttended = recentPractices.filter(p => p.attendance?.[player.id]).length;
+              const attendancePercent = recentPractices.length > 0 ? (practicesAttended / recentPractices.length) * 100 : 0;
+
+              // Game innings played (estimate from games they were in lineup)
+              const gamesPlayed = filteredGames.filter(g => (g.lineup || []).find(l => l.playerId === player.id));
+              const estimatedInnings = gamesPlayed.length * 7; // Rough estimate - assume full game
+              const totalPossibleInnings = filteredGames.length * 7;
+              const playingTimePercent = totalPossibleInnings > 0 ? (estimatedInnings / totalPossibleInnings) * 100 : 0;
+
+              return {
+                player,
+                practicesAttended,
+                totalRecentPractices: recentPractices.length,
+                attendancePercent,
+                gamesPlayed: gamesPlayed.length,
+                totalGames: filteredGames.length,
+                estimatedInnings,
+                totalPossibleInnings,
+                playingTimePercent,
+                needsAttention: attendancePercent < 70 || playingTimePercent < 40
+              };
+            }).sort((a, b) => b.attendancePercent - a.attendancePercent);
+
+            return (
+              <div>
+                {/* Summary Stats */}
+                <Card style={{ padding: 16, marginBottom: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, textAlign: "center" }}>
+                    <div>
+                      <div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                        {recentPractices.length}
+                      </div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>Practices (30 days)</div>
+                    </div>
+                    <div>
+                      <div style={{ color: THEME.blue, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                        {filteredGames.length}
+                      </div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>Games Played</div>
+                    </div>
+                    <div>
+                      <div style={{ color: THEME.red, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                        {playerPlayingTime.filter(p => p.needsAttention).length}
+                      </div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>Need Attention</div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Player List */}
+                <Card style={{ padding: 16 }}>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {playerPlayingTime.map(pt => {
+                      const lowAttendance = pt.attendancePercent < 70;
+                      const lowPlayingTime = pt.playingTimePercent < 40;
+
+                      return (
+                        <div key={pt.player.id} style={{
+                          padding: "12px",
+                          background: pt.needsAttention ? "rgba(231,76,60,0.1)" : THEME.blackLight,
+                          borderRadius: 6,
+                          border: `1px solid ${pt.needsAttention ? THEME.red + "40" : THEME.charcoal}`
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                            <div>
+                              <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>
+                                {pt.player.name}
+                                {pt.needsAttention && <span style={{ color: THEME.red, marginLeft: 8 }}>⚠️ Needs Attention</span>}
+                              </div>
+                              <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                                {pt.player.primaryPosition && `Primary: ${pt.player.primaryPosition}`}
+                                {(pt.player.secondaryPositions || []).length > 0 && ` • Can play: ${(pt.player.secondaryPositions || []).join(", ")}`}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            {/* Practice Attendance */}
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                <span style={{ color: THEME.gray, fontSize: 11 }}>Practice Attendance (30d)</span>
+                                <span style={{
+                                  color: lowAttendance ? THEME.red : THEME.green,
+                                  fontSize: 11,
+                                  fontWeight: 700
+                                }}>
+                                  {pt.practicesAttended}/{pt.totalRecentPractices} ({pt.attendancePercent.toFixed(0)}%)
+                                </span>
+                              </div>
+                              <div style={{ width: "100%", height: 6, background: THEME.charcoal, borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{
+                                  width: `${pt.attendancePercent}%`,
+                                  height: "100%",
+                                  background: lowAttendance ? THEME.red : THEME.green,
+                                  transition: "width 0.3s ease"
+                                }} />
+                              </div>
+                              {lowAttendance && (
+                                <div style={{ color: THEME.red, fontSize: 10, marginTop: 2 }}>
+                                  ⚠️ Low practice attendance - limit playing time
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Playing Time */}
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                <span style={{ color: THEME.gray, fontSize: 11 }}>Est. Playing Time</span>
+                                <span style={{
+                                  color: lowPlayingTime ? THEME.red : THEME.green,
+                                  fontSize: 11,
+                                  fontWeight: 700
+                                }}>
+                                  {pt.gamesPlayed}/{pt.totalGames} games ({pt.playingTimePercent.toFixed(0)}%)
+                                </span>
+                              </div>
+                              <div style={{ width: "100%", height: 6, background: THEME.charcoal, borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{
+                                  width: `${pt.playingTimePercent}%`,
+                                  height: "100%",
+                                  background: lowPlayingTime ? THEME.red : THEME.green,
+                                  transition: "width 0.3s ease"
+                                }} />
+                              </div>
+                              {lowPlayingTime && !lowAttendance && (
+                                <div style={{ color: THEME.red, fontSize: 10, marginTop: 2 }}>
+                                  ⚠️ Low playing time - prioritize in next game
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              </div>
+            );
+          })()}
         </CollapsibleSection>
       </div>
     )}
