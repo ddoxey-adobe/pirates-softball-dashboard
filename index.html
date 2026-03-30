@@ -417,13 +417,13 @@ const PracticeLog = ({ players }) => {
         </div>}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}><Input label="Date" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} /><Input label="Time" type="time" value={form.time} onChange={e => setForm({...form, time: e.target.value})} /><Input label="Duration" type="number" value={form.duration} onChange={e => setForm({...form, duration: parseInt(e.target.value)||120})} /></div>
-      <div style={{ marginTop: 12 }}><Input label="Focus" value={form.focus} onChange={e => setForm({...form, focus: e.target.value})} placeholder="Fundamentals, Hitting, Game Situations..." /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}><Input label="Date" type="date" value={form.date||""} onChange={e => setForm({...form, date: e.target.value})} /><Input label="Time" type="time" value={form.time||""} onChange={e => setForm({...form, time: e.target.value})} /><Input label="Duration" type="number" value={form.duration||120} onChange={e => setForm({...form, duration: parseInt(e.target.value)||120})} /></div>
+      <div style={{ marginTop: 12 }}><Input label="Focus" value={form.focus||""} onChange={e => setForm({...form, focus: e.target.value})} placeholder="Fundamentals, Hitting, Game Situations..." /></div>
 
-      <div style={{ marginTop: 16 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><SL>Practice Plan — {tt}/{form.duration}min</SL><div style={{ width: 120, height: 6, background: THEME.charcoal, borderRadius: 3 }}><div style={{ width: `${Math.min(100,(tt/form.duration)*100)}%`, height: "100%", background: tt>form.duration?THEME.red:THEME.gold, borderRadius: 3 }} /></div></div>
-        {form.drills.length>0 && <div style={{ marginBottom: 12 }}>{(() => {
+      <div style={{ marginTop: 16 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><SL>Practice Plan — {tt}/{form.duration||120}min</SL><div style={{ width: 120, height: 6, background: THEME.charcoal, borderRadius: 3 }}><div style={{ width: `${Math.min(100,(tt/(form.duration||120))*100)}%`, height: "100%", background: tt>(form.duration||120)?THEME.red:THEME.gold, borderRadius: 3 }} /></div></div>
+        {(form.drills?.length || 0)>0 && <div style={{ marginBottom: 12 }}>{(() => {
           let lastPhase = "";
-          return form.drills.map((d,i) => {
+          return (form.drills||[]).map((d,i) => {
             const showPhaseHeader = d.phase && d.phase !== lastPhase;
             if (d.phase) lastPhase = d.phase;
             return <div key={i}>
@@ -441,9 +441,9 @@ const PracticeLog = ({ players }) => {
                     <span style={{ color: THEME.gray, fontSize: 10 }}>{expandedDrill === `plan-${i}` ? "▲" : "▼"}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <button disabled={i === 0} onClick={() => { const arr = [...form.drills]; [arr[i], arr[i-1]] = [arr[i-1], arr[i]]; setForm({...form, drills: arr}); }} style={{ background: "none", border: "none", color: i === 0 ? THEME.charcoal : THEME.gold, cursor: i === 0 ? "default" : "pointer", fontSize: 14, padding: "2px" }}>▲</button>
-                    <button disabled={i === form.drills.length - 1} onClick={() => { const arr = [...form.drills]; [arr[i], arr[i+1]] = [arr[i+1], arr[i]]; setForm({...form, drills: arr}); }} style={{ background: "none", border: "none", color: i === form.drills.length - 1 ? THEME.charcoal : THEME.gold, cursor: i === form.drills.length - 1 ? "default" : "pointer", fontSize: 14, padding: "2px" }}>▼</button>
-                    <button onClick={() => setForm({...form, drills: form.drills.filter((_,idx) => idx!==i)})} style={{ background: "none", border: "none", color: THEME.red, cursor: "pointer", fontSize: 16, padding: "2px" }}>✕</button>
+                    <button disabled={i === 0} onClick={() => { const arr = [...(form.drills||[])]; [arr[i], arr[i-1]] = [arr[i-1], arr[i]]; setForm({...form, drills: arr}); }} style={{ background: "none", border: "none", color: i === 0 ? THEME.charcoal : THEME.gold, cursor: i === 0 ? "default" : "pointer", fontSize: 14, padding: "2px" }}>▲</button>
+                    <button disabled={i === (form.drills?.length || 0) - 1} onClick={() => { const arr = [...(form.drills||[])]; [arr[i], arr[i+1]] = [arr[i+1], arr[i]]; setForm({...form, drills: arr}); }} style={{ background: "none", border: "none", color: i === (form.drills?.length || 0) - 1 ? THEME.charcoal : THEME.gold, cursor: i === (form.drills?.length || 0) - 1 ? "default" : "pointer", fontSize: 14, padding: "2px" }}>▼</button>
+                    <button onClick={() => setForm({...form, drills: (form.drills||[]).filter((_,idx) => idx!==i)})} style={{ background: "none", border: "none", color: THEME.red, cursor: "pointer", fontSize: 16, padding: "2px" }}>✕</button>
                   </div>
                 </div>
                 {expandedDrill === `plan-${i}` && <div style={{ padding: "0 10px 10px 38px", color: THEME.gray, fontSize: 12, lineHeight: 1.5 }}>{d.description}{d.notes && <div style={{ color: THEME.goldDim, marginTop: 4 }}>Note: {d.notes}</div>}</div>}
@@ -463,12 +463,12 @@ const PracticeLog = ({ players }) => {
                 <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{d.coach}</Badge>
               </div>
             </div>
-            <button onClick={() => setForm({...form, drills: [...form.drills, {...d, assignedCoach: d.coach}]})} style={{ background: THEME.gold, border: "none", color: THEME.black, width: 28, height: 28, borderRadius: 4, cursor: "pointer", fontSize: 16, fontWeight: 700, flexShrink: 0 }}>+</button>
+            <button onClick={() => setForm({...form, drills: [...(form.drills||[]), {...d, assignedCoach: d.coach}]})} style={{ background: THEME.gold, border: "none", color: THEME.black, width: 28, height: 28, borderRadius: 4, cursor: "pointer", fontSize: 16, fontWeight: 700, flexShrink: 0 }}>+</button>
           </div>
           {expandedDrill === d.id && <div style={{ padding: "0 10px 10px 10px", color: THEME.gray, fontSize: 12, lineHeight: 1.5 }}>{d.description}</div>}
         </div>)}</div>
       </div>
-      <TextArea label="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} style={{ marginTop: 12 }} />
+      <TextArea label="Notes" value={form.notes||""} onChange={e => setForm({...form, notes: e.target.value})} style={{ marginTop: 12 }} placeholder="General notes about this practice..." />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}><Button variant="ghost" onClick={() => { setShow(false); setEd(null); }}>Cancel</Button><Button onClick={save}>Save</Button></div>
     </Modal>
   </div>;
