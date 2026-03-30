@@ -279,12 +279,15 @@ const PracticeLog = ({ players }) => {
   const [expandedDrill, setExpandedDrill] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  const emptyPlan = () => ({ id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned" });
+  const emptyPlan = () => ({
+    id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned",
+    attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {})
+  });
   const emptyComplete = (practice) => ({
     ...practice,
     status: "completed",
     drillsRun: practice.drills?.map(d => d.name).join(", ") || "",
-    attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
+    attendance: practice.attendance || players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
     observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
     coachNotes: ""
   });
@@ -370,6 +373,7 @@ const PracticeLog = ({ players }) => {
                         <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">PLANNED</Badge>
                         {p.duration && <Badge>{p.duration}min</Badge>}
                         {p.drills && p.drills.length > 0 && <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{p.drills.length} drills</Badge>}
+                        {p.attendance && <Badge color={THEME.white} bg="rgba(255,255,255,0.1)">{Object.values(p.attendance).filter(Boolean).length} expected</Badge>}
                         {p.focus && <Badge color={THEME.green} bg="rgba(46,204,113,0.15)">{p.focus}</Badge>}
                       </div>
                     </div>
@@ -379,10 +383,10 @@ const PracticeLog = ({ players }) => {
                       <Button small variant="danger" onClick={e => { e.stopPropagation(); if (confirm("Delete this practice?")) setList(x => x.filter(q => q.id !== p.id)); }}>✕</Button>
                     </div>
                   </div>
-                  {exp === p.id && p.drills && p.drills.length > 0 && (
+                  {exp === p.id && (
                     <div style={{ marginTop: 12, borderTop: `1px solid ${THEME.charcoal}`, paddingTop: 12 }}>
-                      {p.drills.map((d, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < p.drills.length - 1 ? `1px solid ${THEME.charcoal}` : "none" }}>
+                      {p.drills && p.drills.length > 0 && p.drills.map((d, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${THEME.charcoal}` }}>
                           <span style={{ color: THEME.white, fontSize: 13 }}>{d.name}</span>
                           <div style={{ display: "flex", gap: 4 }}>
                             <Badge>{d.duration}min</Badge>
@@ -390,6 +394,14 @@ const PracticeLog = ({ players }) => {
                           </div>
                         </div>
                       ))}
+                      {p.attendance && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${THEME.charcoal}` }}>
+                          <span style={{ color: THEME.gray, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>Expected: </span>
+                          <span style={{ color: THEME.white, fontSize: 12 }}>
+                            {players.filter(pl => p.attendance[pl.id]).map(pl => pl.name.split(" ")[0]).join(", ")}
+                          </span>
+                        </div>
+                      )}
                       {p.notes && <p style={{ color: THEME.gray, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>{p.notes}</p>}
                     </div>
                   )}
@@ -488,6 +500,30 @@ const PracticeLog = ({ players }) => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}><Input label="Date" type="date" value={form.date||""} onChange={e => setForm({...form, date: e.target.value})} /><Input label="Time" type="time" value={form.time||""} onChange={e => setForm({...form, time: e.target.value})} /><Input label="Duration" type="number" value={form.duration||120} onChange={e => setForm({...form, duration: parseInt(e.target.value)||120})} /></div>
       <div style={{ marginTop: 12 }}><Input label="Focus" value={form.focus||""} onChange={e => setForm({...form, focus: e.target.value})} placeholder="Fundamentals, Hitting, Game Situations..." /></div>
 
+      <div style={{ marginTop: 16 }}>
+        <SL>Expected Attendance</SL>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          {players.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setForm({ ...form, attendance: { ...(form.attendance || {}), [p.id]: !(form.attendance || {})[p.id] } })}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 6,
+                border: `1px solid ${(form.attendance || {})[p.id] ? THEME.gold : THEME.charcoal}`,
+                background: (form.attendance || {})[p.id] ? "rgba(253,181,21,0.15)" : THEME.black,
+                color: (form.attendance || {})[p.id] ? THEME.gold : THEME.gray,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600
+              }}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div style={{ marginTop: 16 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><SL>Practice Plan — {tt}/{form.duration||120}min</SL><div style={{ width: 120, height: 6, background: THEME.charcoal, borderRadius: 3 }}><div style={{ width: `${Math.min(100,(tt/(form.duration||120))*100)}%`, height: "100%", background: tt>(form.duration||120)?THEME.red:THEME.gold, borderRadius: 3 }} /></div></div>
         {(form.drills?.length || 0)>0 && <div style={{ marginBottom: 12 }}>{(() => {
           let lastPhase = "";
@@ -547,7 +583,7 @@ const PracticeLog = ({ players }) => {
           </div>
           <TextArea label="Drills We Ran" value={form.drillsRun || ""} onChange={e => setForm({ ...form, drillsRun: e.target.value })} style={{ marginTop: 12 }} placeholder="Warm-up, BP on machine, ground balls..." />
           <div style={{ marginTop: 16 }}>
-            <SL>Attendance</SL>
+            <SL>Who Actually Came (adjust from plan)</SL>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {players.map(p => (
                 <button
