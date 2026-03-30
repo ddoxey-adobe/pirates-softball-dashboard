@@ -3700,6 +3700,9 @@ const Reports = ({ players }) => {
                           <div style={{ color: THEME.gray, fontSize: 10 }}>
                             {game.innings || 7} innings
                           </div>
+                          <div style={{ color: THEME.gold, fontSize: 9, marginTop: 2, fontStyle: "italic" }}>
+                            Click for details
+                          </div>
                         </div>
                         <div style={{ color: THEME.gold, fontSize: 16 }}>›</div>
                       </div>
