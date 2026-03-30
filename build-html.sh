@@ -1,7 +1,7 @@
 #!/bin/bash
 
-SOURCE="pirates-coaching-dashboard.jsx"
-OUTPUT="pirates-softball-dashboard/index.html"
+SOURCE="src/App.jsx"
+OUTPUT="index.html"
 
 # Read the JSX file and remove the import line
 JSX_CODE=$(tail -n +2 "$SOURCE")
