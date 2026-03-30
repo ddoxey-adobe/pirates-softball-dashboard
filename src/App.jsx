@@ -2111,42 +2111,71 @@ const PracticeLog = ({ players, coaches }) => {
                                 <div style={{ marginBottom: 12 }}>
                                   <div style={{ color: THEME.white, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>Mark eliminated players:</div>
                                   <div style={{ display: "grid", gap: 4 }}>
-                                    {activePlayers.map(p => (
-                                      <button
-                                        key={p.id}
-                                        onClick={() => {
-                                          setForm({
-                                            ...form,
-                                            drillTracking: {
-                                              ...(form.drillTracking || {}),
-                                              [drill.id]: {
-                                                ...tracking,
-                                                playerStatus: {
-                                                  ...playerStatus,
-                                                  [p.id]: { eliminated: true, eliminatedAt: currentLevel, level: currentLevel }
+                                    {activePlayers.map(p => {
+                                      const isEliminated = playerStatus[p.id]?.eliminated && playerStatus[p.id]?.eliminatedAt === currentLevel;
+
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => {
+                                            if (isEliminated) {
+                                              // Undo elimination
+                                              setForm({
+                                                ...form,
+                                                drillTracking: {
+                                                  ...(form.drillTracking || {}),
+                                                  [drill.id]: {
+                                                    ...tracking,
+                                                    playerStatus: {
+                                                      ...playerStatus,
+                                                      [p.id]: { eliminated: false, eliminatedAt: null, level: currentLevel }
+                                                    }
+                                                  }
                                                 }
-                                              }
+                                              });
+                                            } else {
+                                              // Mark eliminated
+                                              setForm({
+                                                ...form,
+                                                drillTracking: {
+                                                  ...(form.drillTracking || {}),
+                                                  [drill.id]: {
+                                                    ...tracking,
+                                                    playerStatus: {
+                                                      ...playerStatus,
+                                                      [p.id]: { eliminated: true, eliminatedAt: currentLevel, level: currentLevel }
+                                                    }
+                                                  }
+                                                }
+                                              });
                                             }
-                                          });
-                                        }}
-                                        style={{
-                                          padding: "10px",
-                                          background: THEME.blackLight,
-                                          border: `1px solid ${THEME.charcoal}`,
-                                          borderRadius: 4,
-                                          color: THEME.white,
-                                          cursor: "pointer",
-                                          fontSize: 13,
-                                          textAlign: "left",
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          alignItems: "center"
-                                        }}
-                                      >
-                                        <span>{p.name.split(" ")[0]}</span>
-                                        <span style={{ color: THEME.red, fontSize: 11 }}>Tap to eliminate →</span>
-                                      </button>
-                                    ))}
+                                          }}
+                                          style={{
+                                            padding: "10px",
+                                            background: isEliminated ? "rgba(231,76,60,0.2)" : THEME.blackLight,
+                                            border: `2px solid ${isEliminated ? THEME.red : THEME.charcoal}`,
+                                            borderRadius: 4,
+                                            color: THEME.white,
+                                            cursor: "pointer",
+                                            fontSize: 13,
+                                            textAlign: "left",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center"
+                                          }}
+                                        >
+                                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            {isEliminated && <span style={{ color: THEME.red, fontSize: 16 }}>❌</span>}
+                                            <span style={{ textDecoration: isEliminated ? "line-through" : "none" }}>
+                                              {p.name.split(" ")[0]}
+                                            </span>
+                                          </span>
+                                          <span style={{ color: isEliminated ? THEME.green : THEME.red, fontSize: 11 }}>
+                                            {isEliminated ? "Tap to undo" : "Tap to eliminate →"}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               )}
