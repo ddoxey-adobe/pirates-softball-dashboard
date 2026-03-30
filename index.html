@@ -999,7 +999,7 @@ const TABS = [
   { id: "comms", label: "Comms", icon: "✉️" },
 ];
 
-export default function App() {
+function App() {
   const [tab, setTab] = useState("roster");
   const [players, setPlayers] = useState(SEED_PLAYERS);
   const [loaded, setLoaded] = useState(false);
