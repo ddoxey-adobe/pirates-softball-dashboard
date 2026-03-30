@@ -93,7 +93,8 @@ const DRILL_LIBRARY = [
 const D = (id) => DRILL_LIBRARY.find(d => d.id === id);
 
 const PRACTICE_TEMPLATES = [
-  { id: "tmpl1", name: "Early Season — Fundamentals & Team Building", duration: 120, focus: "Fundamentals",
+  // ═══ EARLY SEASON (Weeks 1-4) ═══
+  { id: "early1", name: "Early Season — Fundamentals & Team Building", duration: 120, focus: "Fundamentals",
     description: "First 2-3 weeks. Build culture, assess players, teach basics.",
     phases: [
       { name: "Warm-Up", type: "together", time: "15 min", drills: [
@@ -116,7 +117,83 @@ const PRACTICE_TEMPLATES = [
         { ...D("c1"), assignedCoach: "Any" },
       ]},
     ]},
-  { id: "tmpl2", name: "Mid Season — Game Situations & Refining", duration: 120, focus: "Game Situations",
+  { id: "early2", name: "Early Season — Throwing & Hitting Basics", duration: 120, focus: "Mechanics",
+    description: "Week 2-3. Focus on proper throwing mechanics and hitting foundation.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Throwing Fundamentals", type: "together", time: "20 min", drills: [
+        { ...D("t1"), assignedCoach: "Shari", notes: "One-knee throwing — isolate arm mechanics" },
+        { ...D("t2"), assignedCoach: "Shari", notes: "Rock & Fire — weight transfer" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
+        { ...D("h1"), assignedCoach: "Head Coach", station: "A", notes: "Tee work — check stance, grip, swing path" },
+        { ...D("h2"), assignedCoach: "Ken", station: "B", notes: "Freeze drill — slow down rushed swings" },
+        { ...D("f6"), assignedCoach: "Shari", station: "C", notes: "Bare hand pickups — soft hands" },
+      ]},
+      { name: "Baserunning Basics", type: "together", time: "15 min", drills: [
+        { ...D("b1"), assignedCoach: "Any", notes: "Time each player — track improvement" },
+        { ...D("b4"), assignedCoach: "Any", notes: "Sliding on grass — safety first" },
+      ]},
+      { name: "Fun Finish", type: "together", time: "15 min", drills: [
+        { ...D("b5"), assignedCoach: "Any", notes: "Baserunning race — competitive energy" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Positive self-talk — we all make mistakes" },
+      ]},
+    ]},
+  { id: "early3", name: "Early Season — Defense & Confidence Building", duration: 120, focus: "Defense",
+    description: "Week 3-4. Ground balls, fly balls, and building defensive confidence.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
+        { ...D("f1"), assignedCoach: "Ken", station: "A", notes: "Ground ball fundamentals — charge, field, throw" },
+        { ...D("f4"), assignedCoach: "Shari", station: "B", notes: "Fly ball tracking — drop step, read the ball" },
+        { ...D("h4"), assignedCoach: "Head Coach", station: "C", notes: "Soft toss — timing and contact" },
+      ]},
+      { name: "Full Team Throwing", type: "together", time: "15 min", drills: [
+        { ...D("t3"), assignedCoach: "Any", notes: "Long toss — distance challenge" },
+      ]},
+      { name: "Hitting Competition", type: "together", time: "25 min", drills: [
+        { ...D("h8"), assignedCoach: "Any", notes: "Drop Ball — quick hands drill" },
+        { ...D("h9"), assignedCoach: "Any", notes: "Points-based hitting — quality contact" },
+      ]},
+      { name: "Conditioning", type: "together", time: "10 min", drills: [
+        { ...D("c2"), assignedCoach: "Any", notes: "Cone & hurdle course — footwork" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Cheering for teammates — we win together" },
+      ]},
+    ]},
+  { id: "early4", name: "Early Season — All-Around Assessment", duration: 120, focus: "Assessment",
+    description: "Week 3-4. Assess each player across all skills to identify strengths.",
+    phases: [
+      { name: "Warm-Up & Throwing", type: "together", time: "15 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+        { ...D("t2"), assignedCoach: "Shari", notes: "Rock & Fire — assess arm strength" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "50 min (3 groups × 15 min each + 5 min buffer)", drills: [
+        { ...D("f1"), assignedCoach: "Ken", station: "A", notes: "Assess fielding — speed, hands, accuracy" },
+        { ...D("h3"), assignedCoach: "Head Coach", station: "B", notes: "Inside/outside tee — assess swing path" },
+        { ...D("f8"), assignedCoach: "Shari", station: "C", notes: "Cone triangle — assess footwork & angles" },
+      ]},
+      { name: "Baserunning Assessment", type: "together", time: "15 min", drills: [
+        { ...D("b1"), assignedCoach: "Any", notes: "Time every player — record for tracking" },
+        { ...D("b2"), assignedCoach: "Any", notes: "Assess rounding technique" },
+      ]},
+      { name: "Hitting Competition", type: "together", time: "25 min", drills: [
+        { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — see who thrives under pressure" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Every player brings something unique to this team" },
+      ]},
+    ]},
+
+  // ═══ MID SEASON (Weeks 5-8) ═══
+  { id: "mid1", name: "Mid Season — Game Situations & Refining", duration: 120, focus: "Game IQ",
     description: "Fundamentals are solid. Focus on game IQ and competitive reps.",
     phases: [
       { name: "Warm-Up", type: "together", time: "15 min", drills: [
@@ -136,8 +213,98 @@ const PRACTICE_TEMPLATES = [
         { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: What did we learn from last game?" },
       ]},
     ]},
-  { id: "tmpl3", name: "Pre-Game — Light Work & Mental Prep", duration: 120, focus: "Pre-Game",
-    description: "Game day or day before. Light reps, build confidence. No heavy drilling.",
+  { id: "mid2", name: "Mid Season — Advanced Defense & Relays", duration: 120, focus: "Defense",
+    description: "Week 5-7. Outfield relays, cutoffs, and rapid-fire infield work.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Outfield Work", type: "together", time: "20 min", drills: [
+        { ...D("f4"), assignedCoach: "Any", notes: "Fly ball tracking — read off the bat" },
+        { ...D("t4"), assignedCoach: "Ken", notes: "Relay & cutoff — through vs. do-or-die" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
+        { ...D("f2"), assignedCoach: "Ken", station: "A", notes: "Rapid fire — 3B, 2B, 1B in sequence" },
+        { ...D("h6"), assignedCoach: "Head Coach", station: "B", notes: "Live machine BP — game speeds" },
+        { ...D("f5"), assignedCoach: "Shari", station: "C", notes: "Triangle pop fly — communication" },
+      ]},
+      { name: "Game Situations", type: "together", time: "20 min", drills: [
+        { ...D("g1"), assignedCoach: "All", notes: "Focus on outfield scenarios — gaps, over heads" },
+      ]},
+      { name: "Competition", type: "together", time: "10 min", drills: [
+        { ...D("h8"), assignedCoach: "Any" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Trusting your teammates — make the play" },
+      ]},
+    ]},
+  { id: "mid3", name: "Mid Season — Hitting Power & Speed Adjustment", duration: 120, focus: "Hitting",
+    description: "Week 6-8. Refine swing mechanics, adjust to pitch speeds, drive the ball.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "50 min (3 groups × 15 min each + 5 buffer)", drills: [
+        { ...D("h6"), assignedCoach: "Head Coach", station: "A", notes: "Machine BP — challenge speeds" },
+        { ...D("h7"), assignedCoach: "Ken", station: "B", notes: "Speed changes — adjust timing" },
+        { ...D("h3"), assignedCoach: "Shari", station: "C", notes: "Inside/outside tee — hit to all fields" },
+      ]},
+      { name: "Bunting Practice", type: "together", time: "15 min", drills: [
+        { ...D("h10"), assignedCoach: "Any", notes: "Sacrifice & drag bunts — game situations" },
+      ]},
+      { name: "Hitting Competition", type: "together", time: "30 min", drills: [
+        { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — full 6 levels" },
+        { ...D("h9"), assignedCoach: "Any", notes: "Points-based — line drives win" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Quality at-bats — make the pitcher work" },
+      ]},
+    ]},
+  { id: "mid4", name: "Mid Season — Pressure Situations & 21 Outs", duration: 120, focus: "Pressure",
+    description: "Week 6-8. Build focus under pressure. Team accountability.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "15 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+        { ...D("w2"), assignedCoach: "Any" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "40 min", drills: [
+        { ...D("h5"), assignedCoach: "Head Coach", station: "A", notes: "Front toss — timing under pressure" },
+        { ...D("f7"), assignedCoach: "Ken", station: "B", notes: "Scoop step throw — eliminate wasted movement" },
+        { ...D("p2"), assignedCoach: "Shari", station: "C", notes: "Pitch location — hit your spots" },
+      ]},
+      { name: "Full Team — 21 Outs", type: "together", time: "30 min", drills: [
+        { ...D("f3"), assignedCoach: "All", notes: "Goal: 21 consecutive outs. Reset on error. Team accountability." },
+      ]},
+      { name: "Game Situations", type: "together", time: "20 min", drills: [
+        { ...D("g3"), assignedCoach: "Ken", notes: "Bunt defense — squeeze play" },
+        { ...D("g2"), assignedCoach: "Ken", notes: "First & third — steal scenarios" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Handling pressure — breathe, trust your training" },
+      ]},
+    ]},
+
+  // ═══ END SEASON / TOURNAMENT PREP (Last 3 weeks) ═══
+  { id: "late1", name: "End Season — Tournament Prep & Live Scrimmage", duration: 120, focus: "Game Ready",
+    description: "Last 3 weeks. Simulate real games. Keep it fun and competitive.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "15 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+        { ...D("w2"), assignedCoach: "Any", notes: "Pitchers especially" },
+      ]},
+      { name: "Pre-Game Hitting", type: "together", time: "25 min", drills: [
+        { ...D("h4"), assignedCoach: "Any", notes: "Soft toss — feel-good swings" },
+        { ...D("h6"), assignedCoach: "Head Coach", notes: "8-10 swings each — confidence builders" },
+      ]},
+      { name: "Live Scrimmage", type: "together", time: "60 min", drills: [
+        { ...D("g4"), assignedCoach: "All", notes: "Full game simulation. Keep score. Rotate pitchers. Most realistic practice." },
+      ]},
+      { name: "Cool Down & Mental", type: "together", time: "10 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Trust your training. You're ready for tournament." },
+      ]},
+    ]},
+  { id: "late2", name: "End Season — Pre-Game Light Work", duration: 120, focus: "Pre-Game",
+    description: "Day before tournament or big game. Light reps, build confidence.",
     phases: [
       { name: "Warm-Up & Throwing", type: "together", time: "20 min", drills: [
         { ...D("w1"), assignedCoach: "Any" },
@@ -158,7 +325,57 @@ const PRACTICE_TEMPLATES = [
         { ...D("h9"), assignedCoach: "Any", notes: "Points-Based Hitting — end on a high note" },
       ]},
     ]},
-  { id: "tmpl4", name: "Hitting-Focused Day", duration: 120, focus: "Hitting",
+  { id: "late3", name: "End Season — Fun & Competitions Day", duration: 120, focus: "Fun",
+    description: "Last week of season. All competitions, keep energy high, celebrate the season.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Hitting Competitions", type: "together", time: "40 min", drills: [
+        { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — crown the champion" },
+        { ...D("h8"), assignedCoach: "Any", notes: "Drop Ball — quick hands" },
+        { ...D("h9"), assignedCoach: "Any", notes: "Points-based team draft" },
+      ]},
+      { name: "Fielding Competition", type: "together", time: "25 min", drills: [
+        { ...D("f3"), assignedCoach: "All", notes: "21 Outs challenge — beat your record" },
+      ]},
+      { name: "Baserunning Races", type: "together", time: "20 min", drills: [
+        { ...D("b5"), assignedCoach: "Any", notes: "Race to 2nd and race home — bracket style" },
+        { ...D("b1"), assignedCoach: "Any", notes: "Home to first — final season times" },
+      ]},
+      { name: "Conditioning Challenge", type: "together", time: "10 min", drills: [
+        { ...D("c1"), assignedCoach: "Any", notes: "Agility ladder race" },
+      ]},
+      { name: "Team Celebration", type: "together", time: "10 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Season reflection — shoutouts, favorite memories, what we accomplished" },
+      ]},
+    ]},
+  { id: "late4", name: "End Season — Advanced Skills & Team Chemistry", duration: 120, focus: "Advanced",
+    description: "Final 2-3 weeks. Polish advanced skills, build team chemistry for playoffs.",
+    phases: [
+      { name: "Warm-Up", type: "together", time: "10 min", drills: [
+        { ...D("w1"), assignedCoach: "Any" },
+      ]},
+      { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
+        { ...D("h7"), assignedCoach: "Head Coach", station: "A", notes: "Speed changes — timing mastery" },
+        { ...D("f2"), assignedCoach: "Ken", station: "B", notes: "Rapid fire — game speed" },
+        { ...D("p3"), assignedCoach: "Shari", station: "C", notes: "Simulated innings — pitch count management" },
+      ]},
+      { name: "Advanced Game Situations", type: "together", time: "35 min", drills: [
+        { ...D("g1"), assignedCoach: "All", notes: "Complex scenarios — multiple runners" },
+        { ...D("g2"), assignedCoach: "Ken", notes: "First & third defense — make the right read" },
+        { ...D("g3"), assignedCoach: "Ken", notes: "Bunt defense — squeeze situations" },
+      ]},
+      { name: "Competition Finish", type: "together", time: "15 min", drills: [
+        { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — end practice on a high" },
+      ]},
+      { name: "Huddle", type: "together", time: "5 min", drills: [
+        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Playing for each other — we're at our best when we play together" },
+      ]},
+    ]},
+
+  // ═══ SPECIAL PURPOSE ═══
+  { id: "special1", name: "Hitting-Focused Day", duration: 120, focus: "Hitting",
     description: "All offense. 3 hitting stations rotating, plus competitive hitting games.",
     phases: [
       { name: "Warm-Up", type: "together", time: "10 min", drills: [
