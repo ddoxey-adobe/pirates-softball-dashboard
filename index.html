@@ -645,9 +645,15 @@ const PracticeLog = ({ players, coaches }) => {
   const [expandedDrill, setExpandedDrill] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Enhanced tracking states
+  const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [stopwatchTime, setStopwatchTime] = useState(0);
+  const stopwatchInterval = useRef(null);
+
   const emptyPlan = () => ({
     id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned",
-    attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {})
+    attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
+    groups: {} // { playerId: "red" | "blue" | "gold" | null }
   });
 
   const emptyActive = (practice) => {
@@ -666,11 +672,26 @@ const PracticeLog = ({ players, coaches }) => {
       }
     });
 
+    // Initialize station rotation if this practice has station drills
+    const stationDrills = (practice.drills || []).filter(d => d.station);
+    const stationRotation = stationDrills.length > 0 ? {
+      stations: stationDrills.map(d => ({
+        id: d.station,
+        drillId: d.id,
+        drillName: d.name,
+        currentGroup: null // Will be set manually by coach
+      })),
+      round: 1,
+      active: false // Coach activates rotation when ready
+    } : null;
+
     return {
       ...practice,
       status: "active",
       drillTracking: drillTracking,
-      observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {})
+      observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
+      groups: practice.groups || {}, // Carry over groups from plan, or initialize empty
+      stationRotation: practice.stationRotation || stationRotation
     };
   };
 
@@ -1155,6 +1176,178 @@ const PracticeLog = ({ players, coaches }) => {
             </div>
           )}
 
+          {/* Group Management for Station Rotations */}
+          <div style={{ marginTop: 16 }}>
+            <SL>🎨 Station Groups (for rotations)</SL>
+            <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 8 }}>
+              Assign players to color groups for station rotations. Leave unassigned if doing whole-team drills.
+            </div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {players.filter(p => (form.attendance || {})[p.id]).map(p => {
+                const currentGroup = (form.groups || {})[p.id];
+                const GROUP_COLORS = {
+                  red: { bg: "rgba(231,76,60,0.2)", border: "#e74c3c", text: "#e74c3c" },
+                  blue: { bg: "rgba(52,152,219,0.2)", border: "#3498db", text: "#3498db" },
+                  gold: { bg: "rgba(253,181,21,0.2)", border: "#fdb515", text: "#fdb515" }
+                };
+
+                return (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600, minWidth: 100, flexShrink: 0 }}>
+                      {p.name.split(" ")[0]}
+                    </span>
+                    <div style={{ display: "flex", gap: 4, flex: 1 }}>
+                      {["red", "blue", "gold"].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            const newGroups = { ...(form.groups || {}) };
+                            newGroups[p.id] = currentGroup === color ? null : color;
+                            setForm({ ...form, groups: newGroups });
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "6px 8px",
+                            borderRadius: 4,
+                            border: `2px solid ${currentGroup === color ? GROUP_COLORS[color].border : THEME.charcoal}`,
+                            background: currentGroup === color ? GROUP_COLORS[color].bg : THEME.black,
+                            color: currentGroup === color ? GROUP_COLORS[color].text : THEME.gray,
+                            cursor: "pointer",
+                            fontSize: 12,
+                            fontWeight: currentGroup === color ? 700 : 400,
+                            textTransform: "capitalize"
+                          }}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Group Summary */}
+            <div style={{ marginTop: 8, padding: 8, background: THEME.blackLight, borderRadius: 4, display: "flex", gap: 16, fontSize: 12 }}>
+              {["red", "blue", "gold"].map(color => {
+                const count = players.filter(p => (form.groups || {})[p.id] === color).length;
+                const colorStyles = {
+                  red: "#e74c3c",
+                  blue: "#3498db",
+                  gold: "#fdb515"
+                };
+                return (
+                  <div key={color} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: colorStyles[color] }}></div>
+                    <span style={{ color: THEME.white, fontWeight: 600, textTransform: "capitalize" }}>{color}:</span>
+                    <span style={{ color: THEME.gray }}>{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Station Rotation Manager */}
+          {form.stationRotation && (
+            <div style={{ marginTop: 16 }}>
+              <SL>🔄 Station Rotations</SL>
+              <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 8 }}>
+                Assign groups to stations, then rotate them through. Round: {form.stationRotation.round}
+              </div>
+
+              {/* Station Assignment */}
+              <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                {form.stationRotation.stations.map((station, idx) => {
+                  const currentGroup = station.currentGroup;
+                  const GROUP_COLORS = {
+                    red: { bg: "rgba(231,76,60,0.2)", border: "#e74c3c", text: "#e74c3c" },
+                    blue: { bg: "rgba(52,152,219,0.2)", border: "#3498db", text: "#3498db" },
+                    gold: { bg: "rgba(253,181,21,0.2)", border: "#fdb515", text: "#fdb515" }
+                  };
+
+                  return (
+                    <div key={station.id} style={{
+                      padding: 12,
+                      background: THEME.black,
+                      borderRadius: 6,
+                      border: `1px solid ${THEME.charcoal}`
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div>
+                          <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700 }}>
+                            Station {station.id}
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 11 }}>{station.drillName}</div>
+                        </div>
+                        {currentGroup && (
+                          <div style={{
+                            padding: "4px 12px",
+                            borderRadius: 4,
+                            background: GROUP_COLORS[currentGroup].bg,
+                            border: `1px solid ${GROUP_COLORS[currentGroup].border}`,
+                            color: GROUP_COLORS[currentGroup].text,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: "capitalize"
+                          }}>
+                            {currentGroup} Group
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {["red", "blue", "gold", null].map((color) => (
+                          <button
+                            key={color || "none"}
+                            onClick={() => {
+                              const newRotation = { ...form.stationRotation };
+                              newRotation.stations[idx].currentGroup = color;
+                              setForm({ ...form, stationRotation: newRotation });
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: "6px 8px",
+                              borderRadius: 4,
+                              border: `2px solid ${currentGroup === color ? (color ? GROUP_COLORS[color].border : THEME.charcoal) : THEME.charcoal}`,
+                              background: currentGroup === color ? (color ? GROUP_COLORS[color].bg : THEME.blackLight) : THEME.blackLight,
+                              color: currentGroup === color ? (color ? GROUP_COLORS[color].text : THEME.white) : THEME.gray,
+                              cursor: "pointer",
+                              fontSize: 11,
+                              fontWeight: currentGroup === color ? 700 : 400,
+                              textTransform: "capitalize"
+                            }}
+                          >
+                            {color || "None"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Rotate Button */}
+              <Button
+                onClick={() => {
+                  const newRotation = { ...form.stationRotation };
+                  const groups = ["red", "blue", "gold"];
+                  const currentAssignments = newRotation.stations.map(s => s.currentGroup);
+
+                  // Rotate: shift groups to next station
+                  newRotation.stations.forEach((station, idx) => {
+                    const prevIdx = idx === 0 ? newRotation.stations.length - 1 : idx - 1;
+                    station.currentGroup = currentAssignments[prevIdx];
+                  });
+
+                  newRotation.round += 1;
+                  setForm({ ...form, stationRotation: newRotation });
+                }}
+                style={{ width: "100%" }}
+              >
+                🔄 Rotate Groups to Next Station
+              </Button>
+            </div>
+          )}
+
           <div style={{ marginTop: 16 }}>
             <SL>Attendance (mark who showed up)</SL>
             <ToggleChips
@@ -1192,7 +1385,7 @@ const PracticeLog = ({ players, coaches }) => {
             </div>
           </div>
 
-          {/* Drill Tracking Section */}
+          {/* Enhanced Drill Tracking Section */}
           {(() => {
             const trackableDrills = (form.drills || []).filter(d => TRACKABLE_DRILLS[d.id]);
             if (trackableDrills.length === 0) return null;
@@ -1202,138 +1395,240 @@ const PracticeLog = ({ players, coaches }) => {
                 <SL>📊 Drill Tracking</SL>
                 <div style={{ marginTop: 8, display: "grid", gap: 12 }}>
                   {trackableDrills.map(drill => {
-                    const config = TRACKABLE_DRILLS[drill.id];
                     const tracking = (form.drillTracking || {})[drill.id] || {};
 
-                    return (
-                      <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `1px solid ${THEME.charcoal}` }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                          <div>
-                            <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700 }}>{drill.name}</div>
-                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>{config.description}</div>
-                          </div>
-                        </div>
+                    // b1: Home to First Sprint - Stopwatch Interface
+                    if (drill.id === "b1") {
+                      const times = tracking.times || [];
+                      return (
+                        <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `2px solid ${THEME.blue}` }}>
+                          <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>⏱️ {drill.name}</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Time each player home-to-first</div>
 
-                        {config.perPlayer ? (
-                          <div style={{ display: "grid", gap: 6 }}>
-                            {players.filter(p => (form.attendance || {})[p.id]).map(p => (
-                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600, minWidth: 90, flexShrink: 0 }}>
-                                  {p.name.split(" ")[0]}
-                                </span>
-                                {config.type === "strikes-balls" ? (
-                                  <div style={{ display: "flex", gap: 6, flex: 1 }}>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      placeholder="Strikes"
-                                      value={tracking[p.id]?.strikes || ""}
-                                      onChange={e => setForm({
+                          {/* Stopwatch Display */}
+                          <div style={{ textAlign: "center", marginBottom: 12 }}>
+                            <div style={{ fontSize: 48, fontWeight: 700, color: stopwatchRunning ? THEME.gold : THEME.white, fontFamily: "monospace" }}>
+                              {(stopwatchTime / 1000).toFixed(2)}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
+                              {!stopwatchRunning ? (
+                                <Button onClick={() => {
+                                  setStopwatchTime(0);
+                                  setStopwatchRunning(true);
+                                  stopwatchInterval.current = setInterval(() => {
+                                    setStopwatchTime(t => t + 10);
+                                  }, 10);
+                                }}>
+                                  ▶️ Start
+                                </Button>
+                              ) : (
+                                <Button onClick={() => {
+                                  setStopwatchRunning(false);
+                                  clearInterval(stopwatchInterval.current);
+                                }} variant="danger">
+                                  ⏸️ Stop
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Player Selection to Save Time */}
+                          {!stopwatchRunning && stopwatchTime > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ color: THEME.white, fontSize: 13, marginBottom: 6 }}>Save time for:</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                                {players.filter(p => (form.attendance || {})[p.id]).map(p => (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => {
+                                      const newTimes = [...times, { playerId: p.id, playerName: p.name, time: stopwatchTime / 1000 }];
+                                      setForm({
                                         ...form,
                                         drillTracking: {
                                           ...(form.drillTracking || {}),
-                                          [drill.id]: {
-                                            ...(form.drillTracking?.[drill.id] || {}),
-                                            [p.id]: { ...(tracking[p.id] || {}), strikes: parseInt(e.target.value) || 0 }
-                                          }
+                                          [drill.id]: { times: newTimes }
                                         }
-                                      })}
-                                      style={{
-                                        flex: 1,
-                                        padding: "6px 8px",
-                                        background: THEME.blackLight,
-                                        border: `1px solid ${THEME.charcoal}`,
-                                        borderRadius: 4,
-                                        color: THEME.white,
-                                        fontSize: 12,
-                                        outline: "none"
-                                      }}
-                                    />
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      placeholder="Balls"
-                                      value={tracking[p.id]?.balls || ""}
-                                      onChange={e => setForm({
-                                        ...form,
-                                        drillTracking: {
-                                          ...(form.drillTracking || {}),
-                                          [drill.id]: {
-                                            ...(form.drillTracking?.[drill.id] || {}),
-                                            [p.id]: { ...(tracking[p.id] || {}), balls: parseInt(e.target.value) || 0 }
-                                          }
-                                        }
-                                      })}
-                                      style={{
-                                        flex: 1,
-                                        padding: "6px 8px",
-                                        background: THEME.blackLight,
-                                        border: `1px solid ${THEME.charcoal}`,
-                                        borderRadius: 4,
-                                        color: THEME.white,
-                                        fontSize: 12,
-                                        outline: "none"
-                                      }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <input
-                                    type={config.type === "time" ? "number" : config.type === "level" ? "number" : "number"}
-                                    min={config.type === "level" ? "1" : "0"}
-                                    max={config.type === "level" ? "6" : undefined}
-                                    step={config.type === "time" ? "0.1" : "1"}
-                                    placeholder={config.label}
-                                    value={tracking[p.id] || ""}
-                                    onChange={e => setForm({
-                                      ...form,
-                                      drillTracking: {
-                                        ...(form.drillTracking || {}),
-                                        [drill.id]: {
-                                          ...(form.drillTracking?.[drill.id] || {}),
-                                          [p.id]: e.target.value
-                                        }
-                                      }
-                                    })}
+                                      });
+                                      setStopwatchTime(0);
+                                    }}
                                     style={{
-                                      flex: 1,
-                                      padding: "6px 8px",
+                                      padding: "8px",
                                       background: THEME.blackLight,
                                       border: `1px solid ${THEME.charcoal}`,
                                       borderRadius: 4,
                                       color: THEME.white,
-                                      fontSize: 12,
-                                      outline: "none"
+                                      cursor: "pointer",
+                                      fontSize: 12
                                     }}
-                                  />
-                                )}
+                                  >
+                                    {p.name.split(" ")[0]}
+                                  </button>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                          )}
+
+                          {/* Sorted Leaderboard */}
+                          {times.length > 0 && (
+                            <div>
+                              <div style={{ color: THEME.white, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>Results (fastest first):</div>
+                              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                                {times.sort((a, b) => a.time - b.time).map((t, idx) => (
+                                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "6px 8px", background: idx === 0 ? "rgba(253,181,21,0.1)" : THEME.blackLight, borderRadius: 4, marginBottom: 4 }}>
+                                    <span style={{ color: THEME.white, fontSize: 12 }}>
+                                      {idx === 0 && "⭐ "}{t.playerName.split(" ")[0]}
+                                    </span>
+                                    <span style={{ color: idx === 0 ? THEME.gold : THEME.gray, fontSize: 12, fontFamily: "monospace" }}>
+                                      {t.time.toFixed(2)}s
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // f3: 21 Outs Drill - Team Counter
+                    if (drill.id === "f3") {
+                      const count = tracking.count || 0;
+                      const best = tracking.best || 0;
+                      return (
+                        <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `2px solid ${THEME.green}` }}>
+                          <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🎯 {drill.name}</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Consecutive outs without error</div>
+
+                          <div style={{ textAlign: "center", marginBottom: 12 }}>
+                            <div style={{ fontSize: 64, fontWeight: 700, color: THEME.green, fontFamily: "monospace" }}>
+                              {count}
+                            </div>
+                            <div style={{ color: THEME.gray, fontSize: 13 }}>
+                              Best Today: <span style={{ color: THEME.gold, fontWeight: 600 }}>{best}</span>
+                            </div>
                           </div>
-                        ) : (
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder={config.label}
-                            value={tracking || ""}
-                            onChange={e => setForm({
-                              ...form,
-                              drillTracking: {
-                                ...(form.drillTracking || {}),
-                                [drill.id]: e.target.value
-                              }
-                            })}
-                            style={{
-                              width: "100%",
-                              padding: "6px 8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 12,
-                              outline: "none"
-                            }}
-                          />
-                        )}
+
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <Button onClick={() => {
+                              const newCount = count + 1;
+                              const newBest = Math.max(newCount, best);
+                              setForm({
+                                ...form,
+                                drillTracking: {
+                                  ...(form.drillTracking || {}),
+                                  [drill.id]: { count: newCount, best: newBest }
+                                }
+                              });
+                            }} style={{ flex: 1 }}>
+                              ✓ OUT (+1)
+                            </Button>
+                            <Button onClick={() => {
+                              setForm({
+                                ...form,
+                                drillTracking: {
+                                  ...(form.drillTracking || {}),
+                                  [drill.id]: { count: 0, best }
+                                }
+                              });
+                            }} variant="danger" style={{ flex: 1 }}>
+                              ✕ ERROR (Reset)
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // p2: Pitch Location - Strike/Ball Counter
+                    if (drill.id === "p2") {
+                      return (
+                        <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `1px solid ${THEME.charcoal}` }}>
+                          <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>⚾ {drill.name}</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Track strikes vs balls for each pitcher</div>
+
+                          {players.filter(p => (form.attendance || {})[p.id]).map(p => {
+                            const pData = tracking[p.id] || { strikes: 0, balls: 0 };
+                            const total = pData.strikes + pData.balls;
+                            const strikePercent = total > 0 ? ((pData.strikes / total) * 100).toFixed(0) : 0;
+
+                            return (
+                              <div key={p.id} style={{ marginBottom: 12, padding: 10, background: THEME.blackLight, borderRadius: 4 }}>
+                                <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{p.name.split(" ")[0]}</div>
+                                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                                  <button
+                                    onClick={() => {
+                                      setForm({
+                                        ...form,
+                                        drillTracking: {
+                                          ...(form.drillTracking || {}),
+                                          [drill.id]: {
+                                            ...tracking,
+                                            [p.id]: { ...pData, strikes: pData.strikes + 1 }
+                                          }
+                                        }
+                                      });
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: "10px",
+                                      background: THEME.green,
+                                      border: "none",
+                                      borderRadius: 4,
+                                      color: THEME.white,
+                                      cursor: "pointer",
+                                      fontSize: 14,
+                                      fontWeight: 700
+                                    }}
+                                  >
+                                    ✓ Strike
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setForm({
+                                        ...form,
+                                        drillTracking: {
+                                          ...(form.drillTracking || {}),
+                                          [drill.id]: {
+                                            ...tracking,
+                                            [p.id]: { ...pData, balls: pData.balls + 1 }
+                                          }
+                                        }
+                                      });
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: "10px",
+                                      background: THEME.red,
+                                      border: "none",
+                                      borderRadius: 4,
+                                      color: THEME.white,
+                                      cursor: "pointer",
+                                      fontSize: 14,
+                                      fontWeight: 700
+                                    }}
+                                  >
+                                    ✕ Ball
+                                  </button>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: THEME.gray }}>
+                                  <span>Strikes: {pData.strikes} | Balls: {pData.balls} | Total: {total}</span>
+                                  <span style={{ color: strikePercent >= 60 ? THEME.green : THEME.gray }}>
+                                    {strikePercent}%
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+
+                    // p3, h9, h10, h11 - Keep simple for now, will enhance in next commits
+                    const config = TRACKABLE_DRILLS[drill.id];
+                    return (
+                      <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `1px solid ${THEME.charcoal}` }}>
+                        <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{drill.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 8 }}>{config.description}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11, fontStyle: "italic" }}>Enhanced interface coming soon...</div>
                       </div>
                     );
                   })}
