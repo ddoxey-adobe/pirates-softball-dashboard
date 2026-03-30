@@ -3918,18 +3918,10 @@ const Reports = ({ players }) => {
 
     {/* Game Details Modal - Rendered at component level */}
     {selectedGame && (
-      <Modal>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div>
-            <h3 style={{ color: THEME.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
-              {selectedGame.result === "W" ? "✅" : selectedGame.result === "L" ? "❌" : "⏸️"} vs {selectedGame.opponent}
-            </h3>
-            <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>
-              {selectedGame.date ? new Date(selectedGame.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : ""}
-              {" • "}{selectedGame.location || "Unknown Location"}
-            </p>
-          </div>
-          <Button onClick={() => setSelectedGame(null)}>✕</Button>
+      <Modal open={true} onClose={() => setSelectedGame(null)} title={`${selectedGame.result === "W" ? "✅" : selectedGame.result === "L" ? "❌" : "⏸️"} vs ${selectedGame.opponent}`} wide>
+        <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
+          {selectedGame.date ? new Date(selectedGame.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : ""}
+          {" • "}{selectedGame.location || "Unknown Location"}
         </div>
 
         {/* Final Score */}
@@ -4079,9 +4071,6 @@ const Reports = ({ players }) => {
           </Card>
         )}
 
-        <div style={{ marginTop: 16, textAlign: "right" }}>
-          <Button onClick={() => setSelectedGame(null)}>Close</Button>
-        </div>
       </Modal>
     )}
   </div>;
