@@ -1029,7 +1029,7 @@ function App() {
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
     <div style={{ background: `linear-gradient(135deg, ${THEME.black} 0%, ${THEME.blackLight} 100%)`, borderBottom: `3px solid ${THEME.gold}`, padding: "20px 24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: THEME.gold, display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxShadow: `0 0 20px ${THEME.gold}40` }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: THEME.black, border: `3px solid ${THEME.gold}`, display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxShadow: `0 0 20px ${THEME.gold}40` }}>
           <img src="assets/pirates-logo.svg" alt="Pittsburgh Pirates" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         <div><h1 style={{ margin: 0, fontFamily: "'Oswald',sans-serif", fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: THEME.gold }}>Pirates Softball</h1><p style={{ margin: 0, color: THEME.gray, fontSize: 13 }}>2026 Season Dashboard</p></div>
