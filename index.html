@@ -767,6 +767,7 @@ const exportToCSV = (data, filename) => {
 // ─── UNIFIED PRACTICE LOG ───────────────────────────────────────
 const PracticeLog = ({ players, coaches }) => {
   const [list, setList] = useState([]);
+  const [loaded, setLoaded] = useState(false);
   const [show, setShow] = useState(false);
   const [mode, setMode] = useState("plan"); // "plan", "active", or "complete"
   const [form, setForm] = useState({});
@@ -854,11 +855,12 @@ const PracticeLog = ({ players, coaches }) => {
       } else {
         setList(unified);
       }
+      setLoaded(true);
     };
     migrate();
   }, []);
 
-  useEffect(() => { saveStore("pirates-practices-unified-2026v1", list); }, [list]);
+  useEffect(() => { if (loaded) saveStore("pirates-practices-unified-2026v1", list); }, [list, loaded]);
 
   // Cleanup stopwatch interval on unmount or modal close
   useEffect(() => {
