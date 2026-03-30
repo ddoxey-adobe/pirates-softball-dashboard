@@ -3107,16 +3107,82 @@ const Comms = ({ players }) => {
   </div>;
 };
 
+// ─── COLLAPSIBLE SECTION COMPONENT ──────────────────────────────
+const CollapsibleSection = ({ id, title, icon, badge, isCollapsed, onToggle, children }) => {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div
+        onClick={() => onToggle(id)}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: isCollapsed ? 0 : 12,
+          cursor: "pointer",
+          padding: "12px 16px",
+          background: THEME.charcoal,
+          borderRadius: 8,
+          transition: "all 0.2s ease"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h3 style={{
+            color: THEME.gold,
+            fontSize: 16,
+            fontWeight: 700,
+            fontFamily: "'Oswald',sans-serif",
+            margin: 0,
+            textTransform: "uppercase"
+          }}>
+            {icon} {title}
+          </h3>
+          {badge && <span style={{
+            color: THEME.gray,
+            fontSize: 13,
+            fontWeight: 600,
+            background: THEME.black,
+            padding: "4px 10px",
+            borderRadius: 12
+          }}>{badge}</span>}
+        </div>
+        <div style={{
+          color: THEME.gold,
+          fontSize: 20,
+          transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)",
+          transition: "transform 0.2s ease"
+        }}>
+          ▼
+        </div>
+      </div>
+      {!isCollapsed && <div style={{ marginTop: 12 }}>{children}</div>}
+    </div>
+  );
+};
+
 // ─── REPORTS ────────────────────────────────────────────────────
 const Reports = ({ players }) => {
   const [practices, setPractices] = useState([]);
+  const [games, setGames] = useState([]);
   const [dateRange, setDateRange] = useState("all"); // "all", "30", "60", "90"
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDrill, setSelectedDrill] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    const saved = localStorage.getItem("pirates-reports-collapsed");
+    return saved ? JSON.parse(saved) : {};
+  });
 
   useEffect(() => {
     loadStore("pirates-practices-unified-2026v1", []).then(setPractices);
+    loadStore(STORAGE_KEYS.GAMELOGS, []).then(setGames);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("pirates-reports-collapsed", JSON.stringify(collapsedSections));
+  }, [collapsedSections]);
+
+  const toggleSection = (sectionId) => {
+    setCollapsedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  };
 
   // Filter practices by date range
   const getFilteredPractices = () => {
@@ -3144,6 +3210,18 @@ const Reports = ({ players }) => {
     ...DRILL_LIBRARY.find(d => d.id === drillId),
     config: TRACKABLE_DRILLS[drillId]
   })).filter(d => d.config);
+
+  // Collapse/Expand functions (defined after trackedDrills)
+  const collapseAll = () => {
+    const allSections = ["stats", "attendance", "games", ...trackedDrills.map(d => d.id)];
+    const collapsed = {};
+    allSections.forEach(id => collapsed[id] = true);
+    setCollapsedSections(collapsed);
+  };
+
+  const expandAll = () => {
+    setCollapsedSections({});
+  };
 
   // Calculate player drill performance
   const getPlayerDrillData = (playerId, drillId) => {
@@ -3225,6 +3303,77 @@ const Reports = ({ players }) => {
     return playerStats;
   };
 
+  // Game Analytics Calculations
+  const filteredGames = games.filter(g => {
+    if (dateRange === "all") return true;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - parseInt(dateRange));
+    return g.date && new Date(g.date + "T12:00:00") >= cutoff;
+  });
+
+  const gameStats = {
+    total: filteredGames.length,
+    wins: filteredGames.filter(g => g.result === "W").length,
+    losses: filteredGames.filter(g => g.result === "L").length,
+    ties: filteredGames.filter(g => g.result === "T").length,
+    runsScored: filteredGames.reduce((sum, g) => sum + (g.ourScore || 0), 0),
+    runsAllowed: filteredGames.reduce((sum, g) => sum + (g.theirScore || 0), 0)
+  };
+  gameStats.winPct = gameStats.total > 0 ? (gameStats.wins / gameStats.total) : 0;
+
+  // Calculate batting stats
+  const playerBattingStats = players.map(player => {
+    const atBats = filteredGames.flatMap(g => g.atBats || []).filter(ab => ab.playerId === player.id);
+    if (atBats.length === 0) return null;
+
+    const hits = atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+    const singles = atBats.filter(ab => ab.result === "1B").length;
+    const doubles = atBats.filter(ab => ab.result === "2B").length;
+    const triples = atBats.filter(ab => ab.result === "3B").length;
+    const hrs = atBats.filter(ab => ab.result === "HR").length;
+    const totalBases = singles + (doubles * 2) + (triples * 3) + (hrs * 4);
+    const rbi = atBats.reduce((sum, ab) => sum + (ab.rbi || 0), 0);
+    const runs = atBats.reduce((sum, ab) => sum + (ab.runs || 0), 0);
+    const avg = atBats.length > 0 ? hits / atBats.length : 0;
+    const slg = atBats.length > 0 ? totalBases / atBats.length : 0;
+
+    return {
+      player,
+      atBats: atBats.length,
+      hits,
+      avg,
+      slg,
+      rbi,
+      runs,
+      hrs,
+      doubles,
+      triples
+    };
+  }).filter(Boolean).sort((a, b) => b.avg - a.avg);
+
+  // Calculate pitching stats
+  const playerPitchingStats = players.map(player => {
+    const pitching = filteredGames.flatMap(g => (g.pitching || []).filter(p => p.playerId === player.id));
+    if (pitching.length === 0) return null;
+
+    const inningsPitched = pitching.reduce((sum, p) => sum + (p.innings || 0), 0);
+    const runsAllowed = pitching.reduce((sum, p) => sum + (p.runsAllowed || 0), 0);
+    const earnedRuns = pitching.reduce((sum, p) => sum + (p.earnedRuns || 0), 0);
+    const strikeouts = pitching.reduce((sum, p) => sum + (p.strikeouts || 0), 0);
+    const walks = pitching.reduce((sum, p) => sum + (p.walks || 0), 0);
+    const era = inningsPitched > 0 ? (earnedRuns / inningsPitched) * 7 : 0;
+
+    return {
+      player,
+      inningsPitched,
+      era,
+      strikeouts,
+      walks,
+      earnedRuns,
+      appearances: pitching.length
+    };
+  }).filter(Boolean).sort((a, b) => a.era - b.era);
+
   // Format value for display
   const formatValue = (value, config) => {
     if (config.type === "time") {
@@ -3242,7 +3391,7 @@ const Reports = ({ players }) => {
     {/* Header with date range filter */}
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
       <div>
-        <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📊 Practice Analytics</h2>
+        <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📊 Reports</h2>
         <p style={{ color: THEME.gray, margin: "4px 0 0 0", fontSize: 13 }}>Track player improvement and team performance</p>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
@@ -3266,6 +3415,14 @@ const Reports = ({ players }) => {
       </div>
     </div>
 
+    {/* Collapse/Expand Controls */}
+    {(completedPractices.length > 0 || filteredGames.length > 0) && (
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <Button small onClick={expandAll}>⬇️ Expand All</Button>
+        <Button small onClick={collapseAll}>⬆️ Collapse All</Button>
+      </div>
+    )}
+
     {completedPractices.length === 0 ? (
       <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 40, marginBottom: 8 }}>📊</div>
@@ -3274,24 +3431,31 @@ const Reports = ({ players }) => {
       </Card>
     ) : (
       <div>
-        {/* Overall Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
-          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
-            <div style={{ color: THEME.gold, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{totalPractices}</div>
-            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Completed Practices</div>
-          </Card>
-          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
-            <div style={{ color: THEME.blue, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{avgAttendance.toFixed(1)}</div>
-            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Avg Attendance</div>
-          </Card>
-          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
-            <div style={{ color: THEME.green, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{trackedDrills.length}</div>
-            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Drills Tracked</div>
-          </Card>
-        </div>
+        {/* Practice Stats - Collapsible */}
+        <CollapsibleSection
+          id="stats"
+          title="Practice Analytics"
+          icon="📊"
+          isCollapsed={collapsedSections["stats"]}
+          onToggle={toggleSection}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
+              <div style={{ color: THEME.gold, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{totalPractices}</div>
+              <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Completed Practices</div>
+            </Card>
+            <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
+              <div style={{ color: THEME.blue, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{avgAttendance.toFixed(1)}</div>
+              <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Avg Attendance</div>
+            </Card>
+            <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
+              <div style={{ color: THEME.green, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{trackedDrills.length}</div>
+              <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Drills Tracked</div>
+            </Card>
+          </div>
+        </CollapsibleSection>
 
-        {/* Drill Leaderboards */}
-        <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", marginBottom: 12, textTransform: "uppercase" }}>🏆 Drill Leaderboards</h3>
+        {/* Drill Leaderboards - Each drill is collapsible */}
 
         {trackedDrills.length === 0 ? (
           <Card style={{ padding: 20, textAlign: "center" }}>
@@ -3304,13 +3468,18 @@ const Reports = ({ players }) => {
               if (leaderboard.length === 0) return null;
 
               return (
-                <Card key={drill.id} style={{ padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div>
-                      <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>{drill.name}</div>
-                      <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>{drill.config.description}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <CollapsibleSection
+                  key={drill.id}
+                  id={drill.id}
+                  title={drill.name}
+                  icon="🏆"
+                  badge={`${leaderboard.length} players`}
+                  isCollapsed={collapsedSections[drill.id]}
+                  onToggle={toggleSection}
+                >
+                  <Card style={{ padding: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ color: THEME.gray, fontSize: 12 }}>{drill.config.description}</div>
                       <Button small onClick={(e) => {
                         e.stopPropagation();
                         const csvData = [
@@ -3326,9 +3495,7 @@ const Reports = ({ players }) => {
                         ];
                         exportToCSV(csvData, `${drill.name.replace(/\s+/g, '_')}_leaderboard.csv`);
                       }}>📥 Export CSV</Button>
-                      <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">{leaderboard.length} players</Badge>
                     </div>
-                  </div>
 
                   <div style={{ display: "grid", gap: 8 }}>
                     {leaderboard.slice(0, 10).map((stat, idx) => (
@@ -3392,12 +3559,13 @@ const Reports = ({ players }) => {
                     ))}
                   </div>
 
-                  {leaderboard.length > 10 && (
-                    <p style={{ color: THEME.gray, fontSize: 11, textAlign: "center", marginTop: 8, marginBottom: 0 }}>
-                      + {leaderboard.length - 10} more player{leaderboard.length - 10 !== 1 ? "s" : ""}
-                    </p>
-                  )}
-                </Card>
+                    {leaderboard.length > 10 && (
+                      <p style={{ color: THEME.gray, fontSize: 11, textAlign: "center", marginTop: 8, marginBottom: 0 }}>
+                        + {leaderboard.length - 10} more player{leaderboard.length - 10 !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </Card>
+                </CollapsibleSection>
               );
             })}
           </div>
@@ -3466,61 +3634,216 @@ const Reports = ({ players }) => {
           );
         })()}
 
+        {/* Game Analytics Section */}
+        {filteredGames.length > 0 && (
+          <CollapsibleSection
+            id="games"
+            title="Game Analytics"
+            icon="⚾"
+            badge={`${gameStats.total} games`}
+            isCollapsed={collapsedSections["games"]}
+            onToggle={toggleSection}
+          >
+            {/* Game Stats Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+              <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
+                <div style={{ color: THEME.green, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                  {gameStats.wins}-{gameStats.losses}{gameStats.ties > 0 ? `-${gameStats.ties}` : ""}
+                </div>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>
+                  Record ({(gameStats.winPct * 100).toFixed(0)}%)
+                </div>
+              </Card>
+              <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
+                <div style={{ color: THEME.blue, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                  {gameStats.runsScored}
+                </div>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Runs Scored</div>
+              </Card>
+              <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.red}40` }}>
+                <div style={{ color: THEME.red, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                  {gameStats.runsAllowed}
+                </div>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Runs Allowed</div>
+              </Card>
+              <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
+                <div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                  +{gameStats.runsScored - gameStats.runsAllowed}
+                </div>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Run Differential</div>
+              </Card>
+            </div>
+
+            {/* Top Hitters */}
+            {playerBattingStats.length > 0 && (
+              <Card style={{ padding: 16, marginBottom: 16 }}>
+                <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🏏 Top Hitters</h4>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {playerBattingStats.slice(0, 5).map((stat, idx) => (
+                    <div key={stat.player.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: idx === 0 ? THEME.blackLight : "transparent",
+                      borderRadius: 4,
+                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          background: idx === 0 ? THEME.gold : THEME.charcoal,
+                          color: idx === 0 ? THEME.black : THEME.white,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          fontWeight: 700
+                        }}>{idx + 1}</div>
+                        <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{stat.player.name}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.gold, fontWeight: 700 }}>.{Math.round(stat.avg * 1000)}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>AVG</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.white, fontWeight: 700 }}>{stat.hits}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>H</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.white, fontWeight: 700 }}>{stat.rbi}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>RBI</div>
+                        </div>
+                        {stat.hrs > 0 && (
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ color: THEME.green, fontWeight: 700 }}>{stat.hrs}</div>
+                            <div style={{ color: THEME.gray, fontSize: 10 }}>HR</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Top Pitchers */}
+            {playerPitchingStats.length > 0 && (
+              <Card style={{ padding: 16 }}>
+                <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚡ Top Pitchers</h4>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {playerPitchingStats.slice(0, 5).map((stat, idx) => (
+                    <div key={stat.player.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: idx === 0 ? THEME.blackLight : "transparent",
+                      borderRadius: 4,
+                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          background: idx === 0 ? THEME.gold : THEME.charcoal,
+                          color: idx === 0 ? THEME.black : THEME.white,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          fontWeight: 700
+                        }}>{idx + 1}</div>
+                        <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{stat.player.name}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.gold, fontWeight: 700 }}>{stat.era.toFixed(2)}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>ERA</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.white, fontWeight: 700 }}>{stat.inningsPitched.toFixed(1)}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>IP</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.green, fontWeight: 700 }}>{stat.strikeouts}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>K</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ color: THEME.red, fontWeight: 700 }}>{stat.walks}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>BB</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </CollapsibleSection>
+        )}
+
         {/* Attendance Summary */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, marginTop: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
-            <span style={{ color: THEME.gray, fontSize: 13, fontWeight: 600, background: THEME.charcoal, padding: "4px 10px", borderRadius: 12 }}>
-              {players.length} {players.length === 1 ? 'player' : 'players'}
-            </span>
-          </div>
-          <Button small onClick={() => {
-            const csvData = [
-              ['Player', 'Practices Attended', 'Total Practices', 'Attendance %'],
-              ...players.map(player => {
+        <CollapsibleSection
+          id="attendance"
+          title="Attendance Summary"
+          icon="📅"
+          badge={`${players.length} players`}
+          isCollapsed={collapsedSections["attendance"]}
+          onToggle={toggleSection}
+        >
+          <Card style={{ padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+              <Button small onClick={() => {
+                const csvData = [
+                  ['Player', 'Practices Attended', 'Total Practices', 'Attendance %'],
+                  ...players.map(player => {
+                    const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+                    const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
+                    return [player.name, attended, totalPractices, percentage + '%'];
+                  })
+                ];
+                exportToCSV(csvData, 'attendance_summary.csv');
+              }}>📥 Export CSV</Button>
+            </div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {players.map(player => {
                 const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
                 const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
-                return [player.name, attended, totalPractices, percentage + '%'];
-              })
-            ];
-            exportToCSV(csvData, 'attendance_summary.csv');
-          }}>📥 Export CSV</Button>
-        </div>
-        <Card style={{ padding: 16 }}>
-          <div style={{ display: "grid", gap: 8 }}>
-            {players.map(player => {
-              const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
-              const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
 
-              return (
-                <div key={player.id} style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "8px 12px",
-                  background: "transparent",
-                  borderRadius: 4,
-                  border: `1px solid ${THEME.charcoal}`
-                }}>
-                  <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 120, height: 8, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{
-                        width: `${percentage}%`,
-                        height: "100%",
-                        background: `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.goldLight} 100%)`,
-                        transition: "width 0.3s ease"
-                      }} />
+                return (
+                  <div key={player.id} style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 12px",
+                    background: "transparent",
+                    borderRadius: 4,
+                    border: `1px solid ${THEME.charcoal}`
+                  }}>
+                    <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 120, height: 8, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${percentage}%`,
+                          height: "100%",
+                          background: `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.goldLight} 100%)`,
+                          transition: "width 0.3s ease"
+                        }} />
+                      </div>
+                      <span style={{ color: THEME.gray, fontSize: 12, minWidth: 70, textAlign: "right" }}>
+                        {attended}/{totalPractices} ({percentage}%)
+                      </span>
                     </div>
-                    <span style={{ color: THEME.gray, fontSize: 12, minWidth: 70, textAlign: "right" }}>
-                      {attended}/{totalPractices} ({percentage}%)
-                    </span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+                );
+              })}
+            </div>
+          </Card>
+        </CollapsibleSection>
       </div>
     )}
   </div>;
