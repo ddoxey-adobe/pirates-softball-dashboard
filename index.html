@@ -3166,6 +3166,7 @@ const Reports = ({ players }) => {
   const [dateRange, setDateRange] = useState("all"); // "all", "30", "60", "90"
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDrill, setSelectedDrill] = useState(null);
+  const [selectedGame, setSelectedGame] = useState(null);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -3674,6 +3675,74 @@ const Reports = ({ players }) => {
               </Card>
             </div>
 
+            {/* Game History Timeline */}
+            <Card style={{ padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📅 Game History</h4>
+              <div style={{ display: "grid", gap: 8 }}>
+                {filteredGames.sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(game => {
+                  const isWin = game.result === "W";
+                  const isLoss = game.result === "L";
+                  const isTie = game.result === "T";
+                  const resultColor = isWin ? THEME.green : isLoss ? THEME.red : THEME.gray;
+                  const resultIcon = isWin ? "✅" : isLoss ? "❌" : "⏸️";
+                  const locationIcon = game.location?.toLowerCase().includes("home") ? "🏠" : "✈️";
+
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => setSelectedGame(game)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "12px 14px",
+                        background: THEME.blackLight,
+                        borderRadius: 6,
+                        border: `1px solid ${resultColor}40`,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = resultColor}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = `${resultColor}40`}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{
+                          fontSize: 20,
+                          width: 32,
+                          textAlign: "center"
+                        }}>{resultIcon}</div>
+                        <div>
+                          <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>
+                            {game.date ? new Date(game.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                            {" "}vs {game.opponent}
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                            {locationIcon} {game.location || "Unknown"}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{
+                            color: resultColor,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            fontFamily: "'Oswald',sans-serif"
+                          }}>
+                            {game.result} {game.ourScore}-{game.theirScore}
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 10 }}>
+                            {game.innings || 7} innings
+                          </div>
+                        </div>
+                        <div style={{ color: THEME.gold, fontSize: 16 }}>›</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
             {/* Top Hitters */}
             {playerBattingStats.length > 0 && (
               <Card style={{ padding: 16, marginBottom: 16 }}>
@@ -3782,6 +3851,175 @@ const Reports = ({ players }) => {
                   ))}
                 </div>
               </Card>
+            )}
+
+            {/* Game Details Modal */}
+            {selectedGame && (
+              <Modal>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ color: THEME.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
+                      {selectedGame.result === "W" ? "✅" : selectedGame.result === "L" ? "❌" : "⏸️"} vs {selectedGame.opponent}
+                    </h3>
+                    <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>
+                      {selectedGame.date ? new Date(selectedGame.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : ""}
+                      {" • "}{selectedGame.location || "Unknown Location"}
+                    </p>
+                  </div>
+                  <Button onClick={() => setSelectedGame(null)}>✕</Button>
+                </div>
+
+                {/* Final Score */}
+                <Card style={{ padding: 20, marginBottom: 16, textAlign: "center", background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)` }}>
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 24 }}>
+                    <div>
+                      <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Pirates</div>
+                      <div style={{
+                        color: selectedGame.result === "W" ? THEME.green : selectedGame.result === "L" ? THEME.red : THEME.gray,
+                        fontSize: 48,
+                        fontWeight: 700,
+                        fontFamily: "'Oswald',sans-serif"
+                      }}>{selectedGame.ourScore}</div>
+                    </div>
+                    <div style={{ color: THEME.gray, fontSize: 24 }}>-</div>
+                    <div>
+                      <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 4 }}>{selectedGame.opponent}</div>
+                      <div style={{
+                        color: THEME.gray,
+                        fontSize: 48,
+                        fontWeight: 700,
+                        fontFamily: "'Oswald',sans-serif"
+                      }}>{selectedGame.theirScore}</div>
+                    </div>
+                  </div>
+                  <div style={{ color: THEME.gray, fontSize: 12, marginTop: 12 }}>
+                    Final • {selectedGame.innings || 7} innings
+                  </div>
+                </Card>
+
+                {/* Top Performers */}
+                {selectedGame.atBats && selectedGame.atBats.length > 0 && (
+                  <Card style={{ padding: 16, marginBottom: 16 }}>
+                    <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⭐ Top Performers</h4>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {(() => {
+                        // Calculate player contributions
+                        const contributions = {};
+                        selectedGame.atBats.forEach(ab => {
+                          if (!contributions[ab.playerId]) {
+                            contributions[ab.playerId] = { hits: 0, atBats: 0, rbi: 0, runs: 0 };
+                          }
+                          contributions[ab.playerId].atBats++;
+                          if (["1B", "2B", "3B", "HR"].includes(ab.result)) contributions[ab.playerId].hits++;
+                          contributions[ab.playerId].rbi += ab.rbi || 0;
+                          contributions[ab.playerId].runs += ab.runs || 0;
+                        });
+
+                        // Get top 5 by hits + RBI
+                        return Object.entries(contributions)
+                          .map(([playerId, stats]) => ({
+                            player: players.find(p => p.id === playerId),
+                            ...stats
+                          }))
+                          .filter(p => p.player && (p.hits > 0 || p.rbi > 0 || p.runs > 0))
+                          .sort((a, b) => (b.hits + b.rbi) - (a.hits + a.rbi))
+                          .slice(0, 5)
+                          .map(stat => (
+                            <div key={stat.player.id} style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "8px 12px",
+                              background: THEME.blackLight,
+                              borderRadius: 4,
+                              border: `1px solid ${THEME.charcoal}`
+                            }}>
+                              <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{stat.player.name}</span>
+                              <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+                                <div style={{ color: THEME.gray }}>
+                                  {stat.hits}-{stat.atBats}
+                                </div>
+                                {stat.rbi > 0 && (
+                                  <div style={{ color: THEME.blue }}>
+                                    {stat.rbi} RBI
+                                  </div>
+                                )}
+                                {stat.runs > 0 && (
+                                  <div style={{ color: THEME.green }}>
+                                    {stat.runs} R
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ));
+                      })()}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Pitching Summary */}
+                {selectedGame.pitching && selectedGame.pitching.length > 0 && (
+                  <Card style={{ padding: 16, marginBottom: 16 }}>
+                    <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚡ Pitching</h4>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {selectedGame.pitching.map(p => {
+                        const pitcher = players.find(pl => pl.id === p.playerId);
+                        if (!pitcher) return null;
+                        return (
+                          <div key={p.playerId} style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "8px 12px",
+                            background: THEME.blackLight,
+                            borderRadius: 4,
+                            border: `1px solid ${THEME.charcoal}`
+                          }}>
+                            <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{pitcher.name}</span>
+                            <div style={{ display: "flex", gap: 12, fontSize: 12, color: THEME.gray }}>
+                              <div>{p.innings || 0} IP</div>
+                              <div style={{ color: THEME.green }}>{p.strikeouts || 0} K</div>
+                              <div style={{ color: THEME.red }}>{p.walks || 0} BB</div>
+                              <div>{p.earnedRuns || 0} ER</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Lineup */}
+                {selectedGame.lineup && selectedGame.lineup.length > 0 && (
+                  <Card style={{ padding: 16 }}>
+                    <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📋 Lineup & Positions</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+                      {selectedGame.lineup
+                        .sort((a, b) => (a.battingOrder || 99) - (b.battingOrder || 99))
+                        .map(l => {
+                          const player = players.find(p => p.id === l.playerId);
+                          if (!player) return null;
+                          return (
+                            <div key={l.playerId} style={{
+                              padding: "6px 10px",
+                              background: THEME.blackLight,
+                              borderRadius: 4,
+                              border: `1px solid ${THEME.charcoal}`,
+                              fontSize: 12
+                            }}>
+                              <div style={{ color: THEME.gold, fontWeight: 700 }}>#{l.battingOrder} {l.position}</div>
+                              <div style={{ color: THEME.white, marginTop: 2 }}>{player.name}</div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </Card>
+                )}
+
+                <div style={{ marginTop: 16, textAlign: "right" }}>
+                  <Button onClick={() => setSelectedGame(null)}>Close</Button>
+                </div>
+              </Modal>
             )}
           </CollapsibleSection>
         )}
