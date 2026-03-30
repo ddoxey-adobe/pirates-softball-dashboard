@@ -3081,7 +3081,7 @@ const Reports = ({ players }) => {
   const [selectedDrill, setSelectedDrill] = useState(null);
 
   useEffect(() => {
-    loadStore(STORAGE_KEYS.PRACTICELOGS, []).then(setPractices);
+    loadStore("pirates-practices-unified-2026v1", []).then(setPractices);
   }, []);
 
   // Filter practices by date range
