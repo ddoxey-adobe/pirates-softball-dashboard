@@ -118,12 +118,12 @@ const PRACTICE_TEMPLATES = [
     phases: [
       { name: "Warm-Up", type: "together", time: "15 min", drills: [
         { ...D("w1"), assignedCoach: "Any" },
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: 'What does being a Pirate mean? We support each other.'" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: 'What does being a Pirate mean? We support each other.'" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("t1"), assignedCoach: "Shari", station: "A" },
-        { ...D("f1"), assignedCoach: "Ken", station: "B" },
-        { ...D("h1"), assignedCoach: "Head Coach", station: "C" },
+        { ...D("t1"), assignedCoach: "Throwing", station: "A" },
+        { ...D("f1"), assignedCoach: "Infield", station: "B" },
+        { ...D("h1"), assignedCoach: "Hitting", station: "C" },
       ]},
       { name: "Full Team — Baserunning", type: "together", time: "15 min", drills: [
         { ...D("b1"), assignedCoach: "Any" },
@@ -143,13 +143,13 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Throwing Fundamentals", type: "together", time: "20 min", drills: [
-        { ...D("t1"), assignedCoach: "Shari", notes: "One-knee throwing — isolate arm mechanics" },
-        { ...D("t2"), assignedCoach: "Shari", notes: "Rock & Fire — weight transfer" },
+        { ...D("t1"), assignedCoach: "Throwing", notes: "One-knee throwing — isolate arm mechanics" },
+        { ...D("t2"), assignedCoach: "Throwing", notes: "Rock & Fire — weight transfer" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("h1"), assignedCoach: "Head Coach", station: "A", notes: "Tee work — check stance, grip, swing path" },
-        { ...D("h2"), assignedCoach: "Ken", station: "B", notes: "Freeze drill — slow down rushed swings" },
-        { ...D("f6"), assignedCoach: "Shari", station: "C", notes: "Bare hand pickups — soft hands" },
+        { ...D("h1"), assignedCoach: "Hitting", station: "A", notes: "Tee work — check stance, grip, swing path" },
+        { ...D("h2"), assignedCoach: "Hitting", station: "B", notes: "Freeze drill — slow down rushed swings" },
+        { ...D("f6"), assignedCoach: "Infield", station: "C", notes: "Bare hand pickups — soft hands" },
       ]},
       { name: "Baserunning Basics", type: "together", time: "15 min", drills: [
         { ...D("b1"), assignedCoach: "Any", notes: "Time each player — track improvement" },
@@ -159,7 +159,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("b5"), assignedCoach: "Any", notes: "Baserunning race — competitive energy" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Positive self-talk — we all make mistakes" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Positive self-talk — we all make mistakes" },
       ]},
     ]},
   { id: "early3", name: "Early Season — Defense & Confidence Building", duration: 120, focus: "Defense",
@@ -169,9 +169,9 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("f1"), assignedCoach: "Ken", station: "A", notes: "Ground ball fundamentals — charge, field, throw" },
-        { ...D("f4"), assignedCoach: "Shari", station: "B", notes: "Fly ball tracking — drop step, read the ball" },
-        { ...D("f10"), assignedCoach: "Head Coach", station: "C", notes: "Lateral shuffle box — defensive positioning" },
+        { ...D("f1"), assignedCoach: "Infield", station: "A", notes: "Ground ball fundamentals — charge, field, throw" },
+        { ...D("f4"), assignedCoach: "Outfield", station: "B", notes: "Fly ball tracking — drop step, read the ball" },
+        { ...D("f10"), assignedCoach: "Defense", station: "C", notes: "Lateral shuffle box — defensive positioning" },
       ]},
       { name: "Full Team Throwing", type: "together", time: "15 min", drills: [
         { ...D("t3"), assignedCoach: "Any", notes: "Long toss — distance challenge" },
@@ -184,7 +184,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("c2"), assignedCoach: "Any", notes: "Cone & hurdle course — footwork" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Cheering for teammates — we win together" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Cheering for teammates — we win together" },
       ]},
     ]},
   { id: "early4", name: "Early Season — All-Around Assessment", duration: 120, focus: "Assessment",
@@ -192,12 +192,12 @@ const PRACTICE_TEMPLATES = [
     phases: [
       { name: "Warm-Up & Throwing", type: "together", time: "15 min", drills: [
         { ...D("w1"), assignedCoach: "Any" },
-        { ...D("t2"), assignedCoach: "Shari", notes: "Rock & Fire — assess arm strength" },
+        { ...D("t2"), assignedCoach: "Throwing", notes: "Rock & Fire — assess arm strength" },
       ]},
       { name: "Station Rotations", type: "stations", time: "50 min (3 groups × 15 min each + 5 min buffer)", drills: [
-        { ...D("f1"), assignedCoach: "Ken", station: "A", notes: "Assess fielding — speed, hands, accuracy" },
-        { ...D("h3"), assignedCoach: "Head Coach", station: "B", notes: "Inside/outside tee — assess swing path" },
-        { ...D("f8"), assignedCoach: "Shari", station: "C", notes: "Cone triangle — assess footwork & angles" },
+        { ...D("f1"), assignedCoach: "Infield", station: "A", notes: "Assess fielding — speed, hands, accuracy" },
+        { ...D("h3"), assignedCoach: "Hitting", station: "B", notes: "Inside/outside tee — assess swing path" },
+        { ...D("f8"), assignedCoach: "Infield", station: "C", notes: "Cone triangle — assess footwork & angles" },
       ]},
       { name: "Baserunning Assessment", type: "together", time: "15 min", drills: [
         { ...D("b1"), assignedCoach: "Any", notes: "Time every player — record for tracking" },
@@ -208,7 +208,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — see who thrives under pressure" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Every player brings something unique to this team" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Every player brings something unique to this team" },
       ]},
     ]},
 
@@ -221,16 +221,16 @@ const PRACTICE_TEMPLATES = [
         { ...D("w2"), assignedCoach: "Any", notes: "Shoulder bands for pitchers especially" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("h6"), assignedCoach: "Head Coach", station: "A", notes: "Machine BP — vary speeds" },
-        { ...D("f9"), assignedCoach: "Ken", station: "B", notes: "Cone weave grounders — lateral movement while fielding" },
-        { ...D("p1"), assignedCoach: "Shari", station: "C", notes: "Rose, Kaizley, Jayden + catchers" },
+        { ...D("h6"), assignedCoach: "Hitting", station: "A", notes: "Machine BP — vary speeds" },
+        { ...D("f9"), assignedCoach: "Infield", station: "B", notes: "Cone weave grounders — lateral movement while fielding" },
+        { ...D("p1"), assignedCoach: "Pitching", station: "C", notes: "Rose, Kaizley, Jayden + catchers" },
       ]},
       { name: "Full Team — Game Situations", type: "together", time: "35 min", drills: [
-        { ...D("g1"), assignedCoach: "All", notes: "Call different scenarios each round" },
-        { ...D("g2"), assignedCoach: "Ken" },
+        { ...D("g1"), assignedCoach: "All Coaches", notes: "Call different scenarios each round" },
+        { ...D("g2"), assignedCoach: "Infield" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: What did we learn from last game?" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: What did we learn from last game?" },
       ]},
     ]},
   { id: "mid2", name: "Mid Season — Advanced Defense & Relays", duration: 120, focus: "Defense",
@@ -242,21 +242,21 @@ const PRACTICE_TEMPLATES = [
       { name: "Outfield Work", type: "together", time: "20 min", drills: [
         { ...D("f10"), assignedCoach: "Any", notes: "Lateral shuffle box — defensive positioning" },
         { ...D("f4"), assignedCoach: "Any", notes: "Fly ball tracking — read off the bat" },
-        { ...D("t4"), assignedCoach: "Ken", notes: "Relay & cutoff — through vs. do-or-die" },
+        { ...D("t4"), assignedCoach: "Throwing", notes: "Relay & cutoff — through vs. do-or-die" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("f2"), assignedCoach: "Ken", station: "A", notes: "Rapid fire — 3B, 2B, 1B in sequence" },
-        { ...D("h6"), assignedCoach: "Head Coach", station: "B", notes: "Live machine BP — game speeds" },
-        { ...D("f5"), assignedCoach: "Shari", station: "C", notes: "Triangle pop fly — communication" },
+        { ...D("f2"), assignedCoach: "Infield", station: "A", notes: "Rapid fire — 3B, 2B, 1B in sequence" },
+        { ...D("h6"), assignedCoach: "Hitting", station: "B", notes: "Live machine BP — game speeds" },
+        { ...D("f5"), assignedCoach: "Outfield", station: "C", notes: "Triangle pop fly — communication" },
       ]},
       { name: "Game Situations", type: "together", time: "20 min", drills: [
-        { ...D("g1"), assignedCoach: "All", notes: "Focus on outfield scenarios — gaps, over heads" },
+        { ...D("g1"), assignedCoach: "All Coaches", notes: "Focus on outfield scenarios — gaps, over heads" },
       ]},
       { name: "Competition", type: "together", time: "10 min", drills: [
         { ...D("h8"), assignedCoach: "Any" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Trusting your teammates — make the play" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Trusting your teammates — make the play" },
       ]},
     ]},
   { id: "mid3", name: "Mid Season — Hitting Power & Speed Adjustment", duration: 120, focus: "Hitting",
@@ -266,9 +266,9 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Station Rotations", type: "stations", time: "50 min (3 groups × 15 min each + 5 buffer)", drills: [
-        { ...D("h6"), assignedCoach: "Head Coach", station: "A", notes: "Machine BP — challenge speeds" },
-        { ...D("h7"), assignedCoach: "Ken", station: "B", notes: "Speed changes — adjust timing" },
-        { ...D("h3"), assignedCoach: "Shari", station: "C", notes: "Inside/outside tee — hit to all fields" },
+        { ...D("h6"), assignedCoach: "Hitting", station: "A", notes: "Machine BP — challenge speeds" },
+        { ...D("h7"), assignedCoach: "Hitting", station: "B", notes: "Speed changes — adjust timing" },
+        { ...D("h3"), assignedCoach: "Hitting", station: "C", notes: "Inside/outside tee — hit to all fields" },
       ]},
       { name: "Bunting Practice", type: "together", time: "15 min", drills: [
         { ...D("h10"), assignedCoach: "Any", notes: "Sacrifice & drag bunts — game situations" },
@@ -278,7 +278,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("h9"), assignedCoach: "Any", notes: "Points-based — line drives win" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Quality at-bats — make the pitcher work" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Quality at-bats — make the pitcher work" },
       ]},
     ]},
   { id: "mid4", name: "Mid Season — Pressure Situations & 21 Outs", duration: 120, focus: "Pressure",
@@ -289,19 +289,19 @@ const PRACTICE_TEMPLATES = [
         { ...D("w2"), assignedCoach: "Any" },
       ]},
       { name: "Station Rotations", type: "stations", time: "40 min", drills: [
-        { ...D("h5"), assignedCoach: "Head Coach", station: "A", notes: "Front toss — timing under pressure" },
-        { ...D("f7"), assignedCoach: "Ken", station: "B", notes: "Scoop step throw — eliminate wasted movement" },
-        { ...D("p2"), assignedCoach: "Shari", station: "C", notes: "Pitch location — hit your spots" },
+        { ...D("h5"), assignedCoach: "Hitting", station: "A", notes: "Front toss — timing under pressure" },
+        { ...D("f7"), assignedCoach: "Infield", station: "B", notes: "Scoop step throw — eliminate wasted movement" },
+        { ...D("p2"), assignedCoach: "Pitching", station: "C", notes: "Pitch location — hit your spots" },
       ]},
       { name: "Full Team — 21 Outs", type: "together", time: "30 min", drills: [
-        { ...D("f3"), assignedCoach: "All", notes: "Goal: 21 consecutive outs. Reset on error. Team accountability." },
+        { ...D("f3"), assignedCoach: "All Coaches", notes: "Goal: 21 consecutive outs. Reset on error. Team accountability." },
       ]},
       { name: "Game Situations", type: "together", time: "20 min", drills: [
-        { ...D("g3"), assignedCoach: "Ken", notes: "Bunt defense — squeeze play" },
-        { ...D("g2"), assignedCoach: "Ken", notes: "First & third — steal scenarios" },
+        { ...D("g3"), assignedCoach: "Infield", notes: "Bunt defense — squeeze play" },
+        { ...D("g2"), assignedCoach: "Infield", notes: "First & third — steal scenarios" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Handling pressure — breathe, trust your training" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Handling pressure — breathe, trust your training" },
       ]},
     ]},
 
@@ -316,13 +316,13 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Pre-Game Hitting", type: "together", time: "25 min", drills: [
         { ...D("h4"), assignedCoach: "Any", notes: "Soft toss — feel-good swings" },
-        { ...D("h6"), assignedCoach: "Head Coach", notes: "8-10 swings each — confidence builders" },
+        { ...D("h6"), assignedCoach: "Hitting", notes: "8-10 swings each — confidence builders" },
       ]},
       { name: "Live Scrimmage", type: "together", time: "60 min", drills: [
-        { ...D("g4"), assignedCoach: "All", notes: "Full game simulation. Keep score. Rotate pitchers. Most realistic practice." },
+        { ...D("g4"), assignedCoach: "All Coaches", notes: "Full game simulation. Keep score. Rotate pitchers. Most realistic practice." },
       ]},
       { name: "Cool Down & Mental", type: "together", time: "10 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Trust your training. You're ready for tournament." },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Trust your training. You're ready for tournament." },
       ]},
     ]},
   { id: "late2", name: "End Season — Pre-Game Light Work", duration: 120, focus: "Pre-Game",
@@ -338,10 +338,10 @@ const PRACTICE_TEMPLATES = [
       ]},
       { name: "Defensive Review", type: "together", time: "25 min", drills: [
         { ...D("b2"), assignedCoach: "Any", notes: "Review rounding bases" },
-        { ...D("f4"), assignedCoach: "Ken", notes: "Fly ball tracking — outfielders especially" },
+        { ...D("f4"), assignedCoach: "Outfield", notes: "Fly ball tracking — outfielders especially" },
       ]},
       { name: "Mental Prep", type: "together", time: "10 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Talk about opponent, focus cues, positive energy. 'Trust your training.'" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Talk about opponent, focus cues, positive energy. 'Trust your training.'" },
       ]},
       { name: "Fun Finish", type: "together", time: "15 min", drills: [
         { ...D("h9"), assignedCoach: "Any", notes: "Points-Based Hitting — end on a high note" },
@@ -359,7 +359,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("h9"), assignedCoach: "Any", notes: "Points-based team draft" },
       ]},
       { name: "Fielding Competition", type: "together", time: "25 min", drills: [
-        { ...D("f3"), assignedCoach: "All", notes: "21 Outs challenge — beat your record" },
+        { ...D("f3"), assignedCoach: "All Coaches", notes: "21 Outs challenge — beat your record" },
       ]},
       { name: "Baserunning Races", type: "together", time: "20 min", drills: [
         { ...D("b5"), assignedCoach: "Any", notes: "Race to 2nd and race home — bracket style" },
@@ -370,7 +370,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("c5"), assignedCoach: "Any", notes: "Ladder-hurdle combo — advanced challenge race" },
       ]},
       { name: "Team Celebration", type: "together", time: "10 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Season reflection — shoutouts, favorite memories, what we accomplished" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Season reflection — shoutouts, favorite memories, what we accomplished" },
       ]},
     ]},
   { id: "late4", name: "End Season — Advanced Skills & Team Chemistry", duration: 120, focus: "Advanced",
@@ -380,20 +380,20 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("h7"), assignedCoach: "Head Coach", station: "A", notes: "Speed changes — timing mastery" },
-        { ...D("c4"), assignedCoach: "Ken", station: "B", notes: "Hurdle hops — explosive power for tournament prep" },
-        { ...D("p3"), assignedCoach: "Shari", station: "C", notes: "Simulated innings — pitch count management" },
+        { ...D("h7"), assignedCoach: "Hitting", station: "A", notes: "Speed changes — timing mastery" },
+        { ...D("c4"), assignedCoach: "Conditioning", station: "B", notes: "Hurdle hops — explosive power for tournament prep" },
+        { ...D("p3"), assignedCoach: "Pitching", station: "C", notes: "Simulated innings — pitch count management" },
       ]},
       { name: "Advanced Game Situations", type: "together", time: "35 min", drills: [
-        { ...D("g1"), assignedCoach: "All", notes: "Complex scenarios — multiple runners" },
-        { ...D("g2"), assignedCoach: "Ken", notes: "First & third defense — make the right read" },
-        { ...D("g3"), assignedCoach: "Ken", notes: "Bunt defense — squeeze situations" },
+        { ...D("g1"), assignedCoach: "All Coaches", notes: "Complex scenarios — multiple runners" },
+        { ...D("g2"), assignedCoach: "Infield", notes: "First & third defense — make the right read" },
+        { ...D("g3"), assignedCoach: "Infield", notes: "Bunt defense — squeeze situations" },
       ]},
       { name: "Competition Finish", type: "together", time: "15 min", drills: [
         { ...D("h11"), assignedCoach: "Any", notes: "Batting Queen — end practice on a high" },
       ]},
       { name: "Huddle", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "Topic: Playing for each other — we're at our best when we play together" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "Topic: Playing for each other — we're at our best when we play together" },
       ]},
     ]},
 
@@ -405,9 +405,9 @@ const PRACTICE_TEMPLATES = [
         { ...D("w1"), assignedCoach: "Any" },
       ]},
       { name: "Hitting Station Rotations", type: "stations", time: "45 min (3 groups × 15 min each)", drills: [
-        { ...D("h6"), assignedCoach: "Head Coach", station: "A", notes: "Jugs machine — vary speeds each round" },
-        { ...D("h3"), assignedCoach: "Ken", station: "B", notes: "Inside/outside tee — move tee between reps" },
-        { ...D("h5"), assignedCoach: "Shari", station: "C", notes: "Front toss — focus on timing" },
+        { ...D("h6"), assignedCoach: "Hitting", station: "A", notes: "Jugs machine — vary speeds each round" },
+        { ...D("h3"), assignedCoach: "Hitting", station: "B", notes: "Inside/outside tee — move tee between reps" },
+        { ...D("h5"), assignedCoach: "Hitting", station: "C", notes: "Front toss — focus on timing" },
       ]},
       { name: "Bunting", type: "together", time: "10 min", drills: [
         { ...D("h10"), assignedCoach: "Any" },
@@ -418,7 +418,7 @@ const PRACTICE_TEMPLATES = [
         { ...D("h9"), assignedCoach: "Any", notes: "Points-Based Hitting — team draft" },
       ]},
       { name: "Cool Down", type: "together", time: "5 min", drills: [
-        { ...D("m1"), assignedCoach: "Head Coach", notes: "What felt good today? What do we work on next?" },
+        { ...D("m1"), assignedCoach: "Leadership", notes: "What felt good today? What do we work on next?" },
       ]},
     ]},
 ];
