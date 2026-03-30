@@ -3133,6 +3133,7 @@ const Reports = ({ players }) => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [selectedPlayerGameLog, setSelectedPlayerGameLog] = useState(null);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -3718,15 +3719,20 @@ const Reports = ({ players }) => {
                 <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🏏 Top Hitters</h4>
                 <div style={{ display: "grid", gap: 8 }}>
                   {playerBattingStats.slice(0, 5).map((stat, idx) => (
-                    <div key={stat.player.id} style={{
+                    <div key={stat.player.id} onClick={() => setSelectedPlayerGameLog(stat.player)} style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "8px 12px",
                       background: idx === 0 ? THEME.blackLight : "transparent",
                       borderRadius: 4,
-                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`
-                    }}>
+                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = THEME.blackLight}
+                    onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? THEME.blackLight : "transparent"}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{
                           width: 24,
@@ -3774,15 +3780,20 @@ const Reports = ({ players }) => {
                 <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚡ Top Pitchers</h4>
                 <div style={{ display: "grid", gap: 8 }}>
                   {playerPitchingStats.slice(0, 5).map((stat, idx) => (
-                    <div key={stat.player.id} style={{
+                    <div key={stat.player.id} onClick={() => setSelectedPlayerGameLog(stat.player)} style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "8px 12px",
                       background: idx === 0 ? THEME.blackLight : "transparent",
                       borderRadius: 4,
-                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`
-                    }}>
+                      border: `1px solid ${idx === 0 ? THEME.gold : THEME.charcoal}`,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = THEME.blackLight}
+                    onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? THEME.blackLight : "transparent"}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{
                           width: 24,
@@ -4081,6 +4092,222 @@ const Reports = ({ players }) => {
         </div>
       </div>
     )}
+
+    {/* Player Game Log Modal */}
+    {selectedPlayerGameLog && (() => {
+      const player = selectedPlayerGameLog;
+
+      // Calculate player's game-by-game stats
+      const playerGames = filteredGames.map(game => {
+        const atBats = (game.atBats || []).filter(ab => ab.playerId === player.id);
+        const pitching = (game.pitching || []).filter(p => p.playerId === player.id);
+        const lineup = (game.lineup || []).find(l => l.playerId === player.id);
+
+        if (atBats.length === 0 && pitching.length === 0 && !lineup) return null;
+
+        // Batting stats
+        const hits = atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+        const rbi = atBats.reduce((sum, ab) => sum + (ab.rbi || 0), 0);
+        const runs = atBats.reduce((sum, ab) => sum + (ab.runs || 0), 0);
+        const avg = atBats.length > 0 ? hits / atBats.length : 0;
+
+        // Pitching stats
+        const totalPitching = pitching.reduce((acc, p) => ({
+          innings: acc.innings + (p.innings || 0),
+          strikeouts: acc.strikeouts + (p.strikeouts || 0),
+          walks: acc.walks + (p.walks || 0),
+          earnedRuns: acc.earnedRuns + (p.earnedRuns || 0)
+        }), { innings: 0, strikeouts: 0, walks: 0, earnedRuns: 0 });
+
+        return {
+          game,
+          atBats: atBats.length,
+          hits,
+          avg,
+          rbi,
+          runs,
+          position: lineup?.position || "N/A",
+          battingOrder: lineup?.battingOrder,
+          pitching: totalPitching.innings > 0 ? totalPitching : null
+        };
+      }).filter(Boolean);
+
+      // Overall season totals
+      const seasonTotals = playerGames.reduce((acc, g) => ({
+        games: acc.games + 1,
+        atBats: acc.atBats + g.atBats,
+        hits: acc.hits + g.hits,
+        rbi: acc.rbi + g.rbi,
+        runs: acc.runs + g.runs,
+        innings: acc.innings + (g.pitching?.innings || 0),
+        strikeouts: acc.strikeouts + (g.pitching?.strikeouts || 0)
+      }), { games: 0, atBats: 0, hits: 0, rbi: 0, runs: 0, innings: 0, strikeouts: 0 });
+
+      const seasonAvg = seasonTotals.atBats > 0 ? seasonTotals.hits / seasonTotals.atBats : 0;
+
+      // Positions played with frequency
+      const positionCounts = {};
+      playerGames.forEach(g => {
+        if (g.position && g.position !== "N/A") {
+          positionCounts[g.position] = (positionCounts[g.position] || 0) + 1;
+        }
+      });
+      const positionsList = Object.entries(positionCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([pos, count]) => `${pos} (${count}x)`);
+
+      return (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.85)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999,
+          padding: 20
+        }} onClick={() => setSelectedPlayerGameLog(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: THEME.blackLight,
+            borderRadius: 12,
+            padding: 24,
+            border: `2px solid ${THEME.gold}`,
+            maxWidth: 800,
+            width: "100%",
+            maxHeight: "85vh",
+            overflowY: "auto"
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: THEME.gold, fontFamily: "'Oswald',sans-serif", fontSize: 20, textTransform: "uppercase" }}>
+                👤 {player.name}
+              </h3>
+              <button onClick={() => setSelectedPlayerGameLog(null)} style={{
+                background: "none",
+                border: "none",
+                color: THEME.gray,
+                fontSize: 24,
+                cursor: "pointer",
+                padding: 0,
+                width: 32,
+                height: 32
+              }}>✕</button>
+            </div>
+
+            {/* Season Overview */}
+            <Card style={{ padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📊 Season Overview</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonTotals.games}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11 }}>GAMES</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonAvg.toFixed(3)}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11 }}>AVG</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: THEME.blue, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonTotals.hits}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11 }}>HITS</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: THEME.green, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonTotals.rbi}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11 }}>RBI</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: THEME.white, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonTotals.runs}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11 }}>RUNS</div>
+                </div>
+                {seasonTotals.innings > 0 && (
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ color: THEME.red, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{seasonTotals.innings.toFixed(1)}</div>
+                    <div style={{ color: THEME.gray, fontSize: 11 }}>IP</div>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Positions Played */}
+            {positionsList.length > 0 && (
+              <Card style={{ padding: 16, marginBottom: 16 }}>
+                <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 Positions Played</h4>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {positionsList.map((pos, idx) => (
+                    <span key={idx} style={{
+                      padding: "4px 12px",
+                      background: THEME.charcoal,
+                      borderRadius: 12,
+                      color: THEME.white,
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}>{pos}</span>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Game-by-Game Breakdown */}
+            <Card style={{ padding: 16 }}>
+              <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📋 Game-by-Game Performance</h4>
+              <div style={{ display: "grid", gap: 8 }}>
+                {playerGames.sort((a, b) => (b.game.date || "").localeCompare(a.game.date || "")).map(g => (
+                  <div key={g.game.id} style={{
+                    padding: "12px",
+                    background: THEME.blackLight,
+                    borderRadius: 6,
+                    border: `1px solid ${THEME.charcoal}`
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div>
+                        <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>
+                          {g.game.date ? new Date(g.game.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""} vs {g.game.opponent}
+                        </div>
+                        <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                          #{g.battingOrder} {g.position}
+                        </div>
+                      </div>
+                      <div style={{
+                        color: g.game.result === "W" ? THEME.green : g.game.result === "L" ? THEME.red : THEME.gray,
+                        fontSize: 12,
+                        fontWeight: 700
+                      }}>
+                        {g.game.result} {g.game.ourScore}-{g.game.theirScore}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                      <div style={{ color: THEME.gray }}>
+                        Batting: <span style={{ color: THEME.white }}>{g.hits}-{g.atBats}</span>
+                        {g.atBats > 0 && <span style={{ color: THEME.gold, marginLeft: 4 }}>({g.avg.toFixed(3)})</span>}
+                      </div>
+                      {g.rbi > 0 && (
+                        <div style={{ color: THEME.gray }}>
+                          RBI: <span style={{ color: THEME.blue }}>{g.rbi}</span>
+                        </div>
+                      )}
+                      {g.runs > 0 && (
+                        <div style={{ color: THEME.gray }}>
+                          R: <span style={{ color: THEME.green }}>{g.runs}</span>
+                        </div>
+                      )}
+                      {g.pitching && (
+                        <div style={{ color: THEME.gray }}>
+                          Pitching: <span style={{ color: THEME.white }}>{g.pitching.innings.toFixed(1)} IP, {g.pitching.strikeouts} K</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+          </div>
+        </div>
+      );
+    })()}
   </div>;
 };
 
