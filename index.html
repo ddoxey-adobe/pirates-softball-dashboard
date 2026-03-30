@@ -635,16 +635,21 @@ const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
 
 // ─── PRINT/EXPORT UTILITIES ─────────────────────────────────────
 const printPracticePlan = (practice, players) => {
-  const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
-  const drillsByPhase = {};
+  try {
+    const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
+    const drillsByPhase = {};
 
-  (practice.drills || []).forEach(drill => {
-    const phase = drill.phase || "Other";
-    if (!drillsByPhase[phase]) drillsByPhase[phase] = [];
-    drillsByPhase[phase].push(drill);
-  });
+    (practice.drills || []).forEach(drill => {
+      const phase = drill.phase || "Other";
+      if (!drillsByPhase[phase]) drillsByPhase[phase] = [];
+      drillsByPhase[phase].push(drill);
+    });
 
-  const printWindow = window.open('', '', 'width=800,height=600');
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Pop-up blocked! Please allow pop-ups for this site to print.');
+      return;
+    }
   printWindow.document.write(`
     <html>
     <head>
@@ -791,13 +796,22 @@ const printPracticePlan = (practice, players) => {
     </body>
     </html>
   `);
-  printWindow.document.close();
+    printWindow.document.close();
+  } catch (error) {
+    console.error('Print error:', error);
+    alert('Failed to open print dialog. Please try again.');
+  }
 };
 
 const printPracticeReport = (practice, players) => {
-  const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
+  try {
+    const attendingPlayers = players.filter(p => practice.attendance?.[p.id]);
 
-  const printWindow = window.open('', '', 'width=800,height=600');
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Pop-up blocked! Please allow pop-ups for this site to print.');
+      return;
+    }
   printWindow.document.write(`
     <html>
     <head>
@@ -982,7 +996,11 @@ const printPracticeReport = (practice, players) => {
     </body>
     </html>
   `);
-  printWindow.document.close();
+    printWindow.document.close();
+  } catch (error) {
+    console.error('Print error:', error);
+    alert('Failed to open print dialog. Please try again.');
+  }
 };
 
 const exportToCSV = (data, filename) => {
