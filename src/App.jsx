@@ -2940,10 +2940,395 @@ const Comms = ({ players }) => {
   </div>;
 };
 
+// ─── REPORTS ────────────────────────────────────────────────────
+const Reports = ({ players }) => {
+  const [practices, setPractices] = useState([]);
+  const [dateRange, setDateRange] = useState("all"); // "all", "30", "60", "90"
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedDrill, setSelectedDrill] = useState(null);
+
+  useEffect(() => {
+    loadStore(STORAGE_KEYS.PRACTICELOGS, []).then(setPractices);
+  }, []);
+
+  // Filter practices by date range
+  const getFilteredPractices = () => {
+    if (dateRange === "all") return practices;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - parseInt(dateRange));
+    return practices.filter(p => p.date && new Date(p.date + "T12:00:00") >= cutoff);
+  };
+
+  const filteredPractices = getFilteredPractices();
+  const completedPractices = filteredPractices.filter(p => p.status === "completed");
+
+  // Calculate overall stats
+  const totalPractices = completedPractices.length;
+  const totalPlayers = players.length;
+  const avgAttendance = totalPractices > 0
+    ? completedPractices.reduce((sum, p) => sum + Object.values(p.attendance || {}).filter(Boolean).length, 0) / totalPractices
+    : 0;
+
+  // Get all drills that have been tracked
+  const trackedDrills = [...new Set(
+    completedPractices.flatMap(p => Object.keys(p.drillTracking || {}))
+  )].map(drillId => ({
+    id: drillId,
+    ...DRILL_LIBRARY.find(d => d.id === drillId),
+    config: TRACKABLE_DRILLS[drillId]
+  })).filter(d => d.config);
+
+  // Calculate player drill performance
+  const getPlayerDrillData = (playerId, drillId) => {
+    const config = TRACKABLE_DRILLS[drillId];
+    if (!config || !config.perPlayer) return [];
+
+    return completedPractices
+      .filter(p => p.drillTracking?.[drillId]?.[playerId] && p.attendance?.[playerId])
+      .map(p => ({
+        date: p.date,
+        value: p.drillTracking[drillId][playerId],
+        practice: p
+      }))
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  };
+
+  // Calculate leaderboards for each drill
+  const getLeaderboard = (drillId) => {
+    const config = TRACKABLE_DRILLS[drillId];
+    if (!config || !config.perPlayer) return [];
+
+    const playerStats = players.map(player => {
+      const drillData = getPlayerDrillData(player.id, drillId);
+      if (drillData.length === 0) return null;
+
+      let bestValue = null;
+      let avgValue = null;
+      let improvement = null;
+
+      if (config.type === "time") {
+        // Lower is better for time
+        const times = drillData.map(d => parseFloat(d.value)).filter(t => !isNaN(t) && t > 0);
+        if (times.length === 0) return null;
+        bestValue = Math.min(...times);
+        avgValue = times.reduce((a, b) => a + b, 0) / times.length;
+        if (times.length >= 2) {
+          improvement = times[0] - times[times.length - 1]; // Positive = got faster
+        }
+      } else if (config.type === "strikes-balls") {
+        const ratios = drillData.map(d => {
+          const s = d.value.strikes || 0;
+          const b = d.value.balls || 0;
+          return (s + b) > 0 ? s / (s + b) : 0;
+        });
+        if (ratios.length === 0) return null;
+        bestValue = Math.max(...ratios);
+        avgValue = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+        if (ratios.length >= 2) {
+          improvement = ratios[ratios.length - 1] - ratios[0];
+        }
+      } else {
+        // Higher is better for points/level
+        const values = drillData.map(d => parseFloat(d.value)).filter(v => !isNaN(v));
+        if (values.length === 0) return null;
+        bestValue = Math.max(...values);
+        avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+        if (values.length >= 2) {
+          improvement = values[values.length - 1] - values[0];
+        }
+      }
+
+      return {
+        player,
+        attempts: drillData.length,
+        bestValue,
+        avgValue,
+        improvement,
+        trend: improvement > 0 ? "up" : improvement < 0 ? "down" : "flat"
+      };
+    }).filter(Boolean);
+
+    // Sort by best value (ascending for time, descending for others)
+    if (config.type === "time") {
+      playerStats.sort((a, b) => a.bestValue - b.bestValue);
+    } else {
+      playerStats.sort((a, b) => b.bestValue - a.bestValue);
+    }
+
+    return playerStats;
+  };
+
+  // Format value for display
+  const formatValue = (value, config) => {
+    if (config.type === "time") {
+      return `${value.toFixed(2)}s`;
+    } else if (config.type === "strikes-balls") {
+      return `${(value * 100).toFixed(0)}%`;
+    } else if (config.type === "level") {
+      return `Level ${Math.round(value)}`;
+    } else {
+      return `${Math.round(value)} pts`;
+    }
+  };
+
+  return <div>
+    {/* Header with date range filter */}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div>
+        <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>📊 Practice Analytics</h2>
+        <p style={{ color: THEME.gray, margin: "4px 0 0 0", fontSize: 13 }}>Track player improvement and team performance</p>
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[["all", "All Time"], ["30", "30 Days"], ["60", "60 Days"], ["90", "90 Days"]].map(([val, label]) => (
+          <button
+            key={val}
+            onClick={() => setDateRange(val)}
+            style={{
+              background: dateRange === val ? THEME.gold : "transparent",
+              border: `1px solid ${dateRange === val ? THEME.gold : THEME.charcoal}`,
+              color: dateRange === val ? THEME.black : THEME.white,
+              padding: "6px 12px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "'Oswald',sans-serif"
+            }}
+          >{label}</button>
+        ))}
+      </div>
+    </div>
+
+    {completedPractices.length === 0 ? (
+      <Card style={{ textAlign: "center", padding: 40 }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>📊</div>
+        <p style={{ color: THEME.gray, margin: 0 }}>No completed practices with tracking data yet.</p>
+        <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Complete practices with drill tracking to see analytics here.</p>
+      </Card>
+    ) : (
+      <div>
+        {/* Overall Stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
+          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
+            <div style={{ color: THEME.gold, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{totalPractices}</div>
+            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Completed Practices</div>
+          </Card>
+          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
+            <div style={{ color: THEME.blue, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{avgAttendance.toFixed(1)}</div>
+            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Avg Attendance</div>
+          </Card>
+          <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
+            <div style={{ color: THEME.green, fontSize: 32, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{trackedDrills.length}</div>
+            <div style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginTop: 4 }}>Drills Tracked</div>
+          </Card>
+        </div>
+
+        {/* Drill Leaderboards */}
+        <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", marginBottom: 12, textTransform: "uppercase" }}>🏆 Drill Leaderboards</h3>
+
+        {trackedDrills.length === 0 ? (
+          <Card style={{ padding: 20, textAlign: "center" }}>
+            <p style={{ color: THEME.gray, margin: 0 }}>No drill tracking data available for this date range.</p>
+          </Card>
+        ) : (
+          <div style={{ display: "grid", gap: 16, marginBottom: 32 }}>
+            {trackedDrills.map(drill => {
+              const leaderboard = getLeaderboard(drill.id);
+              if (leaderboard.length === 0) return null;
+
+              return (
+                <Card key={drill.id} style={{ padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>{drill.name}</div>
+                      <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>{drill.config.description}</div>
+                    </div>
+                    <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">{leaderboard.length} players</Badge>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {leaderboard.slice(0, 10).map((stat, idx) => (
+                      <div
+                        key={stat.player.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "10px 12px",
+                          background: idx < 3 ? THEME.blackLight : "transparent",
+                          borderRadius: 6,
+                          border: `1px solid ${idx === 0 ? THEME.gold : idx === 1 ? THEME.grayLight : idx === 2 ? "#CD7F32" : THEME.charcoal}`,
+                          cursor: "pointer"
+                        }}
+                        onClick={() => {
+                          setSelectedPlayer(stat.player.id);
+                          setSelectedDrill(drill.id);
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            background: idx === 0 ? THEME.gold : idx === 1 ? THEME.grayLight : idx === 2 ? "#CD7F32" : THEME.charcoal,
+                            color: idx < 3 ? THEME.black : THEME.white,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            fontFamily: "'Oswald',sans-serif"
+                          }}>{idx + 1}</div>
+                          <div>
+                            <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{stat.player.name}</div>
+                            <div style={{ color: THEME.gray, fontSize: 11 }}>{stat.attempts} attempt{stat.attempts !== 1 ? "s" : ""}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>
+                              {formatValue(stat.bestValue, drill.config)}
+                            </div>
+                            <div style={{ color: THEME.gray, fontSize: 11 }}>
+                              avg: {formatValue(stat.avgValue, drill.config)}
+                            </div>
+                          </div>
+                          {stat.improvement !== null && (
+                            <div style={{
+                              color: stat.trend === "up" ? THEME.green : stat.trend === "down" ? THEME.red : THEME.gray,
+                              fontSize: 18,
+                              width: 24,
+                              textAlign: "center"
+                            }}>
+                              {stat.trend === "up" ? "↗" : stat.trend === "down" ? "↘" : "→"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {leaderboard.length > 10 && (
+                    <p style={{ color: THEME.gray, fontSize: 11, textAlign: "center", marginTop: 8, marginBottom: 0 }}>
+                      + {leaderboard.length - 10} more player{leaderboard.length - 10 !== 1 ? "s" : ""}
+                    </p>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Player Progress Detail Modal */}
+        {selectedPlayer && selectedDrill && (() => {
+          const player = players.find(p => p.id === selectedPlayer);
+          const drill = trackedDrills.find(d => d.id === selectedDrill);
+          const drillData = getPlayerDrillData(selectedPlayer, selectedDrill);
+
+          return (
+            <Modal
+              open={true}
+              onClose={() => { setSelectedPlayer(null); setSelectedDrill(null); }}
+              title={`${player?.name} - ${drill?.name}`}
+            >
+              <div>
+                <p style={{ color: THEME.gray, fontSize: 13, marginBottom: 16 }}>{drill?.config?.description}</p>
+
+                {drillData.length === 0 ? (
+                  <p style={{ color: THEME.gray, textAlign: "center", padding: 20 }}>No data available for this player.</p>
+                ) : (
+                  <div>
+                    <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Progress Over Time ({drillData.length} session{drillData.length !== 1 ? "s" : ""})</h4>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {drillData.map((d, idx) => {
+                        let displayValue = "";
+                        if (drill.config.type === "strikes-balls") {
+                          const s = d.value.strikes || 0;
+                          const b = d.value.balls || 0;
+                          const pct = (s + b) > 0 ? ((s / (s + b)) * 100).toFixed(0) : 0;
+                          displayValue = `${s}/${b} (${pct}% strikes)`;
+                        } else if (drill.config.type === "time") {
+                          displayValue = `${d.value}s`;
+                        } else if (drill.config.type === "level") {
+                          displayValue = `Level ${d.value}`;
+                        } else {
+                          displayValue = `${d.value} pts`;
+                        }
+
+                        return (
+                          <div key={idx} style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            padding: "8px 12px",
+                            background: idx === drillData.length - 1 ? THEME.blackLight : "transparent",
+                            borderRadius: 4,
+                            border: `1px solid ${THEME.charcoal}`
+                          }}>
+                            <span style={{ color: THEME.gray, fontSize: 12 }}>
+                              {d.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
+                            </span>
+                            <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{displayValue}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: 16, textAlign: "right" }}>
+                <Button onClick={() => { setSelectedPlayer(null); setSelectedDrill(null); }}>Close</Button>
+              </div>
+            </Modal>
+          );
+        })()}
+
+        {/* Attendance Summary */}
+        <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, fontFamily: "'Oswald',sans-serif", marginBottom: 12, marginTop: 32, textTransform: "uppercase" }}>📅 Attendance Summary</h3>
+        <Card style={{ padding: 16 }}>
+          <div style={{ display: "grid", gap: 8 }}>
+            {players.map(player => {
+              const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+              const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
+
+              return (
+                <div key={player.id} style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  background: "transparent",
+                  borderRadius: 4,
+                  border: `1px solid ${THEME.charcoal}`
+                }}>
+                  <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 120, height: 8, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{
+                        width: `${percentage}%`,
+                        height: "100%",
+                        background: `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.goldLight} 100%)`,
+                        transition: "width 0.3s ease"
+                      }} />
+                    </div>
+                    <span style={{ color: THEME.gray, fontSize: 12, minWidth: 70, textAlign: "right" }}>
+                      {attended}/{totalPractices} ({percentage}%)
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    )}
+  </div>;
+};
+
 // ─── MAIN ───────────────────────────────────────────────────────
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
   { id: "practicelog", label: "Practice Log", icon: "📋" },
+  { id: "reports", label: "Reports", icon: "📊" },
   { id: "gamelog", label: "Game Log", icon: "⚾" },
   { id: "comms", label: "Comms", icon: "✉️" },
 ];
@@ -2994,6 +3379,7 @@ function App() {
       <Tabs tabs={TABS} active={tab} onSelect={setTab} />
       {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} coaches={coaches} setCoaches={setCoaches} />}
       {tab==="practicelog" && <PracticeLog players={players} coaches={coaches} />}
+      {tab==="reports" && <Reports players={players} />}
       {tab==="gamelog" && <GameLog players={players} />}
       {tab==="comms" && <Comms players={players} />}
     </div>
