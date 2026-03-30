@@ -2137,10 +2137,14 @@ const PracticeLog = ({ players, coaches }) => {
                                           color: THEME.white,
                                           cursor: "pointer",
                                           fontSize: 13,
-                                          textAlign: "left"
+                                          textAlign: "left",
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          alignItems: "center"
                                         }}
                                       >
-                                        ❌ {p.name.split(" ")[0]}
+                                        <span>{p.name.split(" ")[0]}</span>
+                                        <span style={{ color: THEME.red, fontSize: 11 }}>Tap to eliminate →</span>
                                       </button>
                                     ))}
                                   </div>
