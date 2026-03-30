@@ -39,6 +39,17 @@ const isOnBase = (code) => ["1B","2B","3B","HR","BB","HBP","FC","E"].includes(co
 const isOut = (code) => ["K","ꓘ","GO","FO","SAC"].includes(code);
 const abColor = (code) => (AB_RESULTS.find(a => a.code === code) || {}).color || THEME.gray;
 
+// Drill tracking configuration
+const TRACKABLE_DRILLS = {
+  b1: { type: "time", label: "Time (seconds)", perPlayer: true, description: "Record each player's home-to-first time" },
+  p2: { type: "strikes-balls", label: "Strikes / Balls", perPlayer: true, description: "Track strikes vs balls for each pitcher" },
+  p3: { type: "number", label: "Pitch Count", perPlayer: true, description: "Total pitches thrown" },
+  f3: { type: "team-count", label: "Consecutive Outs", perPlayer: false, description: "Team's best consecutive outs before error" },
+  h9: { type: "number", label: "Points", perPlayer: true, description: "Total points (GB=1, FB=2, LD=3)" },
+  h10: { type: "number", label: "Points", perPlayer: true, description: "Bunt accuracy points" },
+  h11: { type: "level", label: "Level Reached", perPlayer: true, description: "Highest level (1-6) achieved" },
+};
+
 const DRILL_LIBRARY = [
   // ── Warm-Up ──
   { id: "w1", name: "Dynamic Warm-Up", category: "Warm-Up", duration: 10, coach: "Any", description: "Jog, arm circles, high knees, butt kicks, lunges, karaokes, leg swings. Get blood flowing and muscles loose before throwing. Every practice starts here." },
@@ -593,14 +604,32 @@ const PracticeLog = ({ players, coaches }) => {
     id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned",
     attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {})
   });
-  const emptyComplete = (practice) => ({
-    ...practice,
-    status: "completed",
-    drillsRun: practice.drills?.map(d => d.name).join(", ") || "",
-    attendance: practice.attendance || players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
-    observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
-    coachNotes: ""
-  });
+  const emptyComplete = (practice) => {
+    // Initialize drill tracking for trackable drills in this practice
+    const trackableDrillsInPractice = (practice.drills || []).filter(d => TRACKABLE_DRILLS[d.id]);
+    const drillTracking = {};
+    trackableDrillsInPractice.forEach(drill => {
+      const config = TRACKABLE_DRILLS[drill.id];
+      if (config.perPlayer) {
+        drillTracking[drill.id] = players.filter(p => practice.attendance?.[p.id]).reduce((acc, p) => ({
+          ...acc,
+          [p.id]: config.type === "strikes-balls" ? { strikes: 0, balls: 0 } : ""
+        }), {});
+      } else {
+        drillTracking[drill.id] = "";
+      }
+    });
+
+    return {
+      ...practice,
+      status: "completed",
+      drillsRun: practice.drills?.map(d => d.name).join(", ") || "",
+      attendance: practice.attendance || players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
+      observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
+      coachNotes: "",
+      drillTracking
+    };
+  };
 
   useEffect(() => {
     // Migrate data from old storage keys to unified structure
@@ -736,6 +765,10 @@ const PracticeLog = ({ players, coaches }) => {
                         <Badge color={THEME.green} bg="rgba(46,204,113,0.15)">COMPLETED</Badge>
                         {l.focus && <Badge color={THEME.gray} bg="rgba(142,142,142,0.1)">{l.focus}</Badge>}
                         {l.attendance && <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">{Object.values(l.attendance).filter(Boolean).length} attended</Badge>}
+                        {l.drillTracking && Object.keys(l.drillTracking).some(drillId => {
+                          const data = l.drillTracking[drillId];
+                          return typeof data === 'object' ? Object.keys(data).length > 0 : data !== "";
+                        }) && <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">📊 Tracked</Badge>}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
@@ -756,6 +789,51 @@ const PracticeLog = ({ players, coaches }) => {
                           </div>
                         );
                       })}
+
+                      {/* Display Drill Tracking Data */}
+                      {l.drillTracking && Object.keys(l.drillTracking).length > 0 && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${THEME.charcoal}` }}>
+                          <span style={{ color: THEME.gold, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>📊 Drill Metrics: </span>
+                          {Object.entries(l.drillTracking).map(([drillId, data]) => {
+                            const drill = DRILL_LIBRARY.find(d => d.id === drillId);
+                            const config = TRACKABLE_DRILLS[drillId];
+                            if (!drill || !config) return null;
+
+                            return (
+                              <div key={drillId} style={{ marginTop: 8, padding: "8px", background: THEME.blackLight, borderRadius: 4 }}>
+                                <div style={{ color: THEME.white, fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{drill.name}</div>
+                                {config.perPlayer ? (
+                                  <div style={{ fontSize: 11, color: THEME.gray }}>
+                                    {players.filter(p => l.attendance?.[p.id] && data[p.id]).map(p => {
+                                      const value = data[p.id];
+                                      let displayValue = "";
+                                      if (config.type === "strikes-balls") {
+                                        displayValue = `${value.strikes || 0}/${value.balls || 0} (S/B)`;
+                                      } else if (config.type === "time") {
+                                        displayValue = `${value}s`;
+                                      } else if (config.type === "level") {
+                                        displayValue = `Level ${value}`;
+                                      } else {
+                                        displayValue = `${value} pts`;
+                                      }
+                                      return (
+                                        <span key={p.id} style={{ marginRight: 12 }}>
+                                          {p.name.split(" ")[0]}: <span style={{ color: THEME.white }}>{displayValue}</span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: 11, color: THEME.white }}>
+                                    Team: {data} consecutive outs
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       {l.coachNotes && <p style={{ color: THEME.gray, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>Coach: {l.coachNotes}</p>}
                     </div>
                   )}
@@ -972,6 +1050,157 @@ const PracticeLog = ({ players, coaches }) => {
               ))}
             </div>
           </div>
+
+          {/* Drill Tracking Section */}
+          {(() => {
+            const trackableDrills = (form.drills || []).filter(d => TRACKABLE_DRILLS[d.id]);
+            if (trackableDrills.length === 0) return null;
+
+            return (
+              <div style={{ marginTop: 16 }}>
+                <SL>📊 Drill Tracking</SL>
+                <div style={{ marginTop: 8, display: "grid", gap: 12 }}>
+                  {trackableDrills.map(drill => {
+                    const config = TRACKABLE_DRILLS[drill.id];
+                    const tracking = (form.drillTracking || {})[drill.id] || {};
+
+                    return (
+                      <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `1px solid ${THEME.charcoal}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div>
+                            <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700 }}>{drill.name}</div>
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>{config.description}</div>
+                          </div>
+                        </div>
+
+                        {config.perPlayer ? (
+                          <div style={{ display: "grid", gap: 6 }}>
+                            {players.filter(p => (form.attendance || {})[p.id]).map(p => (
+                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600, minWidth: 90, flexShrink: 0 }}>
+                                  {p.name.split(" ")[0]}
+                                </span>
+                                {config.type === "strikes-balls" ? (
+                                  <div style={{ display: "flex", gap: 6, flex: 1 }}>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder="Strikes"
+                                      value={tracking[p.id]?.strikes || ""}
+                                      onChange={e => setForm({
+                                        ...form,
+                                        drillTracking: {
+                                          ...(form.drillTracking || {}),
+                                          [drill.id]: {
+                                            ...(form.drillTracking?.[drill.id] || {}),
+                                            [p.id]: { ...(tracking[p.id] || {}), strikes: parseInt(e.target.value) || 0 }
+                                          }
+                                        }
+                                      })}
+                                      style={{
+                                        flex: 1,
+                                        padding: "6px 8px",
+                                        background: THEME.blackLight,
+                                        border: `1px solid ${THEME.charcoal}`,
+                                        borderRadius: 4,
+                                        color: THEME.white,
+                                        fontSize: 12,
+                                        outline: "none"
+                                      }}
+                                    />
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder="Balls"
+                                      value={tracking[p.id]?.balls || ""}
+                                      onChange={e => setForm({
+                                        ...form,
+                                        drillTracking: {
+                                          ...(form.drillTracking || {}),
+                                          [drill.id]: {
+                                            ...(form.drillTracking?.[drill.id] || {}),
+                                            [p.id]: { ...(tracking[p.id] || {}), balls: parseInt(e.target.value) || 0 }
+                                          }
+                                        }
+                                      })}
+                                      style={{
+                                        flex: 1,
+                                        padding: "6px 8px",
+                                        background: THEME.blackLight,
+                                        border: `1px solid ${THEME.charcoal}`,
+                                        borderRadius: 4,
+                                        color: THEME.white,
+                                        fontSize: 12,
+                                        outline: "none"
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <input
+                                    type={config.type === "time" ? "number" : config.type === "level" ? "number" : "number"}
+                                    min={config.type === "level" ? "1" : "0"}
+                                    max={config.type === "level" ? "6" : undefined}
+                                    step={config.type === "time" ? "0.1" : "1"}
+                                    placeholder={config.label}
+                                    value={tracking[p.id] || ""}
+                                    onChange={e => setForm({
+                                      ...form,
+                                      drillTracking: {
+                                        ...(form.drillTracking || {}),
+                                        [drill.id]: {
+                                          ...(form.drillTracking?.[drill.id] || {}),
+                                          [p.id]: e.target.value
+                                        }
+                                      }
+                                    })}
+                                    style={{
+                                      flex: 1,
+                                      padding: "6px 8px",
+                                      background: THEME.blackLight,
+                                      border: `1px solid ${THEME.charcoal}`,
+                                      borderRadius: 4,
+                                      color: THEME.white,
+                                      fontSize: 12,
+                                      outline: "none"
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={config.label}
+                            value={tracking || ""}
+                            onChange={e => setForm({
+                              ...form,
+                              drillTracking: {
+                                ...(form.drillTracking || {}),
+                                [drill.id]: e.target.value
+                              }
+                            })}
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 12,
+                              outline: "none"
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <TextArea label="Coach Notes" value={form.coachNotes || ""} onChange={e => setForm({ ...form, coachNotes: e.target.value })} style={{ marginTop: 12 }} placeholder="What went well, what to work on..." />
         </div>
       )}
