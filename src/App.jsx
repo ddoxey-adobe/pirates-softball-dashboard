@@ -453,6 +453,116 @@ const SEED_COACHES = [
   { id: "c3", name: "Shari", role: "Pitching Coach", phone: "", email: "", specialties: ["Pitching", "Throwing"] },
 ];
 
+const SEED_PRACTICES = [
+  {
+    id: "test-practice-1",
+    date: "2026-03-15",
+    time: "5:00 PM",
+    duration: 120,
+    focus: "Hitting fundamentals and base running",
+    status: "completed",
+    attendance: {
+      "ret1": true, "ret2": true, "ret3": true, "ret4": true, "ret5": true,
+      "new1": true, "new2": true, "new3": true, "new4": false, "new5": true,
+      "new6": true, "new7": true, "new8": true
+    },
+    drills: [
+      { id: "w1", name: "Dynamic Warm-Up", category: "Warm-Up", duration: 10, coach: "Any" },
+      { id: "b1", name: "Home to First Sprint", category: "Baserunning", duration: 10, coach: "Any" },
+      { id: "p2", name: "Pitch Location Work", category: "Pitching", duration: 15, coach: "Shari" },
+      { id: "h9", name: "Points-Based Hitting", category: "Hitting", duration: 15, coach: "Any" },
+      { id: "h10", name: "Bunt Stations", category: "Hitting", duration: 10, coach: "Any" },
+      { id: "h11", name: "Batting Queen", category: "Hitting", duration: 15, coach: "Any" },
+      { id: "f3", name: "21 Outs Drill", category: "Fielding", duration: 20, coach: "All" }
+    ],
+    drillTracking: {
+      "b1": {
+        "ret1": "3.2", "ret2": "2.9", "ret3": "3.1", "ret4": "3.3", "ret5": "3.4",
+        "new1": "3.0", "new2": "2.8", "new3": "3.2", "new5": "3.3",
+        "new6": "2.7", "new7": "3.5", "new8": "3.6"
+      },
+      "p2": {
+        "ret4": { strikes: 18, balls: 7 },
+        "new4": { strikes: 15, balls: 10 },
+        "new6": { strikes: 12, balls: 13 }
+      },
+      "f3": "17",
+      "h9": {
+        "ret1": "12", "ret2": "15", "ret3": "11", "ret4": "9", "ret5": "13",
+        "new1": "18", "new2": "14", "new3": "10", "new5": "11",
+        "new6": "8", "new7": "7", "new8": "6"
+      },
+      "h10": {
+        "ret1": "8", "ret2": "9", "ret3": "7", "ret4": "6", "ret5": "8",
+        "new1": "10", "new2": "9", "new3": "7", "new5": "6",
+        "new6": "5", "new7": "4", "new8": "3"
+      },
+      "h11": {
+        "ret1": "4", "ret2": "5", "ret3": "4", "ret4": "3", "ret5": "4",
+        "new1": "6", "new2": "5", "new3": "4", "new5": "3",
+        "new6": "3", "new7": "2", "new8": "2"
+      }
+    },
+    observations: {
+      "new1": "Outstanding all-around performance",
+      "new2": "Great speed and bat control",
+      "ret2": "Excellent speed work, best sprint time",
+      "new6": "Needs pitching consistency work"
+    },
+    coachNotes: "Great practice! Players showed excellent energy. Focus on pitching control next time.",
+    drillsRun: "Dynamic Warm-Up, Home to First Sprint, Pitch Location Work, Points-Based Hitting, Bunt Stations, Batting Queen, 21 Outs Drill",
+    groups: {}
+  }
+];
+
+const SEED_GAMELOGS = [
+  {
+    id: "test-game-1",
+    date: "2026-03-22",
+    opponent: "Wildcats",
+    location: "Home Field",
+    result: "W",
+    score: "8-5",
+    ourScore: 8,
+    theirScore: 5,
+    innings: 7,
+    lineup: [
+      { playerId: "new1", position: "1B", battingOrder: 1 },
+      { playerId: "ret2", position: "CF", battingOrder: 2 },
+      { playerId: "ret3", position: "SS", battingOrder: 3 },
+      { playerId: "ret1", position: "3B", battingOrder: 4 },
+      { playerId: "ret5", position: "C", battingOrder: 5 },
+      { playerId: "new2", position: "2B", battingOrder: 6 },
+      { playerId: "new3", position: "LF", battingOrder: 7 },
+      { playerId: "new5", position: "RF", battingOrder: 8 },
+      { playerId: "new7", position: "Bench", battingOrder: 9 }
+    ],
+    atBats: [
+      { playerId: "new1", inning: 1, result: "1B", rbi: 0, runs: 1 },
+      { playerId: "ret2", inning: 1, result: "2B", rbi: 1, runs: 1 },
+      { playerId: "ret3", inning: 1, result: "GO", rbi: 0, runs: 0 },
+      { playerId: "ret1", inning: 1, result: "K", rbi: 0, runs: 0 },
+      { playerId: "new1", inning: 3, result: "HR", rbi: 2, runs: 1 },
+      { playerId: "ret2", inning: 3, result: "1B", rbi: 0, runs: 1 },
+      { playerId: "ret3", inning: 3, result: "1B", rbi: 1, runs: 0 },
+      { playerId: "ret1", inning: 3, result: "FO", rbi: 0, runs: 0 },
+      { playerId: "ret5", inning: 3, result: "BB", rbi: 0, runs: 1 },
+      { playerId: "new2", inning: 4, result: "2B", rbi: 1, runs: 1 },
+      { playerId: "new3", inning: 4, result: "GO", rbi: 0, runs: 0 },
+      { playerId: "new5", inning: 5, result: "1B", rbi: 0, runs: 0 },
+      { playerId: "new1", inning: 5, result: "K", rbi: 0, runs: 0 },
+      { playerId: "ret2", inning: 6, result: "3B", rbi: 2, runs: 1 },
+      { playerId: "ret3", inning: 6, result: "GO", rbi: 0, runs: 0 }
+    ],
+    pitching: [
+      { playerId: "ret4", inningsP: 5, pitches: 78, strikes: 52, balls: 26, k: 6, bb: 2, runs: 3, er: 2 },
+      { playerId: "new4", inningsP: 2, pitches: 31, strikes: 19, balls: 12, k: 2, bb: 1, runs: 2, er: 1 }
+    ],
+    notes: "Great team win! Penny hit a huge home run in the 3rd. Rose pitched strong through 5 innings.",
+    mvp: "new1"
+  }
+];
+
 // ─── Storage ────────────────────────────────────────────────────
 const loadStore = async (key, fb) => { try { const r = await window.storage.get(key); return r?.value ? JSON.parse(r.value) : fb; } catch { return fb; } };
 const saveStore = async (key, d) => { try { await window.storage.set(key, JSON.stringify(d)); } catch {} };
@@ -3749,9 +3859,9 @@ const Reports = ({ players }) => {
 // ─── MAIN ───────────────────────────────────────────────────────
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
-  { id: "practicelog", label: "Practice Log", icon: "📋" },
+  { id: "practicelog", label: "Practice", icon: "📋" },
+  { id: "gamelog", label: "Game", icon: "⚾" },
   { id: "reports", label: "Reports", icon: "📊" },
-  { id: "gamelog", label: "Game Log", icon: "⚾" },
   { id: "comms", label: "Comms", icon: "✉️" },
 ];
 
@@ -3775,6 +3885,20 @@ function App() {
         if (r?.value) {
           const c = JSON.parse(r.value);
           if (Array.isArray(c) && c.length > 0) setCoaches(c);
+        }
+      } catch {}
+      // Seed practices if none exist
+      try {
+        const r = await window.storage.get("pirates-practices-unified-2026v1");
+        if (!r?.value || JSON.parse(r.value).length === 0) {
+          await window.storage.set("pirates-practices-unified-2026v1", JSON.stringify(SEED_PRACTICES));
+        }
+      } catch {}
+      // Seed game logs if none exist
+      try {
+        const r = await window.storage.get(STORAGE_KEYS.GAMELOGS);
+        if (!r?.value || JSON.parse(r.value).length === 0) {
+          await window.storage.set(STORAGE_KEYS.GAMELOGS, JSON.stringify(SEED_GAMELOGS));
         }
       } catch {}
       setLoaded(true);
