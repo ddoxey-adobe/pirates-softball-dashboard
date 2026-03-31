@@ -7875,7 +7875,7 @@ const Reports = ({ players }) => {
           };
 
           return (
-            <Modal title="Compare Players" onClose={() => setShowCompareModal(false)} wide={true}>
+            <Modal open={true} title="Compare Players" onClose={() => setShowCompareModal(false)} wide={true}>
               {/* Player selector */}
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
