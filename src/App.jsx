@@ -4760,7 +4760,7 @@ const Reports = ({ players }) => {
 
   // Collapse/Expand functions (defined after trackedDrills)
   const collapseAll = () => {
-    const allSections = ["stats", "attendance", "games", ...trackedDrills.map(d => d.id)];
+    const allSections = ["stats", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
     const collapsed = {};
     allSections.forEach(id => collapsed[id] = true);
     setCollapsedSections(collapsed);
@@ -4867,6 +4867,62 @@ const Reports = ({ players }) => {
     runsAllowed: filteredGames.reduce((sum, g) => sum + (g.theirScore || 0), 0)
   };
   gameStats.winPct = gameStats.total > 0 ? (gameStats.wins / gameStats.total) : 0;
+
+  // Injury Analytics Calculations
+  const allInjuries = filteredGames.flatMap(g => {
+    if (!g.gameState?.injuredPlayers) return [];
+    return g.gameState.injuredPlayers.map(injury => ({
+      ...injury,
+      gameId: g.id,
+      gameDate: g.date,
+      opponent: g.opponent
+    }));
+  });
+
+  const injuryStats = {
+    total: allInjuries.length,
+    playersAffected: [...new Set(allInjuries.map(i => i.playerId))].length,
+    avgPerGame: filteredGames.length > 0 ? allInjuries.length / filteredGames.length : 0,
+    multiGame: allInjuries.filter(i => i.multiGame).length,
+    returned: allInjuries.filter(i => i.returnedInning && !i.multiGame).length
+  };
+  injuryStats.returnRate = (injuryStats.total - injuryStats.multiGame) > 0
+    ? (injuryStats.returned / (injuryStats.total - injuryStats.multiGame)) * 100
+    : 0;
+
+  // Injuries by position
+  const injuriesByPosition = allInjuries.reduce((acc, injury) => {
+    acc[injury.position] = (acc[injury.position] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Injuries by inning
+  const injuriesByInning = allInjuries.reduce((acc, injury) => {
+    acc[injury.inning] = (acc[injury.inning] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Player injury history
+  const playerInjuryHistory = players.map(player => {
+    const playerInjuries = allInjuries.filter(i => i.playerId === player.id);
+    if (playerInjuries.length === 0) return null;
+
+    return {
+      player,
+      injuries: playerInjuries,
+      count: playerInjuries.length,
+      multiGameCount: playerInjuries.filter(i => i.multiGame).length,
+      returnCount: playerInjuries.filter(i => i.returnedInning).length
+    };
+  }).filter(Boolean).sort((a, b) => b.count - a.count);
+
+  // Common injury types (from notes)
+  const injuryNotes = allInjuries.filter(i => i.notes && i.notes.trim()).map(i => i.notes.toLowerCase());
+  const commonKeywords = ['ankle', 'knee', 'wrist', 'hand', 'shoulder', 'foot', 'leg', 'arm', 'back', 'head'];
+  const injuryTypes = commonKeywords.map(keyword => ({
+    type: keyword,
+    count: injuryNotes.filter(note => note.includes(keyword)).length
+  })).filter(t => t.count > 0).sort((a, b) => b.count - a.count);
 
   // Calculate batting stats
   const playerBattingStats = players.map(player => {
@@ -5472,6 +5528,189 @@ const Reports = ({ players }) => {
             </div>
           </Card>
         </CollapsibleSection>
+
+        {/* Injury Metrics */}
+        {allInjuries.length > 0 && (
+          <CollapsibleSection
+            id="injuries"
+            title="Injury Metrics"
+            icon="🚑"
+            badge={`${injuryStats.total} total injuries`}
+            isCollapsed={collapsedSections["injuries"]}
+            onToggle={toggleSection}
+          >
+            <div style={{ display: "grid", gap: 16 }}>
+              {/* Summary Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+                <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.red}40` }}>
+                  <div style={{ color: THEME.red, fontSize: 28, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{injuryStats.total}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Total Injuries</div>
+                </Card>
+                <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
+                  <div style={{ color: THEME.gold, fontSize: 28, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{injuryStats.playersAffected}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Players Affected</div>
+                </Card>
+                <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
+                  <div style={{ color: THEME.blue, fontSize: 28, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{injuryStats.avgPerGame.toFixed(1)}</div>
+                  <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Avg Per Game</div>
+                </Card>
+                <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
+                  <div style={{ color: THEME.green, fontSize: 28, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{injuryStats.returnRate.toFixed(0)}%</div>
+                  <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Return Rate</div>
+                </Card>
+              </div>
+
+              {/* Injuries by Position */}
+              <Card style={{ padding: 16 }}>
+                <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: "0 0 12px 0" }}>🛡️ Injuries by Position</h4>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {Object.entries(injuriesByPosition)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([position, count]) => {
+                      const maxCount = Math.max(...Object.values(injuriesByPosition));
+                      const percentage = (count / maxCount) * 100;
+                      return (
+                        <div key={position} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600, minWidth: 80 }}>{position}</div>
+                          <div style={{ flex: 1, height: 24, background: THEME.charcoal, borderRadius: 4, overflow: "hidden", position: "relative" }}>
+                            <div style={{
+                              width: `${percentage}%`,
+                              height: "100%",
+                              background: `linear-gradient(90deg, ${THEME.red} 0%, ${THEME.gold} 100%)`,
+                              transition: "width 0.3s ease"
+                            }} />
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              paddingLeft: 8,
+                              color: THEME.white,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              textShadow: "0 1px 2px rgba(0,0,0,0.8)"
+                            }}>
+                              {count} {count === 1 ? 'injury' : 'injuries'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </Card>
+
+              {/* Injuries by Inning */}
+              <Card style={{ padding: 16 }}>
+                <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: "0 0 12px 0" }}>⏱️ Injury Timeline by Inning</h4>
+                <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 120 }}>
+                  {[1, 2, 3, 4, 5, 6, 7].map(inning => {
+                    const count = injuriesByInning[inning] || 0;
+                    const maxCount = Math.max(...Object.values(injuriesByInning), 1);
+                    const height = (count / maxCount) * 100;
+                    return (
+                      <div key={inning} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <div style={{ position: "relative", width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", height: 100 }}>
+                          <div style={{
+                            width: "100%",
+                            height: `${height}%`,
+                            background: count > 0 ? `linear-gradient(180deg, ${THEME.red} 0%, ${THEME.gold} 100%)` : THEME.charcoal,
+                            borderRadius: "4px 4px 0 0",
+                            transition: "height 0.3s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            minHeight: count > 0 ? 24 : 0
+                          }}>
+                            {count > 0 && (
+                              <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{count}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>Inn {inning}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              {/* Player Injury History */}
+              {playerInjuryHistory.length > 0 && (
+                <Card style={{ padding: 16 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: "0 0 12px 0" }}>👤 Player Injury History</h4>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {playerInjuryHistory.map(({ player, injuries, count, multiGameCount, returnCount }) => (
+                      <div key={player.id} style={{
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 6,
+                        padding: 12
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{player.name}</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <Badge color={THEME.red} bg="rgba(231,76,60,0.15)">{count} {count === 1 ? 'injury' : 'injuries'}</Badge>
+                            {multiGameCount > 0 && (
+                              <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)">🚫 {multiGameCount} serious</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gap: 4, fontSize: 11, color: THEME.gray }}>
+                          {injuries.map((injury, idx) => (
+                            <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                              <div>
+                                <span style={{ color: THEME.white, fontWeight: 600 }}>Inning {injury.inning}</span>
+                                {" • "}
+                                {injury.position}
+                                {injury.notes && (
+                                  <span style={{ fontStyle: "italic", marginLeft: 4 }}>"{injury.notes}"</span>
+                                )}
+                              </div>
+                              <div>
+                                {injury.multiGame ? (
+                                  <span style={{ color: THEME.red }}>🚫 Multi-game</span>
+                                ) : injury.returnedInning ? (
+                                  <span style={{ color: THEME.green }}>✅ Returned Inn {injury.returnedInning}</span>
+                                ) : (
+                                  <span style={{ color: THEME.gold }}>Temporary</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Common Injury Types */}
+              {injuryTypes.length > 0 && (
+                <Card style={{ padding: 16 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: "0 0 12px 0" }}>📋 Common Injury Types</h4>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {injuryTypes.map(({ type, count }) => (
+                      <div key={type} style={{
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 6,
+                        padding: "6px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6
+                      }}>
+                        <div style={{ color: THEME.white, fontSize: 12, fontWeight: 600, textTransform: "capitalize" }}>{type}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>×{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+          </CollapsibleSection>
+        )}
 
         {/* Playing Time & Attendance Equity */}
         <CollapsibleSection
