@@ -2631,27 +2631,38 @@ const LineupBuilder = ({ players }) => {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
-              🎮 LIVE: vs {activeGame.opponent}
+              {activeGame.status === "completed" ? "🏁 COMPLETED:" : "🎮 LIVE:"} vs {activeGame.opponent}
             </h2>
-            <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">Inning {gameState.currentInning}</Badge>
+            <Badge color={activeGame.status === "completed" ? THEME.green : THEME.blue} bg={activeGame.status === "completed" ? "rgba(46,204,113,0.15)" : "rgba(52,152,219,0.15)"}>
+              {activeGame.status === "completed" ? "Game Completed" : `Inning ${gameState.currentInning}`}
+            </Badge>
           </div>
           <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>
             {activeGame.date ? new Date(activeGame.date + "T12:00:00").toLocaleDateString() : ""} {activeGame.location && `• ${activeGame.location}`}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button small onClick={() => {
-            if (confirm("Save and exit game? You can resume later.")) {
-              setLineups(prev => prev.map(l => l.id === activeGame.id ? activeGame : l));
-              setActiveGame(null);
-            }
-          }}>💾 Save & Exit</Button>
-          <Button small variant="danger" onClick={() => {
-            if (confirm("End game? This will finalize all stats.")) {
-              setLineups(prev => prev.map(l => l.id === activeGame.id ? { ...activeGame, gameState: { ...gameState, completed: true } } : l));
-              setActiveGame(null);
-            }
-          }}>🏁 End Game</Button>
+          {activeGame.status !== "completed" && (
+            <>
+              <Button small onClick={() => {
+                if (confirm("Save and exit game? You can resume later.")) {
+                  setLineups(prev => prev.map(l => l.id === activeGame.id ? activeGame : l));
+                  setActiveGame(null);
+                }
+              }}>💾 Save & Exit</Button>
+              <Button small variant="danger" onClick={() => {
+                if (confirm("End game? This will finalize all stats.")) {
+                  setLineups(prev => prev.map(l => l.id === activeGame.id ? { ...activeGame, status: "completed", gameState: { ...gameState, completed: true } } : l));
+                  setActiveGame(null);
+                }
+              }}>🏁 End Game</Button>
+            </>
+          )}
+          {activeGame.status === "completed" && (
+            <Button small onClick={() => setActiveGame(null)}>
+              ← Back to Lineups
+            </Button>
+          )}
         </div>
       </div>
 
@@ -2690,27 +2701,29 @@ const LineupBuilder = ({ players }) => {
                         <div style={{ color: THEME.gray, fontSize: 10 }}>{inningsPlayed} innings</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                      <Button small style={{ flex: 1 }} onClick={() => {
-                        setInjuryNotes("");
-                        setMultiGameInjury(false);
-                        setSubModal({ playerId: spot.playerId, position: spot.position });
-                      }}>Substitute</Button>
-                      <button onClick={() => {
-                        setInjuryNotes("");
-                        setMultiGameInjury(false);
-                        setSubModal({ playerId: spot.playerId, position: spot.position, isInjury: true });
-                      }} style={{
-                        background: THEME.red,
-                        border: "none",
-                        color: THEME.white,
-                        borderRadius: 6,
-                        padding: "6px 10px",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: 600
-                      }}>🚑</button>
-                    </div>
+                    {activeGame.status !== "completed" && (
+                      <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                        <Button small style={{ flex: 1 }} onClick={() => {
+                          setInjuryNotes("");
+                          setMultiGameInjury(false);
+                          setSubModal({ playerId: spot.playerId, position: spot.position });
+                        }}>Substitute</Button>
+                        <button onClick={() => {
+                          setInjuryNotes("");
+                          setMultiGameInjury(false);
+                          setSubModal({ playerId: spot.playerId, position: spot.position, isInjury: true });
+                        }} style={{
+                          background: THEME.red,
+                          border: "none",
+                          color: THEME.white,
+                          borderRadius: 6,
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}>🚑</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2945,51 +2958,53 @@ const LineupBuilder = ({ players }) => {
 
         {/* Right Column: Controls & Stats */}
         <div>
-          {/* Inning Controls */}
-          <Card style={{ padding: 16, marginBottom: 16 }}>
-            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⏱️ Inning Controls</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
-              <Button
-                small
-                disabled={gameState.currentInning === 1}
-                onClick={() => {
-                  if (!confirm("Go back to previous inning? This will revert to the previous inning's positions.")) return;
-                  const prevInning = gameState.currentInning - 1;
-                  setActiveGame({
-                    ...activeGame,
-                    gameState: {
-                      ...gameState,
-                      currentInning: prevInning
-                    }
-                  });
-                }}
-                style={{
-                  opacity: gameState.currentInning === 1 ? 0.5 : 1,
-                  cursor: gameState.currentInning === 1 ? "not-allowed" : "pointer"
-                }}
-              >
-                ⬅️ Prev
-              </Button>
-              <Button onClick={() => {
-                const nextInning = gameState.currentInning + 1;
-                const updatedGameState = {
-                  ...gameState,
-                  currentInning: nextInning,
-                  inningData: {
-                    ...gameState.inningData,
-                    [nextInning]: currentPositions // Copy current positions to next inning
-                  },
-                  playingTime: currentPositions.reduce((acc, spot) => ({
-                    ...acc,
-                    [spot.playerId]: (gameState.playingTime[spot.playerId] || 0) + 1
-                  }), gameState.playingTime)
-                };
-                setActiveGame({ ...activeGame, gameState: updatedGameState });
-              }}>
-                ➡️ Next Inning ({gameState.currentInning + 1})
-              </Button>
-            </div>
-          </Card>
+          {/* Inning Controls - only show if game not completed */}
+          {activeGame.status !== "completed" && (
+            <Card style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⏱️ Inning Controls</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+                <Button
+                  small
+                  disabled={gameState.currentInning === 1}
+                  onClick={() => {
+                    if (!confirm("Go back to previous inning? This will revert to the previous inning's positions.")) return;
+                    const prevInning = gameState.currentInning - 1;
+                    setActiveGame({
+                      ...activeGame,
+                      gameState: {
+                        ...gameState,
+                        currentInning: prevInning
+                      }
+                    });
+                  }}
+                  style={{
+                    opacity: gameState.currentInning === 1 ? 0.5 : 1,
+                    cursor: gameState.currentInning === 1 ? "not-allowed" : "pointer"
+                  }}
+                >
+                  ⬅️ Prev
+                </Button>
+                <Button onClick={() => {
+                  const nextInning = gameState.currentInning + 1;
+                  const updatedGameState = {
+                    ...gameState,
+                    currentInning: nextInning,
+                    inningData: {
+                      ...gameState.inningData,
+                      [nextInning]: currentPositions // Copy current positions to next inning
+                    },
+                    playingTime: currentPositions.reduce((acc, spot) => ({
+                      ...acc,
+                      [spot.playerId]: (gameState.playingTime[spot.playerId] || 0) + 1
+                    }), gameState.playingTime)
+                  };
+                  setActiveGame({ ...activeGame, gameState: updatedGameState });
+                }}>
+                  ➡️ Next Inning ({gameState.currentInning + 1})
+                </Button>
+              </div>
+            </Card>
+          )}
 
           {/* Load Alignment */}
           <Card style={{ padding: 16, marginBottom: 16 }}>
@@ -3490,8 +3505,11 @@ const LineupBuilder = ({ players }) => {
                   <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, margin: 0 }}>
                     vs {lineup.opponent}
                   </h3>
-                  <Badge color={lineup.status === "finalized" ? THEME.green : THEME.gold} bg={lineup.status === "finalized" ? "rgba(46,204,113,0.15)" : "rgba(253,181,21,0.15)"}>
-                    {lineup.status === "finalized" ? "✓ Finalized" : "Draft"}
+                  <Badge
+                    color={lineup.status === "completed" ? THEME.blue : lineup.status === "finalized" ? THEME.green : THEME.gold}
+                    bg={lineup.status === "completed" ? "rgba(52,152,219,0.15)" : lineup.status === "finalized" ? "rgba(46,204,113,0.15)" : "rgba(253,181,21,0.15)"}
+                  >
+                    {lineup.status === "completed" ? "🏁 Game Completed" : lineup.status === "finalized" ? "✓ Finalized" : "Draft"}
                   </Badge>
                 </div>
                 <div style={{ color: THEME.gray, fontSize: 12 }}>
@@ -3524,13 +3542,18 @@ const LineupBuilder = ({ players }) => {
                     ▶ Start Game
                   </Button>
                 )}
-                {lineup.gameState && (
+                {lineup.gameState && !lineup.gameState.completed && (
                   <Button small onClick={() => setActiveGame(lineup)} style={{ background: THEME.blue }}>
                     🎮 Resume Game
                   </Button>
                 )}
+                {lineup.status === "completed" && (
+                  <Button small onClick={() => setActiveGame(lineup)} style={{ background: THEME.purple }}>
+                    📊 View Game Stats
+                  </Button>
+                )}
                 <Button small onClick={() => { setForm({...lineup}); setEditing(lineup.id); setShowBuilder(true); }}>
-                  {lineup.status === "finalized" ? "View" : "Edit"}
+                  {lineup.status === "completed" ? "View" : lineup.status === "finalized" ? "View" : "Edit"}
                 </Button>
                 <Button small variant="danger" onClick={() => {
                   if (confirm(`Delete lineup for ${lineup.opponent}?`)) {
