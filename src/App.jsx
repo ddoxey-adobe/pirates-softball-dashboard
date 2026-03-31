@@ -2540,6 +2540,7 @@ const LineupBuilder = ({ players }) => {
   });
 
   const [activeGame, setActiveGame] = useState(null);
+  const [subModal, setSubModal] = useState(null); // { playerId, position }
 
   const [form, setForm] = useState(emptyLineup());
 
@@ -2658,8 +2659,7 @@ const LineupBuilder = ({ players }) => {
                       </div>
                     </div>
                     <Button small style={{ width: "100%", marginTop: 8 }} onClick={() => {
-                      // Substitution logic will go here
-                      alert("Substitution coming in Stage 2!");
+                      setSubModal({ playerId: spot.playerId, position: spot.position });
                     }}>Substitute</Button>
                   </div>
                 );
@@ -2730,6 +2730,115 @@ const LineupBuilder = ({ players }) => {
             </Button>
           </Card>
 
+          {/* Load Alignment */}
+          <Card style={{ padding: 16, marginBottom: 16 }}>
+            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🛡️ Quick Alignments</h3>
+            {alignmentLibrary.length === 0 && activeGame.alignments.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 12, color: THEME.gray, fontSize: 11 }}>
+                <p style={{ margin: 0 }}>No saved alignments</p>
+              </div>
+            ) : (
+              <>
+                {alignmentLibrary.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Library</div>
+                    <div style={{ display: "grid", gap: 4 }}>
+                      {alignmentLibrary.map(alignment => (
+                        <button key={alignment.id} onClick={() => {
+                          if (!confirm(`Load "${alignment.name}" alignment? This will replace current positions.`)) return;
+
+                          const updatedPositions = alignment.lineup.map(spot => ({
+                            playerId: spot.playerId,
+                            position: spot.position
+                          }));
+
+                          const updatedGameState = {
+                            ...gameState,
+                            inningData: {
+                              ...gameState.inningData,
+                              [gameState.currentInning]: updatedPositions
+                            },
+                            substitutionHistory: [
+                              ...gameState.substitutionHistory,
+                              {
+                                inning: gameState.currentInning,
+                                type: "alignment",
+                                alignmentName: alignment.name,
+                                timestamp: new Date().toISOString()
+                              }
+                            ]
+                          };
+
+                          setActiveGame({ ...activeGame, gameState: updatedGameState });
+                        }} style={{
+                          background: THEME.blackLight,
+                          border: `1px solid ${THEME.charcoal}`,
+                          borderRadius: 4,
+                          padding: "8px 10px",
+                          color: THEME.white,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.2s"
+                        }}>
+                          {alignment.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {activeGame.alignments.length > 0 && (
+                  <div>
+                    <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>This Game</div>
+                    <div style={{ display: "grid", gap: 4 }}>
+                      {activeGame.alignments.map(alignment => (
+                        <button key={alignment.id} onClick={() => {
+                          if (!confirm(`Load "${alignment.name}" alignment? This will replace current positions.`)) return;
+
+                          const updatedPositions = alignment.lineup.map(spot => ({
+                            playerId: spot.playerId,
+                            position: spot.position
+                          }));
+
+                          const updatedGameState = {
+                            ...gameState,
+                            inningData: {
+                              ...gameState.inningData,
+                              [gameState.currentInning]: updatedPositions
+                            },
+                            substitutionHistory: [
+                              ...gameState.substitutionHistory,
+                              {
+                                inning: gameState.currentInning,
+                                type: "alignment",
+                                alignmentName: alignment.name,
+                                timestamp: new Date().toISOString()
+                              }
+                            ]
+                          };
+
+                          setActiveGame({ ...activeGame, gameState: updatedGameState });
+                        }} style={{
+                          background: THEME.blackLight,
+                          border: `1px solid ${THEME.charcoal}`,
+                          borderRadius: 4,
+                          padding: "8px 10px",
+                          color: THEME.white,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.2s"
+                        }}>
+                          {alignment.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
+
           {/* Playing Time Tracker */}
           <Card style={{ padding: 16 }}>
             <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>📊 Playing Time</h3>
@@ -2776,6 +2885,203 @@ const LineupBuilder = ({ players }) => {
           </Card>
         </div>
       </div>
+
+      {/* Substitution Modal */}
+      {subModal && (() => {
+        const outgoingPlayer = players.find(p => p.id === subModal.playerId);
+        const outgoingInnings = gameState.playingTime[subModal.playerId] || 0;
+
+        // Find bench players who can play this position
+        const eligibleSubs = benchPlayers.filter(p => {
+          const playerObj = players.find(pl => pl.id === p.id);
+          if (!playerObj) return false;
+          const canPlayPosition =
+            playerObj.primaryPosition === subModal.position ||
+            (playerObj.secondaryPositions || []).includes(subModal.position) ||
+            subModal.position === "Bench";
+          return canPlayPosition;
+        }).map(p => {
+          const inningsPlayed = gameState.playingTime[p.id] || 0;
+          const needsPlayingTime = inningsPlayed < gameState.currentInning * 0.5;
+          return { ...p, inningsPlayed, needsPlayingTime };
+        }).sort((a, b) => a.inningsPlayed - b.inningsPlayed); // Sort by least playing time first
+
+        const makeSubstitution = (incomingPlayerId) => {
+          const currentPositions = gameState.inningData[gameState.currentInning];
+          const updatedPositions = currentPositions.map(spot =>
+            spot.playerId === subModal.playerId
+              ? { ...spot, playerId: incomingPlayerId }
+              : spot
+          );
+
+          const updatedGameState = {
+            ...gameState,
+            inningData: {
+              ...gameState.inningData,
+              [gameState.currentInning]: updatedPositions
+            },
+            substitutionHistory: [
+              ...gameState.substitutionHistory,
+              {
+                inning: gameState.currentInning,
+                out: subModal.playerId,
+                in: incomingPlayerId,
+                position: subModal.position,
+                timestamp: new Date().toISOString()
+              }
+            ]
+          };
+
+          setActiveGame({ ...activeGame, gameState: updatedGameState });
+          setSubModal(null);
+        };
+
+        return (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20
+          }} onClick={() => setSubModal(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: THEME.blackLight,
+              borderRadius: 12,
+              padding: 24,
+              border: `2px solid ${THEME.gold}`,
+              maxWidth: 600,
+              width: "100%",
+              maxHeight: "80vh",
+              overflowY: "auto"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h3 style={{ margin: 0, color: THEME.gold, fontFamily: "'Oswald',sans-serif", fontSize: 20 }}>
+                  🔄 Substitute {subModal.position}
+                </h3>
+                <button onClick={() => setSubModal(null)} style={{
+                  background: "none",
+                  border: "none",
+                  color: THEME.gray,
+                  fontSize: 24,
+                  cursor: "pointer"
+                }}>✕</button>
+              </div>
+
+              {/* Outgoing Player */}
+              <Card style={{ padding: 16, marginBottom: 16, background: THEME.black }}>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 8 }}>Coming Out</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    minWidth: 40,
+                    height: 40,
+                    background: THEME.red,
+                    color: THEME.white,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 16
+                  }}>{subModal.position}</div>
+                  <div>
+                    <div style={{ color: THEME.white, fontSize: 16, fontWeight: 700 }}>{outgoingPlayer?.name}</div>
+                    <div style={{ color: THEME.gray, fontSize: 12 }}>{outgoingInnings} innings played</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Available Substitutes */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                  Available Substitutes ({eligibleSubs.length})
+                </div>
+                <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>
+                  {eligibleSubs.length === 0
+                    ? `No bench players can play ${subModal.position}`
+                    : "Sorted by least playing time (fairest first)"
+                  }
+                </div>
+              </div>
+
+              {eligibleSubs.length === 0 ? (
+                <Card style={{ padding: 20, textAlign: "center", background: THEME.black }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚫</div>
+                  <p style={{ color: THEME.gray, margin: 0 }}>
+                    No bench players have {subModal.position} as their primary or secondary position.
+                  </p>
+                  <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 12 }}>
+                    You may need to adjust positions or substitute someone else first.
+                  </p>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {eligibleSubs.map(sub => {
+                    const player = players.find(p => p.id === sub.id);
+                    return (
+                      <Card key={sub.id} style={{
+                        padding: 12,
+                        background: THEME.black,
+                        border: `2px solid ${sub.needsPlayingTime ? THEME.gold : THEME.charcoal}`,
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }} onClick={() => makeSubstitution(sub.id)}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{
+                            minWidth: 40,
+                            height: 40,
+                            background: THEME.green,
+                            color: THEME.white,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 8,
+                            fontWeight: 700,
+                            fontSize: 16
+                          }}>{subModal.position}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>
+                                {player?.name}
+                              </div>
+                              {sub.needsPlayingTime && (
+                                <Badge color={THEME.gold} bg="rgba(253,181,21,0.15)" style={{ fontSize: 10 }}>
+                                  ⚡ Priority
+                                </Badge>
+                              )}
+                            </div>
+                            <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>
+                              {sub.inningsPlayed} innings played • {player?.primaryPosition}
+                              {(player?.secondaryPositions || []).length > 0 && `, ${player.secondaryPositions.join(", ")}`}
+                            </div>
+                            {sub.needsPlayingTime && (
+                              <div style={{ color: THEME.gold, fontSize: 11, marginTop: 4 }}>
+                                ⚠️ Needs playing time - recommended substitute
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ color: THEME.green, fontSize: 20 }}>→</div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ marginTop: 16, padding: 12, background: THEME.black, borderRadius: 6 }}>
+                <div style={{ color: THEME.gray, fontSize: 11 }}>
+                  💡 <strong>Tip:</strong> Players marked "Priority" need more playing time for fairness.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>;
   }
 
