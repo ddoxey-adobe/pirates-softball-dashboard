@@ -2748,30 +2748,11 @@ const LineupBuilder = ({ players }) => {
                   const hasReturned = injury.returnedInning;
 
                   return (
-                    <div key={injury.playerId} onClick={() => {
-                      if (!canReturn) return;
-                      if (!confirm(`${injury.name} was injured in inning ${injury.inning}.\n\nIs ${injury.name} cleared to return to the game?`)) return;
-
-                      // Remove from injured list and update with return info
-                      const updatedInjuredPlayers = gameState.injuredPlayers.map(ip =>
-                        ip.playerId === injury.playerId
-                          ? { ...ip, returnedInning: gameState.currentInning }
-                          : ip
-                      );
-
-                      setActiveGame({
-                        ...activeGame,
-                        gameState: {
-                          ...gameState,
-                          injuredPlayers: updatedInjuredPlayers
-                        }
-                      });
-                    }} style={{
+                    <div key={injury.playerId} style={{
                       background: THEME.blackLight,
                       border: `2px solid ${hasReturned ? THEME.green : THEME.red}`,
                       borderRadius: 6,
                       padding: 12,
-                      cursor: canReturn ? "pointer" : "default",
                       transition: "all 0.2s",
                       opacity: hasReturned ? 0.6 : 1
                     }}>
@@ -2802,11 +2783,53 @@ const LineupBuilder = ({ players }) => {
                               ✅ Returned in inning {injury.returnedInning}
                             </div>
                           ) : injury.multiGame ? (
-                            <div style={{ color: THEME.red, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
-                              🚫 Out for multiple games - serious injury
+                            <div style={{ marginTop: 8 }}>
+                              <div style={{ color: THEME.red, fontSize: 11, fontWeight: 600, marginBottom: 8 }}>
+                                🚫 Out for multiple games - serious injury
+                              </div>
+                              <Button small onClick={(e) => {
+                                e.stopPropagation();
+                                const updatedInjuredPlayers = gameState.injuredPlayers.map(ip =>
+                                  ip.playerId === injury.playerId
+                                    ? { ...ip, multiGame: false }
+                                    : ip
+                                );
+                                setActiveGame({
+                                  ...activeGame,
+                                  gameState: {
+                                    ...gameState,
+                                    injuredPlayers: updatedInjuredPlayers
+                                  }
+                                });
+                              }} style={{ background: THEME.gold, color: THEME.black }}>
+                                🔓 Changed - Allow Return
+                              </Button>
                             </div>
                           ) : (
-                            <div style={{ color: THEME.gold, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                            <div onClick={() => {
+                              if (!confirm(`${injury.name} was injured in inning ${injury.inning}.\n\nIs ${injury.name} cleared to return to the game?`)) return;
+
+                              const updatedInjuredPlayers = gameState.injuredPlayers.map(ip =>
+                                ip.playerId === injury.playerId
+                                  ? { ...ip, returnedInning: gameState.currentInning }
+                                  : ip
+                              );
+
+                              setActiveGame({
+                                ...activeGame,
+                                gameState: {
+                                  ...gameState,
+                                  injuredPlayers: updatedInjuredPlayers
+                                }
+                              });
+                            }} style={{
+                              color: THEME.gold,
+                              fontSize: 11,
+                              marginTop: 4,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              padding: "4px 0"
+                            }}>
                               👆 Click to sub back in when cleared
                             </div>
                           )}
