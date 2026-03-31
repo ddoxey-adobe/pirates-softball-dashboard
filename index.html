@@ -2569,8 +2569,11 @@ const LineupBuilder = ({ players }) => {
     lineup: [], // [{ playerId, battingOrder, position }]
     alignments: [], // [{ name, lineup: [...] }]
     activeAlignment: null,
-    notes: ""
+    notes: "",
+    gameState: null // Active game tracking: { currentInning, inningData: { 1: [...positions], 2: [...] }, playingTime: {...} }
   });
+
+  const [activeGame, setActiveGame] = useState(null);
 
   const [form, setForm] = useState(emptyLineup());
 
@@ -2614,6 +2617,202 @@ const LineupBuilder = ({ players }) => {
     };
   };
 
+  // Active Game View
+  if (activeGame) {
+    const { gameState } = activeGame;
+    const currentPositions = gameState.inningData[gameState.currentInning] || [];
+    const onFieldPlayerIds = currentPositions.map(p => p.playerId);
+    const benchPlayers = players.filter(p =>
+      activeGame.availability[p.id] && !onFieldPlayerIds.includes(p.id)
+    );
+
+    return <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8, border: `2px solid ${THEME.gold}` }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
+              🎮 LIVE: vs {activeGame.opponent}
+            </h2>
+            <Badge color={THEME.blue} bg="rgba(52,152,219,0.15)">Inning {gameState.currentInning}</Badge>
+          </div>
+          <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>
+            {activeGame.date ? new Date(activeGame.date + "T12:00:00").toLocaleDateString() : ""} {activeGame.location && `• ${activeGame.location}`}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button small onClick={() => {
+            if (confirm("Save and exit game? You can resume later.")) {
+              setLineups(prev => prev.map(l => l.id === activeGame.id ? activeGame : l));
+              setActiveGame(null);
+            }
+          }}>💾 Save & Exit</Button>
+          <Button small variant="danger" onClick={() => {
+            if (confirm("End game? This will finalize all stats.")) {
+              setLineups(prev => prev.map(l => l.id === activeGame.id ? { ...activeGame, gameState: { ...gameState, completed: true } } : l));
+              setActiveGame(null);
+            }
+          }}>🏁 End Game</Button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+        {/* Left Column: Field & Bench */}
+        <div>
+          {/* On Field */}
+          <Card style={{ padding: 16, marginBottom: 16 }}>
+            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⚾ On Field (Inning {gameState.currentInning})</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {currentPositions.map(spot => {
+                const player = players.find(p => p.id === spot.playerId);
+                const inningsPlayed = gameState.playingTime[spot.playerId] || 0;
+                return (
+                  <div key={spot.playerId} style={{
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    padding: 12
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{
+                        minWidth: 32,
+                        height: 32,
+                        background: THEME.gold,
+                        color: THEME.black,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        fontSize: 14
+                      }}>{spot.position}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player?.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 10 }}>{inningsPlayed} innings</div>
+                      </div>
+                    </div>
+                    <Button small style={{ width: "100%", marginTop: 8 }} onClick={() => {
+                      // Substitution logic will go here
+                      alert("Substitution coming in Stage 2!");
+                    }}>Substitute</Button>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Bench */}
+          <Card style={{ padding: 16 }}>
+            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              🪑 Bench ({benchPlayers.length})
+            </h3>
+            {benchPlayers.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 20, color: THEME.gray }}>
+                <p style={{ margin: 0 }}>Everyone is on the field!</p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                {benchPlayers.map(player => {
+                  const inningsPlayed = gameState.playingTime[player.id] || 0;
+                  const needsPlayingTime = inningsPlayed < gameState.currentInning * 0.5;
+                  return (
+                    <div key={player.id} style={{
+                      background: needsPlayingTime ? "rgba(231,76,60,0.1)" : THEME.blackLight,
+                      border: `1px solid ${needsPlayingTime ? THEME.red : THEME.charcoal}`,
+                      borderRadius: 6,
+                      padding: 10
+                    }}>
+                      <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>
+                        {inningsPlayed} innings • {player.primaryPosition || "Bench"}
+                      </div>
+                      {needsPlayingTime && (
+                        <div style={{ color: THEME.red, fontSize: 10, marginTop: 4 }}>
+                          ⚠️ Needs playing time
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Right Column: Controls & Stats */}
+        <div>
+          {/* Inning Controls */}
+          <Card style={{ padding: 16, marginBottom: 16 }}>
+            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⏱️ Inning Controls</h3>
+            <Button style={{ width: "100%" }} onClick={() => {
+              const nextInning = gameState.currentInning + 1;
+              const updatedGameState = {
+                ...gameState,
+                currentInning: nextInning,
+                inningData: {
+                  ...gameState.inningData,
+                  [nextInning]: currentPositions // Copy current positions to next inning
+                },
+                playingTime: currentPositions.reduce((acc, spot) => ({
+                  ...acc,
+                  [spot.playerId]: (gameState.playingTime[spot.playerId] || 0) + 1
+                }), gameState.playingTime)
+              };
+              setActiveGame({ ...activeGame, gameState: updatedGameState });
+            }}>
+              ➡️ Next Inning ({gameState.currentInning + 1})
+            </Button>
+          </Card>
+
+          {/* Playing Time Tracker */}
+          <Card style={{ padding: 16 }}>
+            <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>📊 Playing Time</h3>
+            <div style={{ display: "grid", gap: 8 }}>
+              {players
+                .filter(p => activeGame.availability[p.id])
+                .sort((a, b) => (gameState.playingTime[a.id] || 0) - (gameState.playingTime[b.id] || 0))
+                .map(player => {
+                  const inningsPlayed = gameState.playingTime[player.id] || 0;
+                  const maxInnings = gameState.currentInning;
+                  const percent = maxInnings > 0 ? (inningsPlayed / maxInnings) * 100 : 0;
+                  const needsAttention = percent < 50 && maxInnings >= 2;
+
+                  return (
+                    <div key={player.id} style={{
+                      background: THEME.blackLight,
+                      borderRadius: 4,
+                      padding: 8,
+                      border: `1px solid ${needsAttention ? THEME.red : THEME.charcoal}`
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>{player.name}</div>
+                        <div style={{ color: needsAttention ? THEME.red : THEME.gray, fontSize: 11 }}>
+                          {inningsPlayed}/{maxInnings} innings
+                        </div>
+                      </div>
+                      <div style={{
+                        height: 6,
+                        background: THEME.black,
+                        borderRadius: 3,
+                        overflow: "hidden"
+                      }}>
+                        <div style={{
+                          width: `${percent}%`,
+                          height: "100%",
+                          background: needsAttention ? THEME.red : THEME.green,
+                          transition: "width 0.3s"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>;
+  }
+
   return <div>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
       <div>
@@ -2652,6 +2851,31 @@ const LineupBuilder = ({ players }) => {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
+                {lineup.status === "finalized" && !lineup.gameState && (
+                  <Button small onClick={() => {
+                    if (lineup.lineup.length === 0) {
+                      alert("Add players to the lineup before starting the game");
+                      return;
+                    }
+                    const initialGameState = {
+                      currentInning: 1,
+                      inningData: {
+                        1: lineup.lineup.map(spot => ({ playerId: spot.playerId, position: spot.position }))
+                      },
+                      playingTime: lineup.lineup.reduce((acc, spot) => ({ ...acc, [spot.playerId]: 1 }), {}),
+                      benchTime: {},
+                      substitutionHistory: []
+                    };
+                    setActiveGame({ ...lineup, gameState: initialGameState });
+                  }} style={{ background: THEME.green }}>
+                    ▶ Start Game
+                  </Button>
+                )}
+                {lineup.gameState && (
+                  <Button small onClick={() => setActiveGame(lineup)} style={{ background: THEME.blue }}>
+                    🎮 Resume Game
+                  </Button>
+                )}
                 <Button small onClick={() => { setForm({...lineup}); setEditing(lineup.id); setShowBuilder(true); }}>
                   {lineup.status === "finalized" ? "View" : "Edit"}
                 </Button>
