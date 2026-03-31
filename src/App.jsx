@@ -2591,9 +2591,10 @@ const LineupBuilder = ({ players }) => {
     const { gameState } = activeGame;
     const currentPositions = gameState.inningData[gameState.currentInning] || [];
     const onFieldPlayerIds = currentPositions.map(p => p.playerId);
-    // Only exclude players who are injured AND haven't returned yet
+    // Only exclude players who are SERIOUSLY injured (multiGame) AND haven't returned yet
+    // Players cleared to return (multiGame: false) should show in sub modal
     const activelyInjuredPlayerIds = (gameState.injuredPlayers || [])
-      .filter(ip => !ip.returnedInning)
+      .filter(ip => !ip.returnedInning && ip.multiGame)
       .map(ip => ip.playerId);
 
     const benchPlayers = players.filter(p =>
