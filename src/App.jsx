@@ -5855,7 +5855,7 @@ const Reports = ({ players }) => {
 
   // Collapse/Expand functions (defined after trackedDrills)
   const collapseAll = () => {
-    const allSections = ["timeline", "stats", "pitchers", "goals", "drill-usage", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
+    const allSections = ["timeline", "team-trends", "stats", "pitchers", "goals", "drill-usage", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
     const collapsed = {};
     allSections.forEach(id => collapsed[id] = true);
     setCollapsedSections(collapsed);
@@ -6514,6 +6514,203 @@ const Reports = ({ players }) => {
         )}
       </CollapsibleSection>
     )}
+
+    {/* Team Improvement Trends */}
+    {completedPractices.length >= 2 && (() => {
+      // Calculate team averages per drill across practices
+      const drillTrends = trackedDrills.map(drill => {
+        const practiceData = completedPractices.map(practice => {
+          const trackingData = practice.drillTracking?.[drill.id];
+          if (!trackingData) return null;
+
+          let total = 0;
+          let count = 0;
+
+          if (drill.config.type === "time") {
+            Object.values(trackingData).forEach(v => {
+              const val = parseFloat(v);
+              if (!isNaN(val)) { total += val; count++; }
+            });
+          } else if (drill.config.type === "number" || drill.config.type === "level") {
+            Object.values(trackingData).forEach(v => {
+              const val = parseInt(v);
+              if (!isNaN(val)) { total += val; count++; }
+            });
+          } else if (drill.config.type === "strikes-balls") {
+            Object.values(trackingData).forEach(v => {
+              if (v.strikes !== undefined && v.balls !== undefined) {
+                const totalPitches = v.strikes + v.balls;
+                if (totalPitches > 0) {
+                  total += (v.strikes / totalPitches) * 100;
+                  count++;
+                }
+              }
+            });
+          }
+
+          return count > 0 ? { avg: total / count, date: practice.date, practiceId: practice.id } : null;
+        }).filter(Boolean);
+
+        if (practiceData.length < 2) return null;
+
+        // Calculate rolling 3-practice average
+        const rollingAvg = practiceData.map((data, idx) => {
+          const window = practiceData.slice(Math.max(0, idx - 2), idx + 1);
+          const avg = window.reduce((sum, d) => sum + d.avg, 0) / window.length;
+          return { ...data, rollingAvg: avg };
+        });
+
+        // Calculate trend (compare last 3 vs first 3 practices)
+        const firstThree = rollingAvg.slice(0, Math.min(3, rollingAvg.length));
+        const lastThree = rollingAvg.slice(Math.max(0, rollingAvg.length - 3));
+        const firstAvg = firstThree.reduce((sum, d) => sum + d.rollingAvg, 0) / firstThree.length;
+        const lastAvg = lastThree.reduce((sum, d) => sum + d.rollingAvg, 0) / lastThree.length;
+
+        let trendDirection = "→";
+        let trendColor = THEME.gold;
+        let improvementRate = 0;
+
+        // For time-based drills, lower is better
+        if (drill.config.type === "time") {
+          const change = ((firstAvg - lastAvg) / firstAvg) * 100; // Positive = improvement
+          improvementRate = change;
+          if (change > 5) { trendDirection = "↗"; trendColor = THEME.green; }
+          else if (change < -5) { trendDirection = "↘"; trendColor = THEME.red; }
+        } else {
+          // For other drills, higher is better
+          const change = ((lastAvg - firstAvg) / firstAvg) * 100; // Positive = improvement
+          improvementRate = change;
+          if (change > 5) { trendDirection = "↗"; trendColor = THEME.green; }
+          else if (change < -5) { trendDirection = "↘"; trendColor = THEME.red; }
+        }
+
+        return {
+          drill,
+          practiceData,
+          rollingAvg,
+          firstAvg,
+          lastAvg,
+          trendDirection,
+          trendColor,
+          improvementRate
+        };
+      }).filter(Boolean);
+
+      return drillTrends.length > 0 && (
+        <CollapsibleSection
+          id="team-trends"
+          title="Team Improvement Trends"
+          icon="📈"
+          badge={`${drillTrends.length} drills`}
+          isCollapsed={collapsedSections["team-trends"]}
+          onToggle={toggleSection}
+        >
+          <div style={{ marginBottom: 16, padding: 12, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}` }}>
+            <div style={{ color: THEME.gold, fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📊 How to Read This</div>
+            <div style={{ color: THEME.gray, fontSize: 11, lineHeight: 1.6 }}>
+              <strong>Rolling Average:</strong> 3-practice average to smooth out day-to-day variance<br />
+              <strong>Trend:</strong> Compares first 3 practices to last 3 practices<br />
+              <strong>↗ Improving</strong> (green) = 5%+ improvement • <strong>→ Flat</strong> (gold) = ±5% • <strong>↘ Declining</strong> (red) = 5%+ decline
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 20 }}>
+            {drillTrends.map(trend => (
+              <Card key={trend.drill.id} style={{ padding: 16 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ color: THEME.white, fontSize: 16, fontWeight: 700 }}>{trend.drill.name}</div>
+                      <div style={{ color: trend.trendColor, fontSize: 24, fontWeight: 700 }}>{trend.trendDirection}</div>
+                    </div>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>
+                      {trend.drill.category} • {trend.practiceData.length} practices tracked
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: trend.trendColor, fontSize: 20, fontWeight: 700 }}>
+                      {trend.improvementRate > 0 ? "+" : ""}{trend.improvementRate.toFixed(1)}%
+                    </div>
+                    <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>Rate of Change</div>
+                  </div>
+                </div>
+
+                {/* Chart */}
+                <LineChart
+                  data={trend.rollingAvg.map(d => ({ value: d.rollingAvg, label: d.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "" }))}
+                  width={600}
+                  height={200}
+                  color={trend.trendColor}
+                  showDots={true}
+                  showGrid={true}
+                />
+
+                {/* Stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16, padding: 12, background: THEME.blackLight, borderRadius: 6 }}>
+                  <div>
+                    <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", marginBottom: 2 }}>First 3 Practices</div>
+                    <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>
+                      {formatValue(trend.firstAvg, trend.drill.config)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", marginBottom: 2 }}>Last 3 Practices</div>
+                    <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>
+                      {formatValue(trend.lastAvg, trend.drill.config)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", marginBottom: 2 }}>Current Trend</div>
+                    <div style={{ color: trend.trendColor, fontSize: 14, fontWeight: 700 }}>
+                      {trend.trendDirection === "↗" && "Improving"}
+                      {trend.trendDirection === "→" && "Stable"}
+                      {trend.trendDirection === "↘" && "Declining"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Practice-by-practice breakdown (optional expand) */}
+                <details style={{ marginTop: 12 }}>
+                  <summary style={{ color: THEME.gold, fontSize: 12, fontWeight: 600, cursor: "pointer", userSelect: "none" }}>
+                    📋 View Practice-by-Practice Data
+                  </summary>
+                  <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+                    {trend.practiceData.map((data, idx) => (
+                      <div key={idx} style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        background: THEME.black,
+                        borderRadius: 4,
+                        border: `1px solid ${THEME.charcoal}`
+                      }}>
+                        <span style={{ color: THEME.gray, fontSize: 11 }}>
+                          {data.date ? new Date(data.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
+                        </span>
+                        <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>
+                          {formatValue(data.avg, trend.drill.config)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </Card>
+            ))}
+          </div>
+
+          {/* Empty state */}
+          {drillTrends.length === 0 && (
+            <Card style={{ textAlign: "center", padding: 32 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>📈</div>
+              <div style={{ color: THEME.gray, fontSize: 13 }}>
+                Not enough data yet. Complete at least 2 practices with drill tracking to see team trends.
+              </div>
+            </Card>
+          )}
+        </CollapsibleSection>
+      );
+    })()}
 
     {completedPractices.length === 0 ? (
       <Card style={{ textAlign: "center", padding: 40 }}>
