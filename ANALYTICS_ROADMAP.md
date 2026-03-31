@@ -1,6 +1,6 @@
 # Pirates Softball Dashboard - Analytics Features Roadmap
 
-**Status:** Phase 2 Complete ✅ - Starting Phase 3
+**Status:** Phase 3 Complete ✅ - Starting Phase 4
 **Last Updated:** 2026-03-31
 **Estimated Total Time:** ~62 hours
 
@@ -12,23 +12,25 @@ Implementing 12 new analytics and UX features to transform the dashboard into a 
 
 ---
 
-## Current Status: Phase 3 - Advanced Analytics (16 hours)
+## Current Status: Phase 4 - Export & Mobile (15 hours)
 
-### ✅ Completed (Phase 1 & 2)
+### ✅ Completed (Phases 1, 2, 3)
 - Feature #5: Attendance Insights ✅
 - Feature #8: Quick Practice Notes ✅
 - Feature #9: Drill Performance by Date ✅
 - Feature #4: Visual Trend Charts ✅
 - Feature #7: Season Goals ✅
 - Feature #1: Practice Timeline View ✅
+- Feature #3: Team Improvement Trends ✅
+- Feature #2: Player Comparison Tool ✅
+- Feature #11: Player Profile Pages ✅
 
 ### 🔄 In Progress
 - None
 
 ### ⏳ Next Up
-- Feature #3: Team Improvement Trends (Task #49)
-- Feature #2: Player Comparison Tool (Task #51)
-- Feature #11: Player Profile Pages (Task #45)
+- Feature #12: Mobile Gestures (Task #46)
+- Feature #10: Export Full Season Report (Task #47)
 
 ---
 
@@ -72,17 +74,19 @@ Implementing 12 new analytics and UX features to transform the dashboard into a 
 
 ---
 
-### Phase 3: Advanced Analytics (3 features, ~16 hours)
+### Phase 3: Advanced Analytics (3 features, ~16 hours) ✅ COMPLETE
 **Goal:** Deep insights and comparisons
 
 | # | Feature | Task | Time | Complexity | Status |
 |---|---------|------|------|------------|--------|
-| 3 | Team Improvement Trends | #49 | 4h | Medium | ⏳ Pending |
-| 2 | Player Comparison Tool | #51 | 4h | Medium | ⏳ Pending |
-| 11 | Player Profile Pages | #45 | 8h | Complex | ⏳ Pending |
+| 3 | Team Improvement Trends | #49 | 4h | Medium | ✅ Complete |
+| 2 | Player Comparison Tool | #51 | 4h | Medium | ✅ Complete |
+| 11 | Player Profile Pages | #45 | 8h | Complex | ✅ Complete |
 
-**Dependencies:**
-- All require Feature #4 (charts)
+**Deliverables:**
+- ✅ Rolling 3-practice averages with trend indicators and improvement rates
+- ✅ Side-by-side player comparison across drills, attendance, and game stats
+- ✅ Comprehensive player profiles with 4 tabs: Overview, Practice History, Game History, Goals
 - Feature #11 integrates #2 (comparison)
 
 ---
@@ -463,5 +467,5 @@ I'll:
 
 ---
 
-**Last worked on:** 2026-03-31 - Feature #1 (Practice Timeline View) complete ✅
-**Next session:** Begin Phase 3 with Feature #3 (Team Improvement Trends), then Feature #2 (Player Comparison Tool)
+**Last worked on:** 2026-03-31 - Feature #11 (Player Profile Pages) complete ✅
+**Next session:** Begin Phase 4 with Feature #12 (Mobile Gestures) or Feature #10 (Export Full Season Report)
