@@ -2541,6 +2541,8 @@ const LineupBuilder = ({ players }) => {
 
   const [activeGame, setActiveGame] = useState(null);
   const [subModal, setSubModal] = useState(null); // { playerId, position }
+  const [injuryNotes, setInjuryNotes] = useState("");
+  const [multiGameInjury, setMultiGameInjury] = useState(false);
 
   const [form, setForm] = useState(emptyLineup());
 
@@ -2589,12 +2591,15 @@ const LineupBuilder = ({ players }) => {
     const { gameState } = activeGame;
     const currentPositions = gameState.inningData[gameState.currentInning] || [];
     const onFieldPlayerIds = currentPositions.map(p => p.playerId);
-    const injuredPlayerIds = (gameState.injuredPlayers || []).map(ip => ip.playerId);
+    // Only exclude players who are injured AND haven't returned yet
+    const activelyInjuredPlayerIds = (gameState.injuredPlayers || [])
+      .filter(ip => !ip.returnedInning)
+      .map(ip => ip.playerId);
 
     const benchPlayers = players.filter(p =>
       activeGame.availability[p.id] &&
       !onFieldPlayerIds.includes(p.id) &&
-      !injuredPlayerIds.includes(p.id)
+      !activelyInjuredPlayerIds.includes(p.id)
     );
 
     const injuredPlayers = (gameState.injuredPlayers || []).map(injury => {
@@ -2669,9 +2674,13 @@ const LineupBuilder = ({ players }) => {
                     </div>
                     <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
                       <Button small style={{ flex: 1 }} onClick={() => {
+                        setInjuryNotes("");
+                        setMultiGameInjury(false);
                         setSubModal({ playerId: spot.playerId, position: spot.position });
                       }}>Substitute</Button>
                       <button onClick={() => {
+                        setInjuryNotes("");
+                        setMultiGameInjury(false);
                         setSubModal({ playerId: spot.playerId, position: spot.position, isInjury: true });
                       }} style={{
                         background: THEME.red,
@@ -2734,37 +2743,78 @@ const LineupBuilder = ({ players }) => {
                 🚑 Injured ({injuredPlayers.length})
               </h3>
               <div style={{ display: "grid", gap: 8 }}>
-                {injuredPlayers.map(injury => (
-                  <div key={injury.playerId} style={{
-                    background: THEME.blackLight,
-                    border: `2px solid ${THEME.red}`,
-                    borderRadius: 6,
-                    padding: 12
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{
-                        minWidth: 36,
-                        height: 36,
-                        background: THEME.red,
-                        color: THEME.white,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 6,
-                        fontSize: 18
-                      }}>🚑</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{injury.name}</div>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
-                          Injured in inning {injury.inning} • Was playing {injury.position}
-                        </div>
-                        <div style={{ color: THEME.red, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
-                          ⚠️ Out for remainder of game
+                {injuredPlayers.map(injury => {
+                  const canReturn = !injury.multiGame && !injury.returnedInning;
+                  const hasReturned = injury.returnedInning;
+
+                  return (
+                    <div key={injury.playerId} onClick={() => {
+                      if (!canReturn) return;
+                      if (!confirm(`${injury.name} was injured in inning ${injury.inning}.\n\nIs ${injury.name} cleared to return to the game?`)) return;
+
+                      // Remove from injured list and update with return info
+                      const updatedInjuredPlayers = gameState.injuredPlayers.map(ip =>
+                        ip.playerId === injury.playerId
+                          ? { ...ip, returnedInning: gameState.currentInning }
+                          : ip
+                      );
+
+                      setActiveGame({
+                        ...activeGame,
+                        gameState: {
+                          ...gameState,
+                          injuredPlayers: updatedInjuredPlayers
+                        }
+                      });
+                    }} style={{
+                      background: THEME.blackLight,
+                      border: `2px solid ${hasReturned ? THEME.green : THEME.red}`,
+                      borderRadius: 6,
+                      padding: 12,
+                      cursor: canReturn ? "pointer" : "default",
+                      transition: "all 0.2s",
+                      opacity: hasReturned ? 0.6 : 1
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{
+                          minWidth: 36,
+                          height: 36,
+                          background: hasReturned ? THEME.green : THEME.red,
+                          color: THEME.white,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 6,
+                          fontSize: 18
+                        }}>{hasReturned ? "✓" : "🚑"}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{injury.name}</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                            Injured inning {injury.inning} • Was playing {injury.position}
+                          </div>
+                          {injury.notes && (
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
+                              "{injury.notes}"
+                            </div>
+                          )}
+                          {hasReturned ? (
+                            <div style={{ color: THEME.green, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                              ✅ Returned in inning {injury.returnedInning}
+                            </div>
+                          ) : injury.multiGame ? (
+                            <div style={{ color: THEME.red, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                              🚫 Out for multiple games - serious injury
+                            </div>
+                          ) : (
+                            <div style={{ color: THEME.gold, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                              👆 Click to sub back in when cleared
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           )}
@@ -3029,7 +3079,10 @@ const LineupBuilder = ({ players }) => {
                   playerId: subModal.playerId,
                   inning: gameState.currentInning,
                   position: subModal.position,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  notes: injuryNotes || "",
+                  multiGame: multiGameInjury,
+                  returnedInning: null
                 }]
               : (gameState.injuredPlayers || []),
             substitutionHistory: [
@@ -3047,6 +3100,8 @@ const LineupBuilder = ({ players }) => {
 
           setActiveGame({ ...activeGame, gameState: updatedGameState });
           setSubModal(null);
+          setInjuryNotes("");
+          setMultiGameInjury(false);
         };
 
         return (
@@ -3123,6 +3178,50 @@ const LineupBuilder = ({ players }) => {
                   </div>
                 </div>
               </Card>
+
+              {/* Injury Details */}
+              {subModal.isInjury && (
+                <Card style={{ padding: 16, marginBottom: 16, background: THEME.black }}>
+                  <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                    📝 Injury Details (Optional)
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ color: THEME.gray, fontSize: 11, display: "block", marginBottom: 6 }}>
+                      What happened?
+                    </label>
+                    <input
+                      type="text"
+                      value={injuryNotes}
+                      onChange={e => setInjuryNotes(e.target.value)}
+                      placeholder="e.g., Twisted ankle, Hit by ball, Feeling dizzy..."
+                      style={{
+                        width: "100%",
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        color: THEME.white,
+                        fontSize: 13,
+                        outline: "none"
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: THEME.blackLight, borderRadius: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={multiGameInjury}
+                      onChange={e => setMultiGameInjury(e.target.checked)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <label style={{ color: THEME.white, fontSize: 13, cursor: "pointer" }} onClick={() => setMultiGameInjury(!multiGameInjury)}>
+                      ⚠️ Serious injury - Out for multiple games
+                    </label>
+                  </div>
+                  <div style={{ color: THEME.gray, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
+                    💡 <strong>Tip:</strong> Check this box for serious injuries (broken bones, concussion, etc.) to track across games.
+                  </div>
+                </Card>
+              )}
 
               {/* Available Substitutes */}
               <div style={{ marginBottom: 12 }}>
