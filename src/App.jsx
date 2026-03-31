@@ -2905,20 +2905,59 @@ const LineupBuilder = ({ players }) => {
         const outgoingPlayer = players.find(p => p.id === subModal.playerId);
         const outgoingInnings = gameState.playingTime[subModal.playerId] || 0;
 
-        // Find bench players who can play this position
-        const eligibleSubs = benchPlayers.filter(p => {
+        // Calculate position history for all players this game
+        const getPositionHistory = (playerId) => {
+          const history = {};
+          Object.values(gameState.inningData).forEach(inningPositions => {
+            const playerSpot = inningPositions.find(s => s.playerId === playerId);
+            if (playerSpot) {
+              history[playerSpot.position] = (history[playerSpot.position] || 0) + 1;
+            }
+          });
+          return history;
+        };
+
+        // ALL bench players are eligible - smart sorting guides decisions
+        const eligibleSubs = benchPlayers.map(p => {
           const playerObj = players.find(pl => pl.id === p.id);
-          if (!playerObj) return false;
-          const canPlayPosition =
-            playerObj.primaryPosition === subModal.position ||
-            (playerObj.secondaryPositions || []).includes(subModal.position) ||
-            subModal.position === "Bench";
-          return canPlayPosition;
-        }).map(p => {
           const inningsPlayed = gameState.playingTime[p.id] || 0;
           const needsPlayingTime = inningsPlayed < gameState.currentInning * 0.5;
-          return { ...p, inningsPlayed, needsPlayingTime };
-        }).sort((a, b) => a.inningsPlayed - b.inningsPlayed); // Sort by least playing time first
+          const positionHistory = getPositionHistory(p.id);
+          const hasPlayedPosition = (positionHistory[subModal.position] || 0) > 0;
+
+          // Determine match type for sorting
+          let matchType = 4; // Default: New opportunity
+          let matchLabel = "🆕 New position";
+          let matchDescription = `Never played ${subModal.position} this season`;
+
+          if (playerObj?.primaryPosition === subModal.position) {
+            matchType = 1;
+            matchLabel = "⭐ Primary position";
+            matchDescription = `This is their main position`;
+          } else if ((playerObj?.secondaryPositions || []).includes(subModal.position)) {
+            matchType = 2;
+            matchLabel = "✓ Secondary position";
+            matchDescription = `Listed as backup for ${subModal.position}`;
+          } else if (hasPlayedPosition) {
+            matchType = 3;
+            matchLabel = "🔄 Has experience";
+            matchDescription = `Played ${subModal.position} ${positionHistory[subModal.position]} time${positionHistory[subModal.position] > 1 ? 's' : ''} this game`;
+          }
+
+          return {
+            ...p,
+            inningsPlayed,
+            needsPlayingTime,
+            matchType,
+            matchLabel,
+            matchDescription,
+            positionHistory
+          };
+        }).sort((a, b) => {
+          // Sort by: match type (1-4), then by playing time (fairness)
+          if (a.matchType !== b.matchType) return a.matchType - b.matchType;
+          return a.inningsPlayed - b.inningsPlayed;
+        });
 
         const makeSubstitution = (incomingPlayerId) => {
           const currentPositions = gameState.inningData[gameState.currentInning];
@@ -3037,35 +3076,36 @@ const LineupBuilder = ({ players }) => {
               {/* Available Substitutes */}
               <div style={{ marginBottom: 12 }}>
                 <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-                  Available Substitutes ({eligibleSubs.length})
+                  Available Substitutes ({eligibleSubs.length}) - All Players
                 </div>
                 <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>
-                  {eligibleSubs.length === 0
-                    ? `No bench players can play ${subModal.position}`
-                    : "Sorted by least playing time (fairest first)"
-                  }
+                  Smart sorted: Primary → Secondary → Experience → New opportunities
                 </div>
               </div>
 
               {eligibleSubs.length === 0 ? (
                 <Card style={{ padding: 20, textAlign: "center", background: THEME.black }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚫</div>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🪑</div>
                   <p style={{ color: THEME.gray, margin: 0 }}>
-                    No bench players have {subModal.position} as their primary or secondary position.
-                  </p>
-                  <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 12 }}>
-                    You may need to adjust positions or substitute someone else first.
+                    Everyone is on the field!
                   </p>
                 </Card>
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {eligibleSubs.map(sub => {
                     const player = players.find(p => p.id === sub.id);
+
+                    // Determine badge color based on match type
+                    let badgeColor = THEME.charcoal;
+                    if (sub.matchType === 1) badgeColor = THEME.gold; // Primary
+                    else if (sub.matchType === 2) badgeColor = THEME.blue; // Secondary
+                    else if (sub.matchType === 3) badgeColor = THEME.green; // Experience
+
                     return (
                       <Card key={sub.id} style={{
                         padding: 12,
                         background: THEME.black,
-                        border: `2px solid ${sub.needsPlayingTime ? THEME.gold : THEME.charcoal}`,
+                        border: `2px solid ${sub.needsPlayingTime ? THEME.gold : badgeColor}`,
                         cursor: "pointer",
                         transition: "all 0.2s"
                       }} onClick={() => makeSubstitution(sub.id)}>
@@ -3073,7 +3113,7 @@ const LineupBuilder = ({ players }) => {
                           <div style={{
                             minWidth: 40,
                             height: 40,
-                            background: THEME.green,
+                            background: badgeColor,
                             color: THEME.white,
                             display: "flex",
                             alignItems: "center",
@@ -3083,7 +3123,7 @@ const LineupBuilder = ({ players }) => {
                             fontSize: 16
                           }}>{subModal.position}</div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <div style={{ color: THEME.white, fontSize: 15, fontWeight: 700 }}>
                                 {player?.name}
                               </div>
@@ -3092,18 +3132,24 @@ const LineupBuilder = ({ players }) => {
                                   ⚡ Priority
                                 </Badge>
                               )}
+                              <Badge color={badgeColor} bg={`${badgeColor}20`} style={{ fontSize: 10 }}>
+                                {sub.matchLabel}
+                              </Badge>
                             </div>
-                            <div style={{ color: THEME.gray, fontSize: 12, marginTop: 2 }}>
-                              {sub.inningsPlayed} innings played • {player?.primaryPosition}
-                              {(player?.secondaryPositions || []).length > 0 && `, ${player.secondaryPositions.join(", ")}`}
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 3 }}>
+                              {sub.matchDescription}
+                            </div>
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 3 }}>
+                              {sub.inningsPlayed} innings • Primary: {player?.primaryPosition || "None"}
+                              {(player?.secondaryPositions || []).length > 0 && ` • Also: ${player.secondaryPositions.join(", ")}`}
                             </div>
                             {sub.needsPlayingTime && (
-                              <div style={{ color: THEME.gold, fontSize: 11, marginTop: 4 }}>
-                                ⚠️ Needs playing time - recommended substitute
+                              <div style={{ color: THEME.gold, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                                ⚠️ Needs playing time - fairness priority
                               </div>
                             )}
                           </div>
-                          <div style={{ color: THEME.green, fontSize: 20 }}>→</div>
+                          <div style={{ color: badgeColor, fontSize: 20 }}>→</div>
                         </div>
                       </Card>
                     );
@@ -3112,8 +3158,8 @@ const LineupBuilder = ({ players }) => {
               )}
 
               <div style={{ marginTop: 16, padding: 12, background: THEME.black, borderRadius: 6 }}>
-                <div style={{ color: THEME.gray, fontSize: 11 }}>
-                  💡 <strong>Tip:</strong> Players marked "Priority" need more playing time for fairness.
+                <div style={{ color: THEME.gray, fontSize: 11, lineHeight: 1.5 }}>
+                  💡 <strong>Smart Sorting:</strong> ⭐ Primary positions first, ✓ Secondary next, 🔄 Experience third, 🆕 New opportunities last. Within each tier, sorted by least playing time (fairness). Anyone can play any position!
                 </div>
               </div>
             </div>
