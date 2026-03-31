@@ -2948,24 +2948,47 @@ const LineupBuilder = ({ players }) => {
           {/* Inning Controls */}
           <Card style={{ padding: 16, marginBottom: 16 }}>
             <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⏱️ Inning Controls</h3>
-            <Button style={{ width: "100%" }} onClick={() => {
-              const nextInning = gameState.currentInning + 1;
-              const updatedGameState = {
-                ...gameState,
-                currentInning: nextInning,
-                inningData: {
-                  ...gameState.inningData,
-                  [nextInning]: currentPositions // Copy current positions to next inning
-                },
-                playingTime: currentPositions.reduce((acc, spot) => ({
-                  ...acc,
-                  [spot.playerId]: (gameState.playingTime[spot.playerId] || 0) + 1
-                }), gameState.playingTime)
-              };
-              setActiveGame({ ...activeGame, gameState: updatedGameState });
-            }}>
-              ➡️ Next Inning ({gameState.currentInning + 1})
-            </Button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+              <Button
+                small
+                disabled={gameState.currentInning === 1}
+                onClick={() => {
+                  if (!confirm("Go back to previous inning? This will revert to the previous inning's positions.")) return;
+                  const prevInning = gameState.currentInning - 1;
+                  setActiveGame({
+                    ...activeGame,
+                    gameState: {
+                      ...gameState,
+                      currentInning: prevInning
+                    }
+                  });
+                }}
+                style={{
+                  opacity: gameState.currentInning === 1 ? 0.5 : 1,
+                  cursor: gameState.currentInning === 1 ? "not-allowed" : "pointer"
+                }}
+              >
+                ⬅️ Prev
+              </Button>
+              <Button onClick={() => {
+                const nextInning = gameState.currentInning + 1;
+                const updatedGameState = {
+                  ...gameState,
+                  currentInning: nextInning,
+                  inningData: {
+                    ...gameState.inningData,
+                    [nextInning]: currentPositions // Copy current positions to next inning
+                  },
+                  playingTime: currentPositions.reduce((acc, spot) => ({
+                    ...acc,
+                    [spot.playerId]: (gameState.playingTime[spot.playerId] || 0) + 1
+                  }), gameState.playingTime)
+                };
+                setActiveGame({ ...activeGame, gameState: updatedGameState });
+              }}>
+                ➡️ Next Inning ({gameState.currentInning + 1})
+              </Button>
+            </div>
           </Card>
 
           {/* Load Alignment */}
