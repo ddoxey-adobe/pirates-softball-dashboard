@@ -804,6 +804,12 @@ const PracticeLog = ({ players, coaches }) => {
   const stopwatchInterval = useRef(null);
   const [trackingGroup, setTrackingGroup] = useState(null); // Which group coach is tracking for station drills
 
+  // Highlight modal state
+  const [showHighlightModal, setShowHighlightModal] = useState(false);
+  const [highlightDrill, setHighlightDrill] = useState(null);
+  const [highlightNote, setHighlightNote] = useState("");
+  const [highlightPlayers, setHighlightPlayers] = useState([]);
+
   const emptyPlan = () => ({
     id: "", date: "", time: "", duration: 120, focus: "", drills: [], notes: "", status: "planned",
     attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
@@ -845,7 +851,8 @@ const PracticeLog = ({ players, coaches }) => {
       drillTracking: drillTracking,
       observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
       groups: practice.groups || {}, // Carry over groups from plan, or initialize empty
-      stationRotation: practice.stationRotation || stationRotation
+      stationRotation: practice.stationRotation || stationRotation,
+      highlights: [] // Quick notes/highlights during practice
     };
   };
 
@@ -932,6 +939,27 @@ const PracticeLog = ({ players, coaches }) => {
     setEd(practice.id);
     setMode("complete");
     setShow(true);
+  };
+
+  const saveHighlight = () => {
+    if (!highlightNote.trim()) {
+      alert("Please enter a note");
+      return;
+    }
+    const highlight = {
+      drillId: highlightDrill,
+      note: highlightNote,
+      timestamp: new Date().toISOString(),
+      playersTagged: highlightPlayers
+    };
+    setForm({
+      ...form,
+      highlights: [...(form.highlights || []), highlight]
+    });
+    setShowHighlightModal(false);
+    setHighlightNote("");
+    setHighlightPlayers([]);
+    setHighlightDrill(null);
   };
 
   const loadTemplate = (tmpl) => {
@@ -1639,7 +1667,10 @@ const PracticeLog = ({ players, coaches }) => {
                       const times = tracking.times || [];
                       return (
                         <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `2px solid ${THEME.blue}` }}>
-                          <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>⏱️ {drill.name}</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700 }}>⏱️ {drill.name}</div>
+                            <Button small onClick={() => { setHighlightDrill(drill.id); setShowHighlightModal(true); }} style={{ background: "rgba(253,181,21,0.15)", color: THEME.gold, border: `1px solid ${THEME.gold}` }}>💡 Highlight</Button>
+                          </div>
                           <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Time each player home-to-first</div>
 
                           {/* Stopwatch Display */}
@@ -2551,6 +2582,43 @@ const PracticeLog = ({ players, coaches }) => {
             );
           })()}
 
+          {/* Show Practice Highlights */}
+          {form.highlights && form.highlights.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <SL>💡 Practice Highlights</SL>
+              <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+                {form.highlights.map((highlight, idx) => {
+                  const drill = DRILL_LIBRARY.find(d => d.id === highlight.drillId);
+                  const taggedPlayers = (highlight.playersTagged || []).map(id => players.find(p => p.id === id)).filter(Boolean);
+                  return (
+                    <div key={idx} style={{ background: "rgba(253,181,21,0.05)", borderRadius: 6, padding: 12, border: `1px solid rgba(253,181,21,0.2)` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                        <div style={{ color: THEME.gold, fontSize: 12, fontWeight: 700 }}>
+                          {drill ? drill.name : "General Note"}
+                        </div>
+                        <div style={{ color: THEME.gray, fontSize: 10 }}>
+                          {new Date(highlight.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      </div>
+                      <div style={{ color: THEME.white, fontSize: 13, marginBottom: taggedPlayers.length > 0 ? 6 : 0 }}>
+                        {highlight.note}
+                      </div>
+                      {taggedPlayers.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {taggedPlayers.map(p => (
+                            <span key={p.id} style={{ background: THEME.gold, color: THEME.black, padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
+                              {p.name.split(" ")[0]}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <TextArea label="Coach Notes" value={form.coachNotes || ""} onChange={e => setForm({ ...form, coachNotes: e.target.value })} style={{ marginTop: 16 }} placeholder="What went well, what to work on..." />
         </div>
       )}
@@ -2561,6 +2629,75 @@ const PracticeLog = ({ players, coaches }) => {
         <Button onClick={save}>
           {mode === "plan" ? (ed ? "Save Plan" : "Create Plan") : mode === "active" ? "Save Progress" : "Mark Complete"}
         </Button>
+      </div>
+    </Modal>
+
+    {/* Highlight Modal */}
+    <Modal
+      open={showHighlightModal}
+      onClose={() => {
+        setShowHighlightModal(false);
+        setHighlightNote("");
+        setHighlightPlayers([]);
+        setHighlightDrill(null);
+      }}
+      title="💡 Add Practice Highlight"
+    >
+      <div style={{ display: "grid", gap: 16 }}>
+        <div>
+          <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Note *</label>
+          <textarea
+            value={highlightNote}
+            onChange={(e) => setHighlightNote(e.target.value)}
+            placeholder="e.g., Jessica had her fastest sprint yet!"
+            rows={3}
+            style={{ width: "100%", padding: "10px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14, fontFamily: "inherit", resize: "vertical" }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Tag Players (Optional)</label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+            {players.filter(p => form.attendance?.[p.id]).map(player => {
+              const isSelected = highlightPlayers.includes(player.id);
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => {
+                    if (isSelected) {
+                      setHighlightPlayers(highlightPlayers.filter(id => id !== player.id));
+                    } else {
+                      setHighlightPlayers([...highlightPlayers, player.id]);
+                    }
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    background: isSelected ? THEME.gold : THEME.blackLight,
+                    color: isSelected ? THEME.black : THEME.white,
+                    border: `1px solid ${isSelected ? THEME.gold : THEME.charcoal}`,
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: "all 0.2s"
+                  }}
+                >
+                  {player.name.split(" ")[0]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+          <Button variant="ghost" onClick={() => {
+            setShowHighlightModal(false);
+            setHighlightNote("");
+            setHighlightPlayers([]);
+            setHighlightDrill(null);
+          }}>Cancel</Button>
+          <Button onClick={saveHighlight} style={{ background: THEME.gold }}>Save Highlight</Button>
+        </div>
       </div>
     </Modal>
   </div>;
