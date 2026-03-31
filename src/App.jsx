@@ -5733,6 +5733,8 @@ const Reports = ({ players }) => {
   const [selectedPlayerGameLog, setSelectedPlayerGameLog] = useState(null);
   const [timelineFilter, setTimelineFilter] = useState({ focus: "all", category: "all" });
   const [expandedPractices, setExpandedPractices] = useState({});
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [comparePlayerIds, setComparePlayerIds] = useState([]);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -6227,11 +6229,18 @@ const Reports = ({ players }) => {
       </div>
     </div>
 
-    {/* Collapse/Expand Controls */}
+    {/* Action Buttons */}
     {(completedPractices.length > 0 || filteredGames.length > 0) && (
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <Button small onClick={expandAll}>⬇️ Expand All</Button>
-        <Button small onClick={collapseAll}>⬆️ Collapse All</Button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button small onClick={expandAll}>⬇️ Expand All</Button>
+          <Button small onClick={collapseAll}>⬆️ Collapse All</Button>
+        </div>
+        {players.length >= 2 && (
+          <Button onClick={() => { setComparePlayerIds([]); setShowCompareModal(true); }}>
+            🔍 Compare Players
+          </Button>
+        )}
       </div>
     )}
 
@@ -7791,6 +7800,330 @@ const Reports = ({ players }) => {
             </div>
           </Modal>
         )}
+
+        {/* Player Comparison Modal */}
+        {showCompareModal && (() => {
+          // Calculate comparison data for selected players
+          const comparePlayers = players.filter(p => comparePlayerIds.includes(p.id));
+
+          const comparisonData = comparePlayers.map(player => {
+            // Practice attendance
+            const practicesAttended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+            const attendancePercent = totalPractices > 0 ? (practicesAttended / totalPractices) * 100 : 0;
+
+            // Drill performance
+            const drillStats = {};
+            trackedDrills.forEach(drill => {
+              const playerData = completedPractices
+                .map(p => {
+                  const tracking = p.drillTracking?.[drill.id];
+                  if (!tracking || !tracking[player.id]) return null;
+
+                  if (drill.config.type === "time") {
+                    return parseFloat(tracking[player.id]);
+                  } else if (drill.config.type === "number" || drill.config.type === "level") {
+                    return parseInt(tracking[player.id]);
+                  } else if (drill.config.type === "strikes-balls") {
+                    const s = tracking[player.id].strikes || 0;
+                    const b = tracking[player.id].balls || 0;
+                    return (s + b) > 0 ? (s / (s + b)) * 100 : 0;
+                  }
+                  return null;
+                })
+                .filter(v => v !== null);
+
+              if (playerData.length > 0) {
+                const avg = playerData.reduce((sum, v) => sum + v, 0) / playerData.length;
+                const best = drill.config.type === "time"
+                  ? Math.min(...playerData)
+                  : Math.max(...playerData);
+                drillStats[drill.id] = { avg, best, count: playerData.length };
+              }
+            });
+
+            // Game stats
+            const playerGames = filteredGames.filter(g => (g.lineup || []).find(l => l.playerId === player.id));
+            const atBats = playerGames.flatMap(g => (g.batting || []).filter(ab => ab.playerId === player.id));
+            const hits = atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+            const totalABs = atBats.filter(ab => !["BB", "HBP", "SAC"].includes(ab.result)).length;
+            const battingAvg = totalABs > 0 ? hits / totalABs : 0;
+
+            return {
+              player,
+              attendancePercent,
+              practicesAttended,
+              drillStats,
+              gamesPlayed: playerGames.length,
+              battingAvg,
+              hits,
+              totalABs
+            };
+          });
+
+          // Find leader in each category
+          const getLeader = (category, isLowerBetter = false) => {
+            if (comparisonData.length === 0) return null;
+            return comparisonData.reduce((leader, current) => {
+              const leaderVal = category(leader);
+              const currentVal = category(current);
+              if (leaderVal === null || leaderVal === undefined) return current;
+              if (currentVal === null || currentVal === undefined) return leader;
+              return isLowerBetter
+                ? (currentVal < leaderVal ? current : leader)
+                : (currentVal > leaderVal ? current : leader);
+            });
+          };
+
+          return (
+            <Modal title="Compare Players" onClose={() => setShowCompareModal(false)} wide={true}>
+              {/* Player selector */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                  Select 2-3 Players to Compare
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {players.map(player => {
+                    const isSelected = comparePlayerIds.includes(player.id);
+                    const canSelect = comparePlayerIds.length < 3 || isSelected;
+                    return (
+                      <button
+                        key={player.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setComparePlayerIds(comparePlayerIds.filter(id => id !== player.id));
+                          } else if (canSelect) {
+                            setComparePlayerIds([...comparePlayerIds, player.id]);
+                          }
+                        }}
+                        disabled={!canSelect}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 6,
+                          border: `2px solid ${isSelected ? THEME.gold : THEME.charcoal}`,
+                          background: isSelected ? `${THEME.gold}20` : THEME.blackLight,
+                          color: isSelected ? THEME.gold : THEME.white,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: canSelect ? "pointer" : "not-allowed",
+                          opacity: canSelect ? 1 : 0.5,
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {isSelected && "✓ "}{player.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {comparePlayerIds.length > 0 && (
+                  <div style={{ marginTop: 8, color: THEME.gray, fontSize: 11 }}>
+                    {comparePlayerIds.length} player{comparePlayerIds.length > 1 ? "s" : ""} selected (max 3)
+                  </div>
+                )}
+              </div>
+
+              {/* Comparison results */}
+              {comparisonData.length >= 2 ? (
+                <div>
+                  {/* Attendance comparison */}
+                  <div style={{ marginBottom: 24 }}>
+                    <h4 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📅 Practice Attendance</h4>
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {comparisonData.map(data => {
+                        const isLeader = getLeader(d => d.attendancePercent)?.player.id === data.player.id;
+                        return (
+                          <div key={data.player.id} style={{
+                            padding: 12,
+                            background: isLeader ? `${THEME.green}15` : THEME.blackLight,
+                            border: `1px solid ${isLeader ? THEME.green : THEME.charcoal}`,
+                            borderRadius: 6
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                              <span style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{data.player.name}</span>
+                              {isLeader && <Badge color={THEME.green} bg={`${THEME.green}20`}>🏆 Best</Badge>}
+                            </div>
+                            <div style={{ position: "relative", height: 24, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                              <div style={{
+                                width: `${data.attendancePercent}%`,
+                                height: "100%",
+                                background: `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.green} 100%)`,
+                                transition: "width 0.5s ease"
+                              }} />
+                              <div style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: THEME.white,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textShadow: "0 1px 2px rgba(0,0,0,0.9)"
+                              }}>
+                                {data.practicesAttended}/{totalPractices} ({data.attendancePercent.toFixed(0)}%)
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Drill comparison */}
+                  {trackedDrills.map(drill => {
+                    const playersWithData = comparisonData.filter(d => d.drillStats[drill.id]);
+                    if (playersWithData.length === 0) return null;
+
+                    const leader = getLeader(d => d.drillStats[drill.id]?.best, drill.config.type === "time");
+
+                    return (
+                      <div key={drill.id} style={{ marginBottom: 24 }}>
+                        <h4 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                          {drill.name} ({drill.category})
+                        </h4>
+                        <div style={{ display: "grid", gap: 12 }}>
+                          {playersWithData.map(data => {
+                            const drillData = data.drillStats[drill.id];
+                            const isLeader = leader?.player.id === data.player.id;
+                            const maxValue = Math.max(...playersWithData.map(d => d.drillStats[drill.id].best));
+                            const barPercent = drill.config.type === "time"
+                              ? ((maxValue / drillData.best) * 100) // Invert for time
+                              : ((drillData.best / maxValue) * 100);
+
+                            return (
+                              <div key={data.player.id} style={{
+                                padding: 12,
+                                background: isLeader ? `${THEME.green}15` : THEME.blackLight,
+                                border: `1px solid ${isLeader ? THEME.green : THEME.charcoal}`,
+                                borderRadius: 6
+                              }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                  <span style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{data.player.name}</span>
+                                  {isLeader && <Badge color={THEME.green} bg={`${THEME.green}20`}>🏆 Best</Badge>}
+                                </div>
+                                <div style={{ position: "relative", height: 24, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                                  <div style={{
+                                    width: `${barPercent}%`,
+                                    height: "100%",
+                                    background: isLeader ? `linear-gradient(90deg, ${THEME.green} 0%, ${THEME.gold} 100%)` : THEME.gold,
+                                    transition: "width 0.5s ease"
+                                  }} />
+                                  <div style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: THEME.white,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    textShadow: "0 1px 2px rgba(0,0,0,0.9)"
+                                  }}>
+                                    Best: {formatValue(drillData.best, drill.config)} | Avg: {formatValue(drillData.avg, drill.config)}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Game stats comparison */}
+                  {comparisonData.some(d => d.gamesPlayed > 0) && (
+                    <div style={{ marginBottom: 24 }}>
+                      <h4 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚾ Batting Average</h4>
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {comparisonData.filter(d => d.gamesPlayed > 0).map(data => {
+                          const isLeader = getLeader(d => d.battingAvg)?.player.id === data.player.id;
+                          const maxBA = Math.max(...comparisonData.filter(d => d.gamesPlayed > 0).map(d => d.battingAvg));
+                          const barPercent = maxBA > 0 ? (data.battingAvg / maxBA) * 100 : 0;
+
+                          return (
+                            <div key={data.player.id} style={{
+                              padding: 12,
+                              background: isLeader ? `${THEME.green}15` : THEME.blackLight,
+                              border: `1px solid ${isLeader ? THEME.green : THEME.charcoal}`,
+                              borderRadius: 6
+                            }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                <span style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{data.player.name}</span>
+                                {isLeader && <Badge color={THEME.green} bg={`${THEME.green}20`}>🏆 Best</Badge>}
+                              </div>
+                              <div style={{ position: "relative", height: 24, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                                <div style={{
+                                  width: `${barPercent}%`,
+                                  height: "100%",
+                                  background: isLeader ? `linear-gradient(90deg, ${THEME.green} 0%, ${THEME.gold} 100%)` : THEME.gold,
+                                  transition: "width 0.5s ease"
+                                }} />
+                                <div style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: THEME.white,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  textShadow: "0 1px 2px rgba(0,0,0,0.9)"
+                                }}>
+                                  {data.battingAvg.toFixed(3)} ({data.hits}/{data.totalABs})
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Export button */}
+                  <div style={{ marginTop: 20, textAlign: "right" }}>
+                    <Button small onClick={() => {
+                      const csvData = [["Metric", ...comparisonData.map(d => d.player.name)]];
+
+                      // Attendance
+                      csvData.push(["Attendance %", ...comparisonData.map(d => d.attendancePercent.toFixed(1))]);
+
+                      // Drills
+                      trackedDrills.forEach(drill => {
+                        const playersWithData = comparisonData.map(d => {
+                          const drillData = d.drillStats[drill.id];
+                          return drillData ? formatValue(drillData.best, drill.config) : "N/A";
+                        });
+                        csvData.push([`${drill.name} (Best)`, ...playersWithData]);
+                      });
+
+                      // Batting
+                      if (comparisonData.some(d => d.gamesPlayed > 0)) {
+                        csvData.push(["Batting Avg", ...comparisonData.map(d => d.gamesPlayed > 0 ? d.battingAvg.toFixed(3) : "N/A")]);
+                      }
+
+                      downloadCSV(csvData, "player-comparison.csv");
+                    }}>📊 Export CSV</Button>
+                  </div>
+                </div>
+              ) : (
+                <Card style={{ textAlign: "center", padding: 40 }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                  <div style={{ color: THEME.gray, fontSize: 14 }}>
+                    Select at least 2 players to compare their performance.
+                  </div>
+                </Card>
+              )}
+            </Modal>
+          );
+        })()}
 
         {/* Attendance Summary - Enhanced */}
         <CollapsibleSection
