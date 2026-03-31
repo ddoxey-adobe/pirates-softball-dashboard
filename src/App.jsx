@@ -2762,7 +2762,7 @@ const LineupBuilder = ({ players }) => {
                     <div style={{ background: THEME.blackLight, borderRadius: 8, padding: 16, marginBottom: 16, border: `1px solid ${THEME.charcoal}` }}>
                       <h5 style={{ color: THEME.white, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>Field Coverage</h5>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxWidth: 400 }}>
-                        {/* Outfield */}
+                        {/* Outfield - Row 1 */}
                         {["LF", "CF", "RF"].map(pos => (
                           <div key={pos} style={{
                             background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
@@ -2777,15 +2777,15 @@ const LineupBuilder = ({ players }) => {
                             </div>
                           </div>
                         ))}
-                        {/* Infield */}
-                        {["3B", "SS", "2B", "1B"].map(pos => (
+
+                        {/* Infield - Row 2 */}
+                        {["3B", "SS", "2B"].map(pos => (
                           <div key={pos} style={{
                             background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
                             border: `1px solid ${assignedPositions[pos] ? THEME.green : THEME.red}`,
                             borderRadius: 4,
                             padding: "6px 8px",
-                            textAlign: "center",
-                            gridColumn: pos === "3B" ? "1" : pos === "1B" ? "3" : "auto"
+                            textAlign: "center"
                           }}>
                             <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{pos}</div>
                             <div style={{ color: assignedPositions[pos] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
@@ -2793,15 +2793,32 @@ const LineupBuilder = ({ players }) => {
                             </div>
                           </div>
                         ))}
-                        {/* Battery */}
+
+                        {/* Row 3 - Empty, 1B, Empty */}
+                        <div style={{ gridColumn: "1" }}></div>
+                        <div style={{
+                          background: assignedPositions["1B"] ? THEME.green + "20" : THEME.red + "20",
+                          border: `1px solid ${assignedPositions["1B"] ? THEME.green : THEME.red}`,
+                          borderRadius: 4,
+                          padding: "6px 8px",
+                          textAlign: "center",
+                          gridColumn: "2"
+                        }}>
+                          <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>1B</div>
+                          <div style={{ color: assignedPositions["1B"] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
+                            {assignedPositions["1B"] || "—"}
+                          </div>
+                        </div>
+                        <div style={{ gridColumn: "3" }}></div>
+
+                        {/* Battery - Row 4 */}
                         {["C", "P"].map(pos => (
                           <div key={pos} style={{
                             background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
                             border: `1px solid ${assignedPositions[pos] ? THEME.green : THEME.red}`,
                             borderRadius: 4,
                             padding: "6px 8px",
-                            textAlign: "center",
-                            gridColumn: pos === "P" ? "2" : "auto"
+                            textAlign: "center"
                           }}>
                             <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{pos}</div>
                             <div style={{ color: assignedPositions[pos] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
