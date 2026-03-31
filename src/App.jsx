@@ -5541,6 +5541,7 @@ const Reports = ({ players }) => {
   const [games, setGames] = useState([]);
   const [dateRange, setDateRange] = useState("all"); // "all", "30", "60", "90"
   const [attendanceFilter, setAttendanceFilter] = useState("all"); // "all", "at-risk"
+  const [drillSortBy, setDrillSortBy] = useState("frequency"); // "frequency", "recent", "name"
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -5592,7 +5593,7 @@ const Reports = ({ players }) => {
 
   // Collapse/Expand functions (defined after trackedDrills)
   const collapseAll = () => {
-    const allSections = ["stats", "pitchers", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
+    const allSections = ["stats", "pitchers", "drill-usage", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
     const collapsed = {};
     allSections.forEach(id => collapsed[id] = true);
     setCollapsedSections(collapsed);
@@ -5944,6 +5945,124 @@ const Reports = ({ players }) => {
             </Card>
           </CollapsibleSection>
         )}
+
+        {/* Drill Usage Analytics */}
+        {(() => {
+          // Get all drills used across all practices
+          const drillUsage = {};
+          completedPractices.forEach(practice => {
+            (practice.drills || []).forEach(drill => {
+              if (!drillUsage[drill.id]) {
+                drillUsage[drill.id] = {
+                  drill: DRILL_LIBRARY.find(d => d.id === drill.id) || drill,
+                  timesRun: 0,
+                  lastRun: null,
+                  practices: []
+                };
+              }
+              drillUsage[drill.id].timesRun++;
+              drillUsage[drill.id].practices.push(practice);
+              if (!drillUsage[drill.id].lastRun || practice.date > drillUsage[drill.id].lastRun) {
+                drillUsage[drill.id].lastRun = practice.date;
+              }
+            });
+          });
+
+          const drillStats = Object.values(drillUsage);
+
+          const sortedDrills = [...drillStats].sort((a, b) => {
+            if (drillSortBy === "frequency") return b.timesRun - a.timesRun;
+            if (drillSortBy === "recent") {
+              if (!a.lastRun) return 1;
+              if (!b.lastRun) return -1;
+              return new Date(b.lastRun) - new Date(a.lastRun);
+            }
+            if (drillSortBy === "name") return (a.drill.name || "").localeCompare(b.drill.name || "");
+            return 0;
+          });
+
+          if (drillStats.length === 0) return null;
+
+          return (
+            <CollapsibleSection
+              id="drill-usage"
+              title="Drill Usage Analytics"
+              icon="📊"
+              badge={`${drillStats.length} drills`}
+              isCollapsed={collapsedSections["drill-usage"]}
+              onToggle={toggleSection}
+            >
+              <Card style={{ padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button small variant={drillSortBy === "frequency" ? "primary" : "ghost"} onClick={() => setDrillSortBy("frequency")}>Most Used</Button>
+                    <Button small variant={drillSortBy === "recent" ? "primary" : "ghost"} onClick={() => setDrillSortBy("recent")}>Most Recent</Button>
+                    <Button small variant={drillSortBy === "name" ? "primary" : "ghost"} onClick={() => setDrillSortBy("name")}>A-Z</Button>
+                  </div>
+                  <Button small onClick={() => {
+                    const csvData = [
+                      ['Drill', 'Category', 'Times Run', 'Last Run', 'Days Since'],
+                      ...sortedDrills.map(stat => {
+                        const daysSince = stat.lastRun ? Math.floor((new Date() - new Date(stat.lastRun)) / (1000 * 60 * 60 * 24)) : "Never";
+                        return [
+                          stat.drill.name || stat.drill.id,
+                          stat.drill.category || "Unknown",
+                          stat.timesRun,
+                          stat.lastRun || "Never",
+                          daysSince
+                        ];
+                      })
+                    ];
+                    exportToCSV(csvData, 'drill_usage.csv');
+                  }}>📥 Export CSV</Button>
+                </div>
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  {sortedDrills.map(stat => {
+                    const daysSince = stat.lastRun ? Math.floor((new Date() - new Date(stat.lastRun)) / (1000 * 60 * 60 * 24)) : null;
+                    const isStale = daysSince !== null && daysSince > 14;
+
+                    return (
+                      <div key={stat.drill.id} style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "10px 12px",
+                        background: isStale ? "rgba(231, 76, 60, 0.05)" : THEME.blackLight,
+                        borderRadius: 4,
+                        border: `1px solid ${isStale ? THEME.red : THEME.charcoal}`
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{stat.drill.name}</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                            {stat.drill.category}
+                            {isStale && <span style={{ color: THEME.red, marginLeft: 8 }}>⚠️ Not run in {daysSince} days</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12 }}>
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ color: THEME.gold, fontWeight: 700, fontSize: 16 }}>{stat.timesRun}</div>
+                            <div style={{ color: THEME.gray, fontSize: 10 }}>times</div>
+                          </div>
+                          <div style={{ textAlign: "right", minWidth: 80 }}>
+                            <div style={{ color: THEME.white, fontSize: 11 }}>
+                              {stat.lastRun ? new Date(stat.lastRun).toLocaleDateString() : "Never"}
+                            </div>
+                            {daysSince !== null && (
+                              <div style={{ color: THEME.gray, fontSize: 10 }}>
+                                {daysSince === 0 ? "today" : daysSince === 1 ? "yesterday" : `${daysSince}d ago`}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </CollapsibleSection>
+          );
+        })()}
 
         {/* Drill Leaderboards - Each drill is collapsible */}
 
