@@ -2534,6 +2534,282 @@ const PracticeLog = ({ players, coaches }) => {
   </div>;
 };
 
+// ─── LINEUP PLANNER ─────────────────────────────────────────────
+const LineupPlanner = ({ players, onCreateGame }) => {
+  const [templates, setTemplates] = useState([]);
+  const [alignments, setAlignments] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [showBuilder, setShowBuilder] = useState(false);
+
+  useEffect(() => {
+    loadStore("pirates-lineup-templates-2026v1", []).then(setTemplates);
+    loadStore("pirates-alignment-library-2026v1", []).then(setAlignments);
+  }, []);
+
+  useEffect(() => {
+    saveStore("pirates-lineup-templates-2026v1", templates);
+  }, [templates]);
+
+  useEffect(() => {
+    saveStore("pirates-alignment-library-2026v1", alignments);
+  }, [alignments]);
+
+  const emptyTemplate = () => ({
+    id: Date.now().toString(),
+    name: "",
+    description: "",
+    createdDate: new Date().toISOString(),
+    lineup: [], // [{ playerId, battingOrder, position }]
+    alignments: [], // [{ name, positions: [...] }]
+  });
+
+  const [form, setForm] = useState(emptyTemplate());
+
+  const save = () => {
+    if (!form.name) {
+      alert("Please enter a template name");
+      return;
+    }
+    if (editing) {
+      setTemplates(prev => prev.map(t => t.id === editing ? form : t));
+    } else {
+      setTemplates(prev => [...prev, form]);
+    }
+    setShowBuilder(false);
+    setEditing(null);
+    setForm(emptyTemplate());
+  };
+
+  if (showBuilder) {
+    return <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px 80px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
+            {editing ? "Edit Template" : "New Lineup Template"}
+          </h2>
+          <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>
+            Create a lineup idea without game details - just explore positions and batting order
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={() => { setShowBuilder(false); setEditing(null); setForm(emptyTemplate()); }}>Cancel</Button>
+          <Button onClick={save} style={{ background: THEME.green }}>Save Template</Button>
+        </div>
+      </div>
+
+      <Card style={{ padding: 16, marginBottom: 16 }}>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Template Details</h3>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Template Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g., Aggressive Lineup, Defensive Setup"
+              style={{ width: "100%", padding: "8px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14 }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Description (Optional)</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="e.g., Speed-focused lineup for sunny days"
+              rows={2}
+              style={{ width: "100%", padding: "8px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14, fontFamily: "inherit", resize: "vertical" }}
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Lineup Builder - Same as current LineupBuilder but without game details */}
+      <Card style={{ padding: 16, marginBottom: 16 }}>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Build Lineup</h3>
+        <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
+          Set batting order and starting positions. Drag to reorder batting lineup.
+        </p>
+
+        {form.lineup.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8 }}>
+            <p style={{ color: THEME.gray, margin: 0 }}>No players in lineup yet.</p>
+            <p style={{ color: THEME.gray, margin: "8px 0 16px 0", fontSize: 13 }}>Add players below to start building your lineup.</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+            {form.lineup
+              .sort((a, b) => a.battingOrder - b.battingOrder)
+              .map(spot => {
+                const player = players.find(p => p.id === spot.playerId);
+                return (
+                  <Card key={spot.playerId} style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ minWidth: 32, height: 32, background: THEME.gold, color: THEME.black, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, fontSize: 16, fontWeight: 700 }}>
+                        {spot.battingOrder}
+                      </div>
+                      <div>
+                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{player?.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>{spot.position}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <select
+                        value={spot.position}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            lineup: form.lineup.map(s => s.playerId === spot.playerId ? { ...s, position: e.target.value } : s)
+                          });
+                        }}
+                        style={{ padding: "4px 8px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 12 }}
+                      >
+                        {POSITIONS.filter(p => p !== "Bench").map(pos => (
+                          <option key={pos} value={pos}>{pos}</option>
+                        ))}
+                      </select>
+                      <Button small variant="danger" onClick={() => {
+                        setForm({
+                          ...form,
+                          lineup: form.lineup.filter(s => s.playerId !== spot.playerId)
+                        });
+                      }}>✕</Button>
+                    </div>
+                  </Card>
+                );
+              })}
+          </div>
+        )}
+
+        <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>Available Players</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+          {players
+            .filter(p => !form.lineup.find(l => l.playerId === p.id))
+            .map(player => (
+              <Card
+                key={player.id}
+                onClick={() => {
+                  const nextOrder = form.lineup.length + 1;
+                  setForm({
+                    ...form,
+                    lineup: [...form.lineup, { playerId: player.id, battingOrder: nextOrder, position: player.primaryPosition || "P" }]
+                  });
+                }}
+                style={{ padding: 12, cursor: "pointer", transition: "all 0.2s", border: `1px solid ${THEME.charcoal}` }}
+              >
+                <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</div>
+                <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>Primary: {player.primaryPosition || "None"}</div>
+              </Card>
+            ))}
+        </div>
+      </Card>
+
+      {/* Defensive Alignments */}
+      <Card style={{ padding: 16 }}>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Defensive Alignments</h3>
+        <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
+          Save defensive alignments (e.g., "Lucy Pitching") to quickly load during games.
+        </p>
+
+        {form.alignments.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8, marginBottom: 16 }}>
+            <p style={{ color: THEME.gray, margin: 0 }}>No alignments saved yet.</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+            {form.alignments.map((alignment, idx) => (
+              <Card key={idx} style={{ padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{alignment.name}</div>
+                  <Button small variant="danger" onClick={() => {
+                    setForm({ ...form, alignments: form.alignments.filter((_, i) => i !== idx) });
+                  }}>Delete</Button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, fontSize: 11, color: THEME.gray }}>
+                  {alignment.positions.map((pos, i) => {
+                    const player = players.find(p => p.id === pos.playerId);
+                    return (
+                      <div key={i}>
+                        <span style={{ color: THEME.gold, fontWeight: 600 }}>{pos.position}:</span> {player?.name}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <Button onClick={() => {
+          if (form.lineup.length === 0) {
+            alert("Add players to lineup first");
+            return;
+          }
+          const name = prompt("Alignment name (e.g., 'Lucy Pitching'):");
+          if (!name) return;
+          setForm({
+            ...form,
+            alignments: [...form.alignments, {
+              name,
+              positions: form.lineup.map(spot => ({ playerId: spot.playerId, position: spot.position }))
+            }]
+          });
+        }}>+ Save Current Lineup as Alignment</Button>
+      </Card>
+    </div>;
+  }
+
+  return <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px 80px 16px" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div>
+        <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>💡 Lineup Planner</h2>
+        <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>Explore lineup ideas before creating games</p>
+      </div>
+      <Button onClick={() => { setForm(emptyTemplate()); setEditing(null); setShowBuilder(true); }}>+ New Template</Button>
+    </div>
+
+    {templates.length === 0 ? (
+      <Card style={{ textAlign: "center", padding: 40 }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>💡</div>
+        <p style={{ color: THEME.gray, margin: 0 }}>No lineup templates yet.</p>
+        <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Create templates to explore different lineup strategies.</p>
+      </Card>
+    ) : (
+      <div style={{ display: "grid", gap: 12 }}>
+        {templates.map(template => (
+          <Card key={template.id} style={{ padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, margin: 0 }}>{template.name}</h3>
+                {template.description && (
+                  <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>{template.description}</p>
+                )}
+                <div style={{ color: THEME.gray, fontSize: 11, marginTop: 8 }}>
+                  {template.lineup.length} players • {template.alignments.length} alignment{template.alignments.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <Button small onClick={() => {
+                  if (onCreateGame) {
+                    onCreateGame(template);
+                  } else {
+                    alert("Create game functionality coming soon!");
+                  }
+                }} style={{ background: THEME.green }}>🎮 Create Game</Button>
+                <Button small onClick={() => { setForm(template); setEditing(template.id); setShowBuilder(true); }}>Edit</Button>
+                <Button small variant="danger" onClick={() => {
+                  if (confirm(`Delete template "${template.name}"?`)) {
+                    setTemplates(prev => prev.filter(t => t.id !== template.id));
+                  }
+                }}>✕</Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    )}
+  </div>;
+};
+
 // ─── LINEUP BUILDER ─────────────────────────────────────────────
 const LineupBuilder = ({ players }) => {
   const [lineups, setLineups] = useState([]);
@@ -6377,6 +6653,7 @@ const Reports = ({ players }) => {
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
   { id: "practicelog", label: "Practice", icon: "📋" },
+  { id: "planner", label: "Planner", icon: "💡" },
   { id: "lineup", label: "Lineup", icon: "📋" },
   { id: "gamelog", label: "Game", icon: "⚾" },
   { id: "reports", label: "Reports", icon: "📊" },
@@ -6446,6 +6723,11 @@ function App() {
       <Tabs tabs={TABS} active={tab} onSelect={setTab} />
       {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} coaches={coaches} setCoaches={setCoaches} />}
       {tab==="practicelog" && <PracticeLog players={players} coaches={coaches} />}
+      {tab==="planner" && <LineupPlanner players={players} onCreateGame={(template) => {
+        // TODO: Pass template to GameLog and show game creation form
+        alert(`Creating game from template: ${template.name}\n\nThis will be implemented in Phase 1 Step 2!`);
+        setTab("gamelog");
+      }} />}
       {tab==="lineup" && <LineupBuilder players={players} />}
       {tab==="reports" && <Reports players={players} />}
       {tab==="gamelog" && <GameLog players={players} />}
