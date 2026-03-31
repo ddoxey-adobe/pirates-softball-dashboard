@@ -4972,14 +4972,38 @@ const GameLog = ({ players }) => {
         <div style={{ marginTop: 16 }}><SL>Batting Order</SL>
           <div style={{ border: `1px solid ${THEME.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
             {activeBattingOrder.map((pid, i) => { const p = getPlayer(pid); if (!p) return null;
+              const isFirst = i === 0;
+              const isLast = i === activeBattingOrder.length - 1;
               return <div key={pid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: i < activeBattingOrder.length - 1 ? `1px solid ${THEME.charcoal}` : "none", background: i % 2 === 0 ? THEME.black : "transparent" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ color: THEME.gold, fontWeight: 700, fontFamily: "'Oswald',sans-serif", width: 24, textAlign: "center" }}>{i + 1}</span>
                   <span style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{p.name}</span>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button disabled={i === 0} onClick={() => { const fi = form.battingOrder.indexOf(pid); const ti = form.battingOrder.indexOf(activeBattingOrder[i - 1]); const o = [...form.battingOrder]; [o[fi], o[ti]] = [o[ti], o[fi]]; setForm({ ...form, battingOrder: o }); }} style={{ background: "none", border: "none", color: i === 0 ? THEME.charcoal : THEME.gold, cursor: i === 0 ? "default" : "pointer", fontSize: 18 }}>▲</button>
-                  <button disabled={i === activeBattingOrder.length - 1} onClick={() => { const fi = form.battingOrder.indexOf(pid); const ti = form.battingOrder.indexOf(activeBattingOrder[i + 1]); const o = [...form.battingOrder]; [o[fi], o[ti]] = [o[ti], o[fi]]; setForm({ ...form, battingOrder: o }); }} style={{ background: "none", border: "none", color: i === activeBattingOrder.length - 1 ? THEME.charcoal : THEME.gold, cursor: i === activeBattingOrder.length - 1 ? "default" : "pointer", fontSize: 18 }}>▼</button>
+                  <button
+                    disabled={isFirst}
+                    onClick={() => {
+                      if (isFirst) return;
+                      const fi = form.battingOrder.indexOf(pid);
+                      const ti = form.battingOrder.indexOf(activeBattingOrder[i - 1]);
+                      if (fi === -1 || ti === -1) return;
+                      const o = [...form.battingOrder];
+                      [o[fi], o[ti]] = [o[ti], o[fi]];
+                      setForm({ ...form, battingOrder: o });
+                    }}
+                    style={{ background: "none", border: "none", color: isFirst ? THEME.charcoal : THEME.gold, cursor: isFirst ? "default" : "pointer", fontSize: 18 }}>▲</button>
+                  <button
+                    disabled={isLast}
+                    onClick={() => {
+                      if (isLast) return;
+                      const fi = form.battingOrder.indexOf(pid);
+                      const ti = form.battingOrder.indexOf(activeBattingOrder[i + 1]);
+                      if (fi === -1 || ti === -1) return;
+                      const o = [...form.battingOrder];
+                      [o[fi], o[ti]] = [o[ti], o[fi]];
+                      setForm({ ...form, battingOrder: o });
+                    }}
+                    style={{ background: "none", border: "none", color: isLast ? THEME.charcoal : THEME.gold, cursor: isLast ? "default" : "pointer", fontSize: 18 }}>▼</button>
                 </div>
               </div>;
             })}
