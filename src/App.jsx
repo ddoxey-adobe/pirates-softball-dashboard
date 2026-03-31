@@ -16,7 +16,7 @@ const THEME = {
   blue: "#3498DB", gray: "#8E8E8E", grayLight: "#C4C4C4",
 };
 
-const POSITIONS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "EH", "Bench"];
+const POSITIONS = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "Bench"];
 const GRADES = ["7th", "8th", "9th"];
 const SKILL_AREAS = ["Hitting", "Fielding", "Throwing", "Baserunning", "Pitching", "Attitude"];
 const AB_RESULTS = [
@@ -2505,6 +2505,7 @@ const LineupBuilder = ({ players }) => {
   const [lineups, setLineups] = useState([]);
   const [practices, setPractices] = useState([]);
   const [games, setGames] = useState([]);
+  const [alignmentLibrary, setAlignmentLibrary] = useState([]);
   const [editing, setEditing] = useState(null);
   const [showBuilder, setShowBuilder] = useState(false);
 
@@ -2512,11 +2513,16 @@ const LineupBuilder = ({ players }) => {
     loadStore("pirates-lineups-2026v1", []).then(setLineups);
     loadStore("pirates-practices-unified-2026v1", []).then(setPractices);
     loadStore(STORAGE_KEYS.GAMELOGS, []).then(setGames);
+    loadStore("pirates-alignment-library-2026v1", []).then(setAlignmentLibrary);
   }, []);
 
   useEffect(() => {
     saveStore("pirates-lineups-2026v1", lineups);
   }, [lineups]);
+
+  useEffect(() => {
+    saveStore("pirates-alignment-library-2026v1", alignmentLibrary);
+  }, [alignmentLibrary]);
 
   const emptyLineup = () => ({
     id: Date.now().toString(),
@@ -2675,7 +2681,7 @@ const LineupBuilder = ({ players }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
               <Input label="Opponent *" value={form.opponent} onChange={e => setForm({...form, opponent: e.target.value})} />
               <Input label="Date *" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
-              <Input label="Location" value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="Home Field" />
+              <Input label="Location (optional)" value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="Home Field" />
             </div>
           </Card>
 
@@ -2737,69 +2743,209 @@ const LineupBuilder = ({ players }) => {
                 <p>No lineup created yet. Click "Auto-Fill" to get started, or add players manually below.</p>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-                {form.lineup.sort((a, b) => a.battingOrder - b.battingOrder).map((spot, idx) => {
-                  const player = players.find(p => p.id === spot.playerId);
-                  const warnings = getPlayerWarnings(spot.playerId);
+              <>
+                {/* Field Position Visual */}
+                {(() => {
+                  const fieldPositions = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
+                  const assignedPositions = form.lineup.reduce((acc, spot) => {
+                    if (fieldPositions.includes(spot.position)) {
+                      acc[spot.position] = players.find(p => p.id === spot.playerId)?.name || "?";
+                    }
+                    return acc;
+                  }, {});
+                  const missing = fieldPositions.filter(pos => !assignedPositions[pos]);
+                  const doubled = fieldPositions.filter(pos =>
+                    form.lineup.filter(s => s.position === pos).length > 1
+                  );
+
                   return (
-                    <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center", background: THEME.black, padding: 8, borderRadius: 6 }}>
-                      <div style={{
-                        minWidth: 32,
-                        height: 32,
-                        background: THEME.gold,
-                        color: THEME.black,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 6,
-                        fontWeight: 700,
-                        fontSize: 14
-                      }}>{spot.battingOrder}</div>
-                      <div style={{ flex: 1, color: THEME.white, fontSize: 13 }}>
-                        {player?.name}
-                        {(warnings.lowAttendance || warnings.lowPlayingTime) && (
-                          <div style={{ fontSize: 10, color: THEME.red, marginTop: 2 }}>
-                            {warnings.lowAttendance && "⚠️ Low attendance"}
-                            {warnings.lowPlayingTime && "⚠️ Needs playing time"}
+                    <div style={{ background: THEME.blackLight, borderRadius: 8, padding: 16, marginBottom: 16, border: `1px solid ${THEME.charcoal}` }}>
+                      <h5 style={{ color: THEME.white, fontSize: 12, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>Field Coverage</h5>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxWidth: 400 }}>
+                        {/* Outfield */}
+                        {["LF", "CF", "RF"].map(pos => (
+                          <div key={pos} style={{
+                            background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
+                            border: `1px solid ${assignedPositions[pos] ? THEME.green : THEME.red}`,
+                            borderRadius: 4,
+                            padding: "6px 8px",
+                            textAlign: "center"
+                          }}>
+                            <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{pos}</div>
+                            <div style={{ color: assignedPositions[pos] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
+                              {assignedPositions[pos] || "—"}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <select
-                        value={spot.position}
-                        onChange={e => {
-                          const newLineup = [...form.lineup];
-                          newLineup[idx].position = e.target.value;
-                          setForm({...form, lineup: newLineup});
-                        }}
-                        style={{
-                          background: THEME.blackLight,
-                          color: THEME.white,
-                          border: `1px solid ${THEME.charcoal}`,
-                          borderRadius: 6,
-                          padding: "6px 8px",
-                          fontSize: 12,
-                          minWidth: 100
-                        }}
-                      >
-                        {POSITIONS.map(pos => (
-                          <option key={pos} value={pos}>{pos}</option>
                         ))}
-                      </select>
-                      <button onClick={() => {
-                        setForm({...form, lineup: form.lineup.filter((_, i) => i !== idx)});
-                      }} style={{
-                        background: THEME.red,
-                        color: THEME.white,
-                        border: "none",
-                        borderRadius: 6,
-                        padding: "6px 10px",
-                        cursor: "pointer",
-                        fontSize: 12
-                      }}>✕</button>
+                        {/* Infield */}
+                        {["3B", "SS", "2B", "1B"].map(pos => (
+                          <div key={pos} style={{
+                            background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
+                            border: `1px solid ${assignedPositions[pos] ? THEME.green : THEME.red}`,
+                            borderRadius: 4,
+                            padding: "6px 8px",
+                            textAlign: "center",
+                            gridColumn: pos === "3B" ? "1" : pos === "1B" ? "3" : "auto"
+                          }}>
+                            <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{pos}</div>
+                            <div style={{ color: assignedPositions[pos] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
+                              {assignedPositions[pos] || "—"}
+                            </div>
+                          </div>
+                        ))}
+                        {/* Battery */}
+                        {["C", "P"].map(pos => (
+                          <div key={pos} style={{
+                            background: assignedPositions[pos] ? THEME.green + "20" : THEME.red + "20",
+                            border: `1px solid ${assignedPositions[pos] ? THEME.green : THEME.red}`,
+                            borderRadius: 4,
+                            padding: "6px 8px",
+                            textAlign: "center",
+                            gridColumn: pos === "P" ? "2" : "auto"
+                          }}>
+                            <div style={{ color: THEME.white, fontSize: 11, fontWeight: 700 }}>{pos}</div>
+                            <div style={{ color: assignedPositions[pos] ? THEME.white : THEME.gray, fontSize: 9, marginTop: 2 }}>
+                              {assignedPositions[pos] || "—"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {(missing.length > 0 || doubled.length > 0) && (
+                        <div style={{ marginTop: 12, fontSize: 11 }}>
+                          {missing.length > 0 && (
+                            <div style={{ color: THEME.red }}>⚠️ Missing: {missing.join(", ")}</div>
+                          )}
+                          {doubled.length > 0 && (
+                            <div style={{ color: THEME.red }}>⚠️ Doubled: {doubled.join(", ")}</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
-                })}
-              </div>
+                })()}
+
+                <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+                  {form.lineup.sort((a, b) => a.battingOrder - b.battingOrder).map((spot, idx) => {
+                    const player = players.find(p => p.id === spot.playerId);
+                    const warnings = getPlayerWarnings(spot.playerId);
+
+                    // Get positions already assigned to OTHER players
+                    const otherAssignedPositions = form.lineup
+                      .filter((s, i) => i !== idx)
+                      .map(s => s.position);
+
+                    return (
+                      <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center", background: THEME.black, padding: 8, borderRadius: 6 }}>
+                        {/* Reorder buttons */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <button
+                            onClick={() => {
+                              if (idx === 0) return;
+                              const newLineup = [...form.lineup];
+                              const temp = newLineup[idx].battingOrder;
+                              newLineup[idx].battingOrder = newLineup[idx-1].battingOrder;
+                              newLineup[idx-1].battingOrder = temp;
+                              setForm({...form, lineup: newLineup});
+                            }}
+                            disabled={idx === 0}
+                            style={{
+                              background: idx === 0 ? THEME.charcoal : THEME.blackLight,
+                              border: "none",
+                              color: idx === 0 ? THEME.gray : THEME.white,
+                              cursor: idx === 0 ? "not-allowed" : "pointer",
+                              borderRadius: 4,
+                              padding: "2px 6px",
+                              fontSize: 10
+                            }}
+                          >▲</button>
+                          <button
+                            onClick={() => {
+                              if (idx === form.lineup.length - 1) return;
+                              const newLineup = [...form.lineup];
+                              const temp = newLineup[idx].battingOrder;
+                              newLineup[idx].battingOrder = newLineup[idx+1].battingOrder;
+                              newLineup[idx+1].battingOrder = temp;
+                              setForm({...form, lineup: newLineup});
+                            }}
+                            disabled={idx === form.lineup.length - 1}
+                            style={{
+                              background: idx === form.lineup.length - 1 ? THEME.charcoal : THEME.blackLight,
+                              border: "none",
+                              color: idx === form.lineup.length - 1 ? THEME.gray : THEME.white,
+                              cursor: idx === form.lineup.length - 1 ? "not-allowed" : "pointer",
+                              borderRadius: 4,
+                              padding: "2px 6px",
+                              fontSize: 10
+                            }}
+                          >▼</button>
+                        </div>
+
+                        <div style={{
+                          minWidth: 32,
+                          height: 32,
+                          background: THEME.gold,
+                          color: THEME.black,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 6,
+                          fontWeight: 700,
+                          fontSize: 14
+                        }}>{spot.battingOrder}</div>
+
+                        <div style={{ flex: 1, color: THEME.white, fontSize: 13 }}>
+                          {player?.name}
+                          {(warnings.lowAttendance || warnings.lowPlayingTime) && (
+                            <div style={{ fontSize: 10, color: THEME.red, marginTop: 2 }}>
+                              {warnings.lowAttendance && "⚠️ Low attendance"}
+                              {warnings.lowPlayingTime && "⚠️ Needs playing time"}
+                            </div>
+                          )}
+                        </div>
+
+                        <select
+                          value={spot.position}
+                          onChange={e => {
+                            const newLineup = [...form.lineup];
+                            newLineup[idx].position = e.target.value;
+                            setForm({...form, lineup: newLineup});
+                          }}
+                          style={{
+                            background: THEME.blackLight,
+                            color: THEME.white,
+                            border: `1px solid ${THEME.charcoal}`,
+                            borderRadius: 6,
+                            padding: "6px 8px",
+                            fontSize: 12,
+                            minWidth: 100
+                          }}
+                        >
+                          {POSITIONS.map(pos => {
+                            const isAssignedToOther = otherAssignedPositions.includes(pos) && pos !== "Bench";
+                            return (
+                              <option key={pos} value={pos} disabled={isAssignedToOther} style={{ color: isAssignedToOther ? THEME.gray : THEME.white }}>
+                                {pos}{isAssignedToOther ? " (assigned)" : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        <button onClick={() => {
+                          setForm({...form, lineup: form.lineup.filter((_, i) => i !== idx)});
+                        }} style={{
+                          background: THEME.red,
+                          color: THEME.white,
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                          fontSize: 12
+                        }}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             {/* Add Player to Lineup */}
@@ -2840,58 +2986,125 @@ const LineupBuilder = ({ players }) => {
 
           {/* Defensive Alignments */}
           <Card style={{ padding: 16, marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: 0 }}>🛡️ Defensive Alignments</h4>
-              <Button small onClick={() => {
-                const name = prompt("Alignment name (e.g., 'Rose Pitching'):");
-                if (!name) return;
-                setForm({
-                  ...form,
-                  alignments: [...form.alignments, { id: Date.now().toString(), name, lineup: JSON.parse(JSON.stringify(form.lineup)) }]
-                });
-              }}>Save Current as Alignment</Button>
-            </div>
+            <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🛡️ Defensive Alignments</h4>
 
-            {form.alignments.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 16, color: THEME.gray, fontSize: 12 }}>
-                <p style={{ margin: 0 }}>No defensive alignments saved. Create your batting order above, then save it as an alignment for quick switching during the game.</p>
+            {/* Alignment Library */}
+            <div style={{ marginBottom: 16, padding: 12, background: THEME.black, borderRadius: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ color: THEME.gold, fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>📚 Reusable Library</div>
+                <Button small onClick={() => {
+                  if (form.lineup.length === 0) {
+                    alert("Create a lineup first before saving to library");
+                    return;
+                  }
+                  const name = prompt("Save alignment to library as:");
+                  if (!name) return;
+                  setAlignmentLibrary(prev => [...prev, {
+                    id: Date.now().toString(),
+                    name,
+                    lineup: JSON.parse(JSON.stringify(form.lineup)),
+                    createdDate: new Date().toISOString()
+                  }]);
+                }}>+ Save to Library</Button>
               </div>
-            ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {form.alignments.map(alignment => (
-                  <div key={alignment.id} style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    background: THEME.black,
-                    padding: 12,
-                    borderRadius: 6,
-                    border: form.activeAlignment === alignment.id ? `2px solid ${THEME.gold}` : `1px solid ${THEME.charcoal}`
-                  }}>
-                    <div>
-                      <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{alignment.name}</div>
-                      <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
-                        {alignment.lineup.length} players
+
+              {alignmentLibrary.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 12, color: THEME.gray, fontSize: 11 }}>
+                  <p style={{ margin: 0 }}>No reusable alignments saved yet. Save your formations here to use across all games.</p>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {alignmentLibrary.map(alignment => (
+                    <div key={alignment.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: THEME.blackLight,
+                      padding: 10,
+                      borderRadius: 4,
+                      border: `1px solid ${THEME.charcoal}`
+                    }}>
+                      <div>
+                        <div style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>{alignment.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 10, marginTop: 2 }}>
+                          {alignment.lineup.length} players • {new Date(alignment.createdDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <Button small onClick={() => {
+                          setForm({...form, lineup: JSON.parse(JSON.stringify(alignment.lineup))});
+                        }}>Load</Button>
+                        <Button small variant="danger" onClick={() => {
+                          if (confirm(`Delete "${alignment.name}" from library?`)) {
+                            setAlignmentLibrary(prev => prev.filter(a => a.id !== alignment.id));
+                          }
+                        }}>✕</Button>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <Button small onClick={() => {
-                        setForm({...form, lineup: JSON.parse(JSON.stringify(alignment.lineup)), activeAlignment: alignment.id});
-                      }}>Load</Button>
-                      <Button small variant="danger" onClick={() => {
-                        if (confirm(`Delete alignment "${alignment.name}"?`)) {
-                          setForm({
-                            ...form,
-                            alignments: form.alignments.filter(a => a.id !== alignment.id),
-                            activeAlignment: form.activeAlignment === alignment.id ? null : form.activeAlignment
-                          });
-                        }
-                      }}>✕</Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Game-Specific Alignments */}
+            <div style={{ padding: 12, background: THEME.black, borderRadius: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ color: THEME.white, fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>📋 This Game Only</div>
+                <Button small onClick={() => {
+                  if (form.lineup.length === 0) {
+                    alert("Create a lineup first before saving");
+                    return;
+                  }
+                  const name = prompt("Save alignment for this game as:");
+                  if (!name) return;
+                  setForm({
+                    ...form,
+                    alignments: [...form.alignments, { id: Date.now().toString(), name, lineup: JSON.parse(JSON.stringify(form.lineup)) }]
+                  });
+                }}>+ Save for This Game</Button>
               </div>
-            )}
+
+              {form.alignments.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 12, color: THEME.gray, fontSize: 11 }}>
+                  <p style={{ margin: 0 }}>No game-specific alignments. These are temporary formations for this game only.</p>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {form.alignments.map(alignment => (
+                    <div key={alignment.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: THEME.blackLight,
+                      padding: 10,
+                      borderRadius: 4,
+                      border: form.activeAlignment === alignment.id ? `2px solid ${THEME.gold}` : `1px solid ${THEME.charcoal}`
+                    }}>
+                      <div>
+                        <div style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>{alignment.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 10, marginTop: 2 }}>
+                          {alignment.lineup.length} players
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <Button small onClick={() => {
+                          setForm({...form, lineup: JSON.parse(JSON.stringify(alignment.lineup)), activeAlignment: alignment.id});
+                        }}>Load</Button>
+                        <Button small variant="danger" onClick={() => {
+                          if (confirm(`Delete "${alignment.name}"?`)) {
+                            setForm({
+                              ...form,
+                              alignments: form.alignments.filter(a => a.id !== alignment.id),
+                              activeAlignment: form.activeAlignment === alignment.id ? null : form.activeAlignment
+                            });
+                          }
+                        }}>✕</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* Notes */}
@@ -2920,7 +3133,21 @@ const LineupBuilder = ({ players }) => {
             <Button variant="ghost" onClick={() => { if (!editing || confirm("Close without saving?")) { setShowBuilder(false); setEditing(null); } }}>Cancel</Button>
             <Button onClick={save}>Save {form.status === "finalized" ? "Changes" : "Draft"}</Button>
             {form.status === "draft" && (
-              <Button onClick={() => { setForm({...form, status: "finalized"}); setTimeout(save, 100); }}>Finalize Lineup</Button>
+              <Button onClick={() => {
+                if (!form.opponent || !form.date) {
+                  alert("Please enter opponent and date");
+                  return;
+                }
+                const finalizedForm = {...form, status: "finalized"};
+                if (editing) {
+                  setLineups(prev => prev.map(l => l.id === editing ? finalizedForm : l));
+                } else {
+                  setLineups(prev => [...prev, finalizedForm]);
+                }
+                setShowBuilder(false);
+                setEditing(null);
+                setForm(emptyLineup());
+              }}>Finalize Lineup</Button>
             )}
           </div>
         </div>
