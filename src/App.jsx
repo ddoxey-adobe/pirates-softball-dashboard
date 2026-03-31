@@ -5731,6 +5731,8 @@ const Reports = ({ players }) => {
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [selectedPlayerGameLog, setSelectedPlayerGameLog] = useState(null);
+  const [timelineFilter, setTimelineFilter] = useState({ focus: "all", category: "all" });
+  const [expandedPractices, setExpandedPractices] = useState({});
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -5853,7 +5855,7 @@ const Reports = ({ players }) => {
 
   // Collapse/Expand functions (defined after trackedDrills)
   const collapseAll = () => {
-    const allSections = ["stats", "pitchers", "goals", "drill-usage", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
+    const allSections = ["timeline", "stats", "pitchers", "goals", "drill-usage", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
     const collapsed = {};
     allSections.forEach(id => collapsed[id] = true);
     setCollapsedSections(collapsed);
@@ -6083,6 +6085,120 @@ const Reports = ({ players }) => {
     }
   };
 
+  // Calculate PRs (personal records) for a practice
+  const calculatePRsForPractice = (practice, practiceIndex) => {
+    const prs = [];
+    const previousPractices = completedPractices.slice(0, practiceIndex);
+
+    if (!practice.drillTracking) return prs;
+
+    Object.entries(practice.drillTracking).forEach(([drillId, trackingData]) => {
+      const drill = DRILL_LIBRARY.find(d => d.id === drillId);
+      if (!drill?.config) return;
+
+      // Handle different tracking types
+      if (drill.config.type === "time") {
+        // Time-based (lower is better)
+        Object.entries(trackingData).forEach(([playerId, timeStr]) => {
+          const time = parseFloat(timeStr);
+          if (isNaN(time)) return;
+
+          const player = players.find(p => p.id === playerId);
+          if (!player) return;
+
+          // Find best previous time for this player in this drill
+          const previousBest = previousPractices.reduce((best, prev) => {
+            const prevTime = parseFloat(prev.drillTracking?.[drillId]?.[playerId]);
+            if (!isNaN(prevTime) && (best === null || prevTime < best)) return prevTime;
+            return best;
+          }, null);
+
+          if (previousBest === null || time < previousBest) {
+            prs.push({ player: player.name, drill: drill.name, value: `${time.toFixed(2)}s`, type: "time" });
+          }
+        });
+      } else if (drill.config.type === "number" || drill.config.type === "level") {
+        // Number/level-based (higher is better)
+        Object.entries(trackingData).forEach(([playerId, valueStr]) => {
+          const value = parseInt(valueStr);
+          if (isNaN(value)) return;
+
+          const player = players.find(p => p.id === playerId);
+          if (!player) return;
+
+          const previousBest = previousPractices.reduce((best, prev) => {
+            const prevValue = parseInt(prev.drillTracking?.[drillId]?.[playerId]);
+            if (!isNaN(prevValue) && (best === null || prevValue > best)) return prevValue;
+            return best;
+          }, null);
+
+          if (previousBest === null || value > previousBest) {
+            prs.push({ player: player.name, drill: drill.name, value: drill.config.type === "level" ? `Level ${value}` : `${value} pts`, type: "number" });
+          }
+        });
+      }
+    });
+
+    return prs;
+  };
+
+  // Get sparkline data for a drill across practices
+  const getDrillSparklineData = (drillId) => {
+    return completedPractices.map(p => {
+      const trackingData = p.drillTracking?.[drillId];
+      if (!trackingData) return null;
+
+      const drill = DRILL_LIBRARY.find(d => d.id === drillId);
+      if (!drill?.config) return null;
+
+      let avgValue = 0;
+      let count = 0;
+
+      if (drill.config.type === "time") {
+        Object.values(trackingData).forEach(v => {
+          const val = parseFloat(v);
+          if (!isNaN(val)) { avgValue += val; count++; }
+        });
+      } else if (drill.config.type === "number" || drill.config.type === "level") {
+        Object.values(trackingData).forEach(v => {
+          const val = parseInt(v);
+          if (!isNaN(val)) { avgValue += val; count++; }
+        });
+      } else if (drill.config.type === "strikes-balls") {
+        Object.values(trackingData).forEach(v => {
+          if (v.strikes !== undefined && v.balls !== undefined) {
+            const total = v.strikes + v.balls;
+            if (total > 0) {
+              avgValue += (v.strikes / total) * 100;
+              count++;
+            }
+          }
+        });
+      }
+
+      return count > 0 ? avgValue / count : null;
+    }).filter(v => v !== null);
+  };
+
+  // Filter practices for timeline
+  const getTimelineFilteredPractices = () => {
+    return completedPractices.filter(p => {
+      if (timelineFilter.focus !== "all" && p.focus && !p.focus.toLowerCase().includes(timelineFilter.focus.toLowerCase())) {
+        return false;
+      }
+      if (timelineFilter.category !== "all") {
+        const hasCategory = p.drills?.some(d => {
+          const drill = DRILL_LIBRARY.find(lib => lib.id === d.id);
+          return drill?.category === timelineFilter.category;
+        });
+        if (!hasCategory) return false;
+      }
+      return true;
+    });
+  };
+
+  const timelineFilteredPractices = getTimelineFilteredPractices();
+
   return <div>
     {/* Header with date range filter */}
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -6117,6 +6233,286 @@ const Reports = ({ players }) => {
         <Button small onClick={expandAll}>⬇️ Expand All</Button>
         <Button small onClick={collapseAll}>⬆️ Collapse All</Button>
       </div>
+    )}
+
+    {/* Practice Timeline View */}
+    {completedPractices.length > 0 && (
+      <CollapsibleSection
+        id="timeline"
+        title="Practice Timeline"
+        icon="📅"
+        badge={`${timelineFilteredPractices.length} practices`}
+        isCollapsed={collapsedSections["timeline"]}
+        onToggle={toggleSection}
+      >
+        {/* Filters */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+          <div>
+            <label style={{ display: "block", color: THEME.gray, fontSize: 11, marginBottom: 4, textTransform: "uppercase", fontWeight: 600 }}>Focus Area</label>
+            <select
+              value={timelineFilter.focus}
+              onChange={e => setTimelineFilter({ ...timelineFilter, focus: e.target.value })}
+              style={{
+                padding: "6px 10px",
+                background: THEME.blackLight,
+                border: `1px solid ${THEME.charcoal}`,
+                borderRadius: 6,
+                color: THEME.white,
+                fontSize: 12
+              }}
+            >
+              <option value="all">All Focus Areas</option>
+              <option value="hitting">Hitting</option>
+              <option value="pitching">Pitching</option>
+              <option value="fielding">Fielding</option>
+              <option value="baserunning">Baserunning</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", color: THEME.gray, fontSize: 11, marginBottom: 4, textTransform: "uppercase", fontWeight: 600 }}>Drill Category</label>
+            <select
+              value={timelineFilter.category}
+              onChange={e => setTimelineFilter({ ...timelineFilter, category: e.target.value })}
+              style={{
+                padding: "6px 10px",
+                background: THEME.blackLight,
+                border: `1px solid ${THEME.charcoal}`,
+                borderRadius: 6,
+                color: THEME.white,
+                fontSize: 12
+              }}
+            >
+              <option value="all">All Categories</option>
+              <option value="Warm-Up">Warm-Up</option>
+              <option value="Hitting">Hitting</option>
+              <option value="Pitching">Pitching</option>
+              <option value="Fielding">Fielding</option>
+              <option value="Baserunning">Baserunning</option>
+              <option value="Cool-Down">Cool-Down</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div style={{ position: "relative", paddingLeft: 32 }}>
+          {/* Vertical line */}
+          <div style={{
+            position: "absolute",
+            left: 12,
+            top: 0,
+            bottom: 0,
+            width: 2,
+            background: `linear-gradient(to bottom, ${THEME.gold}, ${THEME.charcoal})`
+          }} />
+
+          {/* Practice cards */}
+          <div style={{ display: "grid", gap: 20 }}>
+            {timelineFilteredPractices.map((practice, index) => {
+              const isExpanded = expandedPractices[practice.id];
+              const attendance = practice.attendance ? Object.values(practice.attendance).filter(Boolean).length : 0;
+              const drillsRun = practice.drills?.length || 0;
+              const prs = calculatePRsForPractice(practice, completedPractices.indexOf(practice));
+              const practiceDate = practice.date ? new Date(practice.date + "T12:00:00") : null;
+
+              return (
+                <div key={practice.id} style={{ position: "relative" }}>
+                  {/* Timeline dot */}
+                  <div style={{
+                    position: "absolute",
+                    left: -26,
+                    top: 16,
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    background: THEME.gold,
+                    border: `2px solid ${THEME.black}`,
+                    zIndex: 1
+                  }} />
+
+                  {/* Practice card */}
+                  <Card style={{
+                    padding: 16,
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                  onClick={() => setExpandedPractices({ ...expandedPractices, [practice.id]: !isExpanded })}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = THEME.gold}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = THEME.charcoal}
+                  >
+                    {/* Header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <div style={{ color: THEME.gold, fontSize: 15, fontWeight: 700 }}>
+                            {practiceDate ? practiceDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No date"}
+                          </div>
+                          {prs.length > 0 && (
+                            <Badge color={THEME.green} bg={`${THEME.green}20`}>🏆 {prs.length} PR{prs.length > 1 ? "s" : ""}</Badge>
+                          )}
+                        </div>
+                        <div style={{ color: THEME.white, fontSize: 13, marginBottom: 4 }}>{practice.focus || "No focus set"}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>
+                          {practice.time} • {practice.duration} min
+                        </div>
+                      </div>
+                      <div style={{ color: THEME.gray, fontSize: 20 }}>
+                        {isExpanded ? "▼" : "▶"}
+                      </div>
+                    </div>
+
+                    {/* Quick stats */}
+                    <div style={{ display: "flex", gap: 16, marginBottom: isExpanded ? 12 : 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ color: THEME.gray, fontSize: 11 }}>👥</span>
+                        <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>{attendance}</span>
+                        <span style={{ color: THEME.gray, fontSize: 11 }}>players</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ color: THEME.gray, fontSize: 11 }}>🎯</span>
+                        <span style={{ color: THEME.white, fontSize: 12, fontWeight: 600 }}>{drillsRun}</span>
+                        <span style={{ color: THEME.gray, fontSize: 11 }}>drills</span>
+                      </div>
+                    </div>
+
+                    {/* Sparklines for tracked drills */}
+                    {!isExpanded && practice.drillTracking && Object.keys(practice.drillTracking).length > 0 && (
+                      <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                        {Object.keys(practice.drillTracking).slice(0, 3).map(drillId => {
+                          const drill = DRILL_LIBRARY.find(d => d.id === drillId);
+                          if (!drill) return null;
+                          const sparklineData = getDrillSparklineData(drillId);
+                          if (sparklineData.length < 2) return null;
+
+                          return (
+                            <div key={drillId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ color: THEME.gray, fontSize: 10 }}>{drill.name}</span>
+                              <Sparkline data={sparklineData} width={40} height={16} color={THEME.gold} showArea={true} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${THEME.charcoal}` }}>
+                        {/* Personal Records */}
+                        {prs.length > 0 && (
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                              🏆 Personal Records
+                            </div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                              {prs.map((pr, idx) => (
+                                <div key={idx} style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  padding: "6px 10px",
+                                  background: `${THEME.green}15`,
+                                  borderRadius: 4,
+                                  border: `1px solid ${THEME.green}40`
+                                }}>
+                                  <span style={{ color: THEME.white, fontSize: 12 }}>{pr.player}</span>
+                                  <span style={{ color: THEME.gray, fontSize: 11 }}>{pr.drill}</span>
+                                  <span style={{ color: THEME.green, fontSize: 12, fontWeight: 700 }}>{pr.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Drills run */}
+                        {practice.drills && practice.drills.length > 0 && (
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                              Drills Run ({practice.drills.length})
+                            </div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                              {practice.drills.map(drill => {
+                                const drillDef = DRILL_LIBRARY.find(d => d.id === drill.id);
+                                const tracked = practice.drillTracking?.[drill.id];
+                                return (
+                                  <div key={drill.id} style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    padding: "6px 10px",
+                                    background: tracked ? THEME.black : "transparent",
+                                    borderRadius: 4,
+                                    border: `1px solid ${THEME.charcoal}`
+                                  }}>
+                                    <div style={{ flex: 1 }}>
+                                      <span style={{ color: THEME.white, fontSize: 12 }}>{drill.name}</span>
+                                      {tracked && <Badge color={THEME.gold} bg={`${THEME.gold}20`} style={{ fontSize: 9, marginLeft: 6 }}>Tracked</Badge>}
+                                    </div>
+                                    <span style={{ color: THEME.gray, fontSize: 11 }}>{drill.duration} min</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Highlights */}
+                        {practice.highlights && practice.highlights.length > 0 && (
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                              💡 Highlights
+                            </div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                              {practice.highlights.map((highlight, idx) => {
+                                const drill = DRILL_LIBRARY.find(d => d.id === highlight.drillId);
+                                return (
+                                  <div key={idx} style={{
+                                    padding: "8px 12px",
+                                    background: `${THEME.gold}10`,
+                                    borderRadius: 4,
+                                    border: `1px solid ${THEME.gold}40`
+                                  }}>
+                                    <div style={{ color: THEME.gray, fontSize: 10, marginBottom: 2 }}>{drill?.name || "Unknown drill"}</div>
+                                    <div style={{ color: THEME.white, fontSize: 12 }}>{highlight.note}</div>
+                                    {highlight.playersTagged.length > 0 && (
+                                      <div style={{ color: THEME.gray, fontSize: 10, marginTop: 4 }}>
+                                        Tagged: {highlight.playersTagged.map(id => players.find(p => p.id === id)?.name || id).join(", ")}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Coach notes */}
+                        {practice.coachNotes && (
+                          <div>
+                            <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                              Coach Notes
+                            </div>
+                            <div style={{ color: THEME.gray, fontSize: 12, padding: "8px 12px", background: THEME.black, borderRadius: 4, border: `1px solid ${THEME.charcoal}` }}>
+                              {practice.coachNotes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Empty state for filtered timeline */}
+        {timelineFilteredPractices.length === 0 && (
+          <Card style={{ textAlign: "center", padding: 32 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+            <div style={{ color: THEME.gray, fontSize: 13 }}>No practices match the selected filters.</div>
+          </Card>
+        )}
+      </CollapsibleSection>
     )}
 
     {completedPractices.length === 0 ? (
