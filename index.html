@@ -5769,6 +5769,9 @@ const Reports = ({ players }) => {
   const [expandedPractices, setExpandedPractices] = useState({});
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [comparePlayerIds, setComparePlayerIds] = useState([]);
+  const [showPlayerProfile, setShowPlayerProfile] = useState(null); // player object
+  const [profileTab, setProfileTab] = useState("overview"); // "overview", "practice", "game", "goals"
+  const [compareToTeam, setCompareToTeam] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -7206,8 +7209,13 @@ const Reports = ({ players }) => {
                   </div>
                 )}
               </div>
-              <div style={{ marginTop: 16, textAlign: "right" }}>
-                <Button onClick={() => { setSelectedPlayer(null); setSelectedDrill(null); }}>Close</Button>
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
+                <Button onClick={() => {
+                  setShowPlayerProfile(player);
+                  setSelectedPlayer(null);
+                  setSelectedDrill(null);
+                }}>👤 View Full Profile</Button>
+                <Button variant="ghost" onClick={() => { setSelectedPlayer(null); setSelectedDrill(null); }}>Close</Button>
               </div>
             </Modal>
           );
@@ -8159,6 +8167,434 @@ const Reports = ({ players }) => {
           );
         })()}
 
+        {/* Player Profile Modal */}
+        {showPlayerProfile && (() => {
+          const player = showPlayerProfile;
+
+          // Calculate all player stats
+          const practicesAttended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+          const attendancePercent = totalPractices > 0 ? (practicesAttended / totalPractices) * 100 : 0;
+
+          // Drill stats
+          const playerDrillStats = trackedDrills.map(drill => {
+            const playerData = completedPractices
+              .map(p => {
+                const tracking = p.drillTracking?.[drill.id];
+                if (!tracking || !tracking[player.id]) return null;
+
+                let value = null;
+                if (drill.config.type === "time") {
+                  value = parseFloat(tracking[player.id]);
+                } else if (drill.config.type === "number" || drill.config.type === "level") {
+                  value = parseInt(tracking[player.id]);
+                } else if (drill.config.type === "strikes-balls") {
+                  const s = tracking[player.id].strikes || 0;
+                  const b = tracking[player.id].balls || 0;
+                  value = (s + b) > 0 ? (s / (s + b)) * 100 : null;
+                }
+
+                return value !== null ? { value, date: p.date, practiceId: p.id } : null;
+              })
+              .filter(Boolean);
+
+            if (playerData.length === 0) return null;
+
+            const values = playerData.map(d => d.value);
+            const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+            const best = drill.config.type === "time" ? Math.min(...values) : Math.max(...values);
+            const latest = values[values.length - 1];
+
+            // Team average for comparison
+            const teamData = completedPractices.map(p => {
+              const tracking = p.drillTracking?.[drill.id];
+              if (!tracking) return null;
+
+              let total = 0;
+              let count = 0;
+
+              Object.values(tracking).forEach(v => {
+                let val = null;
+                if (drill.config.type === "time") val = parseFloat(v);
+                else if (drill.config.type === "number" || drill.config.type === "level") val = parseInt(v);
+                else if (drill.config.type === "strikes-balls") {
+                  const s = v.strikes || 0;
+                  const b = v.balls || 0;
+                  val = (s + b) > 0 ? (s / (s + b)) * 100 : null;
+                }
+                if (val !== null) { total += val; count++; }
+              });
+
+              return count > 0 ? total / count : null;
+            }).filter(v => v !== null);
+
+            const teamAvg = teamData.length > 0 ? teamData.reduce((sum, v) => sum + v, 0) / teamData.length : null;
+
+            return { drill, playerData, avg, best, latest, teamAvg };
+          }).filter(Boolean);
+
+          // Game stats
+          const playerGames = filteredGames.filter(g => (g.lineup || []).find(l => l.playerId === player.id));
+          const atBats = playerGames.flatMap(g => (g.batting || []).filter(ab => ab.playerId === player.id));
+          const hits = atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+          const totalABs = atBats.filter(ab => !["BB", "HBP", "SAC"].includes(ab.result)).length;
+          const walks = atBats.filter(ab => ab.result === "BB").length;
+          const strikeouts = atBats.filter(ab => ["K", "ꓘ"].includes(ab.result)).length;
+          const battingAvg = totalABs > 0 ? hits / totalABs : 0;
+
+          // Player goals
+          const playerGoals = goals.players[player.id] || [];
+
+          return (
+            <Modal open={true} title={`${player.name} - Player Profile`} onClose={() => { setShowPlayerProfile(null); setProfileTab("overview"); }} wide={true}>
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: `1px solid ${THEME.charcoal}`, paddingBottom: 8 }}>
+                {[
+                  ["overview", "📊 Overview"],
+                  ["practice", "🎯 Practice History"],
+                  ["game", "⚾ Game History"],
+                  ["goals", "🎯 Goals"]
+                ].map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    onClick={() => setProfileTab(tab)}
+                    style={{
+                      padding: "8px 16px",
+                      background: profileTab === tab ? THEME.gold : "transparent",
+                      border: `1px solid ${profileTab === tab ? THEME.gold : THEME.charcoal}`,
+                      borderRadius: 6,
+                      color: profileTab === tab ? THEME.black : THEME.white,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Overview Tab */}
+              {profileTab === "overview" && (
+                <div>
+                  {/* Player Info */}
+                  <Card style={{ padding: 16, marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+                      <div>
+                        <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 2 }}>Grade</div>
+                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{player.grade}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 2 }}>Primary Position</div>
+                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{player.primaryPosition || "Not set"}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 2 }}>Status</div>
+                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{player.returning ? "Returning" : "New"}</div>
+                      </div>
+                      {player.isPitcher && (
+                        <div>
+                          <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 2 }}>Pitcher</div>
+                          <Badge color={THEME.gold} bg={`${THEME.gold}20`}>⚡ Pitcher</Badge>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Key Stats */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+                    <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.gold}40` }}>
+                      <div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700 }}>{attendancePercent.toFixed(0)}%</div>
+                      <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Attendance</div>
+                      <div style={{ color: THEME.gray, fontSize: 10, marginTop: 2 }}>{practicesAttended}/{totalPractices} practices</div>
+                    </Card>
+                    <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.blue}40` }}>
+                      <div style={{ color: THEME.blue, fontSize: 24, fontWeight: 700 }}>{playerDrillStats.length}</div>
+                      <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Drills Tracked</div>
+                    </Card>
+                    {playerGames.length > 0 && (
+                      <Card style={{ padding: 16, background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)`, border: `1px solid ${THEME.green}40` }}>
+                        <div style={{ color: THEME.green, fontSize: 24, fontWeight: 700 }}>{battingAvg.toFixed(3)}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginTop: 4 }}>Batting Avg</div>
+                        <div style={{ color: THEME.gray, fontSize: 10, marginTop: 2 }}>{hits}/{totalABs} ({playerGames.length} games)</div>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Drill Performance Summary */}
+                  {playerDrillStats.length > 0 && (
+                    <Card style={{ padding: 16 }}>
+                      <h4 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Drill Performance Summary</h4>
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {playerDrillStats.map(stat => (
+                          <div key={stat.drill.id} style={{
+                            padding: 12,
+                            background: THEME.blackLight,
+                            borderRadius: 6,
+                            border: `1px solid ${THEME.charcoal}`
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                              <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{stat.drill.name}</span>
+                              <span style={{ color: THEME.gray, fontSize: 11 }}>{stat.playerData.length} attempts</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                              <div>
+                                <span style={{ color: THEME.gray }}>Best: </span>
+                                <span style={{ color: THEME.green, fontWeight: 700 }}>{formatValue(stat.best, stat.drill.config)}</span>
+                              </div>
+                              <div>
+                                <span style={{ color: THEME.gray }}>Avg: </span>
+                                <span style={{ color: THEME.white, fontWeight: 700 }}>{formatValue(stat.avg, stat.drill.config)}</span>
+                              </div>
+                              <div>
+                                <span style={{ color: THEME.gray }}>Latest: </span>
+                                <span style={{ color: THEME.gold, fontWeight: 700 }}>{formatValue(stat.latest, stat.drill.config)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Practice History Tab */}
+              {profileTab === "practice" && (
+                <div>
+                  {/* Compare toggle */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={compareToTeam}
+                        onChange={e => setCompareToTeam(e.target.checked)}
+                        style={{ width: 16, height: 16, cursor: "pointer" }}
+                      />
+                      <span style={{ color: THEME.white, fontSize: 13 }}>Compare to Team Average</span>
+                    </label>
+                  </div>
+
+                  {playerDrillStats.length > 0 ? (
+                    <div style={{ display: "grid", gap: 20 }}>
+                      {playerDrillStats.map(stat => (
+                        <Card key={stat.drill.id} style={{ padding: 16 }}>
+                          <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{stat.drill.name}</h4>
+
+                          {/* Chart */}
+                          {compareToTeam && stat.teamAvg !== null ? (
+                            <div style={{ marginBottom: 12 }}>
+                              <LineChart
+                                data={[
+                                  ...stat.playerData.map(d => ({ value: d.value, label: d.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "", color: THEME.gold })),
+                                ]}
+                                width={600}
+                                height={180}
+                                color={THEME.gold}
+                                showDots={true}
+                                showGrid={true}
+                              />
+                              <div style={{ marginTop: 8, display: "flex", gap: 16, fontSize: 11 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <div style={{ width: 12, height: 12, background: THEME.gold, borderRadius: 2 }} />
+                                  <span style={{ color: THEME.gray }}>Player: {formatValue(stat.avg, stat.drill.config)}</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <div style={{ width: 12, height: 12, background: THEME.gray, borderRadius: 2 }} />
+                                  <span style={{ color: THEME.gray }}>Team Avg: {formatValue(stat.teamAvg, stat.drill.config)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ marginBottom: 12 }}>
+                              <LineChart
+                                data={stat.playerData.map(d => ({ value: d.value, label: d.date ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "" }))}
+                                width={600}
+                                height={180}
+                                color={THEME.gold}
+                                showDots={true}
+                                showGrid={true}
+                              />
+                            </div>
+                          )}
+
+                          {/* Data table */}
+                          <details>
+                            <summary style={{ color: THEME.gray, fontSize: 11, cursor: "pointer", userSelect: "none" }}>View all {stat.playerData.length} attempts</summary>
+                            <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+                              {stat.playerData.map((d, idx) => (
+                                <div key={idx} style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  padding: "4px 8px",
+                                  background: THEME.black,
+                                  borderRadius: 4,
+                                  fontSize: 11
+                                }}>
+                                  <span style={{ color: THEME.gray }}>{d.date ? new Date(d.date + "T12:00:00").toLocaleDateString() : "No date"}</span>
+                                  <span style={{ color: THEME.white, fontWeight: 600 }}>{formatValue(d.value, stat.drill.config)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card style={{ textAlign: "center", padding: 40 }}>
+                      <div style={{ fontSize: 40, marginBottom: 8 }}>🎯</div>
+                      <div style={{ color: THEME.gray, fontSize: 13 }}>No practice drill tracking data yet.</div>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Game History Tab */}
+              {profileTab === "game" && (
+                <div>
+                  {playerGames.length > 0 ? (
+                    <div>
+                      {/* Overall stats */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 20 }}>
+                        <Card style={{ padding: 12 }}>
+                          <div style={{ color: THEME.gold, fontSize: 20, fontWeight: 700 }}>{battingAvg.toFixed(3)}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>Batting Avg</div>
+                        </Card>
+                        <Card style={{ padding: 12 }}>
+                          <div style={{ color: THEME.white, fontSize: 20, fontWeight: 700 }}>{hits}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>Hits</div>
+                        </Card>
+                        <Card style={{ padding: 12 }}>
+                          <div style={{ color: THEME.white, fontSize: 20, fontWeight: 700 }}>{walks}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>Walks</div>
+                        </Card>
+                        <Card style={{ padding: 12 }}>
+                          <div style={{ color: THEME.red, fontSize: 20, fontWeight: 700 }}>{strikeouts}</div>
+                          <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>Strikeouts</div>
+                        </Card>
+                      </div>
+
+                      {/* Game-by-game */}
+                      <Card style={{ padding: 16 }}>
+                        <h4 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Game-by-Game Performance</h4>
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {playerGames.map(game => {
+                            const gameABs = atBats.filter(ab => filteredGames.find(g => g.id === game.id));
+                            const gameHits = gameABs.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+                            const gameTotalABs = gameABs.filter(ab => !["BB", "HBP", "SAC"].includes(ab.result)).length;
+                            const gameAvg = gameTotalABs > 0 ? (gameHits / gameTotalABs).toFixed(3) : ".000";
+
+                            return (
+                              <div key={game.id} style={{
+                                padding: 10,
+                                background: THEME.blackLight,
+                                borderRadius: 4,
+                                border: `1px solid ${THEME.charcoal}`,
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                              }}>
+                                <div>
+                                  <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>vs {game.opponent}</div>
+                                  <div style={{ color: THEME.gray, fontSize: 11 }}>{game.date ? new Date(game.date + "T12:00:00").toLocaleDateString() : "No date"}</div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700 }}>{gameAvg}</div>
+                                  <div style={{ color: THEME.gray, fontSize: 10 }}>{gameHits}/{gameTotalABs}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    </div>
+                  ) : (
+                    <Card style={{ textAlign: "center", padding: 40 }}>
+                      <div style={{ fontSize: 40, marginBottom: 8 }}>⚾</div>
+                      <div style={{ color: THEME.gray, fontSize: 13 }}>No game data yet.</div>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Goals Tab */}
+              {profileTab === "goals" && (
+                <div>
+                  {playerGoals.length > 0 ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {playerGoals.map(goal => {
+                        const { current, progress } = calculateGoalProgress(goal, player.id);
+                        const isComplete = progress >= 100;
+                        const deadlinePassed = goal.deadline && new Date(goal.deadline) < new Date();
+
+                        return (
+                          <Card key={goal.id} style={{
+                            padding: 16,
+                            background: isComplete ? `${THEME.green}10` : THEME.blackLight,
+                            border: `1px solid ${isComplete ? THEME.green : THEME.charcoal}`
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                                  <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{goal.goal}</div>
+                                  {isComplete && <Badge color={THEME.green} bg={`${THEME.green}20`}>✓ Complete</Badge>}
+                                  {!isComplete && deadlinePassed && <Badge color={THEME.red} bg={`${THEME.red}20`}>⚠ Overdue</Badge>}
+                                </div>
+                                <div style={{ color: THEME.gray, fontSize: 11 }}>
+                                  Target: {goal.target} | Current: {current.toFixed(1)}
+                                  {goal.deadline && ` | ${new Date(goal.deadline).toLocaleDateString()}`}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div style={{ position: "relative", height: 24, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
+                              <div style={{
+                                width: `${Math.min(progress, 100)}%`,
+                                height: "100%",
+                                background: isComplete
+                                  ? `linear-gradient(90deg, ${THEME.green} 0%, ${THEME.gold} 100%)`
+                                  : `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.red} 100%)`,
+                                transition: "width 0.5s ease"
+                              }} />
+                              <div style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: THEME.white,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textShadow: "0 1px 2px rgba(0,0,0,0.9)"
+                              }}>
+                                {progress.toFixed(0)}%
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Card style={{ textAlign: "center", padding: 40 }}>
+                      <div style={{ fontSize: 40, marginBottom: 8 }}>🎯</div>
+                      <div style={{ color: THEME.gray, fontSize: 13, marginBottom: 12 }}>No goals set for this player yet.</div>
+                      <Button onClick={() => {
+                        setShowPlayerProfile(null);
+                        setShowGoalModal(true);
+                        setGoalForm({ type: "player", playerId: player.id, goal: "", target: "", category: "", deadline: "" });
+                      }}>+ Create Goal</Button>
+                    </Card>
+                  )}
+                </div>
+              )}
+            </Modal>
+          );
+        })()}
+
         {/* Attendance Summary - Enhanced */}
         <CollapsibleSection
           id="attendance"
@@ -8239,7 +8675,14 @@ const Reports = ({ players }) => {
                     border: `1px solid ${data.isAtRisk ? THEME.red : THEME.charcoal}`
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{data.player.name}</span>
+                      <span
+                        onClick={() => setShowPlayerProfile(data.player)}
+                        style={{ color: THEME.white, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+                        onMouseEnter={e => e.currentTarget.style.color = THEME.gold}
+                        onMouseLeave={e => e.currentTarget.style.color = THEME.white}
+                      >
+                        {data.player.name}
+                      </span>
                       {data.isAtRisk && <Badge color={THEME.red} bg="rgba(231, 76, 60, 0.15)" style={{ fontSize: 10 }}>AT RISK</Badge>}
                       {completedPractices.length >= 4 && (
                         <span style={{ color: data.trendColor, fontSize: 16 }}>{data.trendIcon}</span>
