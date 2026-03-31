@@ -2504,62 +2504,179 @@ const PracticeLog = ({ players, coaches }) => {
 const LineupPlanner = ({ players, onCreateGame }) => {
   const [templates, setTemplates] = useState([]);
   const [alignments, setAlignments] = useState([]);
-  const [editing, setEditing] = useState(null);
-  const [showBuilder, setShowBuilder] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [editingAlignment, setEditingAlignment] = useState(null);
+  const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
+  const [showAlignmentBuilder, setShowAlignmentBuilder] = useState(false);
 
   useEffect(() => {
-    loadStore("pirates-lineup-templates-2026v1", []).then(setTemplates);
-    loadStore("pirates-alignment-library-2026v1", []).then(setAlignments);
+    loadStore("pirates-lineup-templates-2026v2", []).then(setTemplates);
+    loadStore("pirates-alignment-library-2026v2", []).then(setAlignments);
   }, []);
 
   useEffect(() => {
-    saveStore("pirates-lineup-templates-2026v1", templates);
+    saveStore("pirates-lineup-templates-2026v2", templates);
   }, [templates]);
 
   useEffect(() => {
-    saveStore("pirates-alignment-library-2026v1", alignments);
+    saveStore("pirates-alignment-library-2026v2", alignments);
   }, [alignments]);
+
+  const emptyAlignment = () => ({
+    id: Date.now().toString(),
+    name: "",
+    positions: [], // [{ playerId, position }]
+    isPrimary: alignments.length === 0, // First one is primary
+    createdDate: new Date().toISOString()
+  });
 
   const emptyTemplate = () => ({
     id: Date.now().toString(),
     name: "",
     description: "",
-    createdDate: new Date().toISOString(),
-    lineup: [], // [{ playerId, battingOrder, position }]
-    alignments: [], // [{ name, positions: [...] }]
+    battingLineup: [], // [{ battingOrder, playerId }] - NO positions
+    alignmentIds: [], // References to alignment IDs
+    createdDate: new Date().toISOString()
   });
 
-  const [form, setForm] = useState(emptyTemplate());
+  const [alignmentForm, setAlignmentForm] = useState(emptyAlignment());
+  const [templateForm, setTemplateForm] = useState(emptyTemplate());
 
-  const save = () => {
-    if (!form.name) {
-      alert("Please enter a template name");
+  const saveAlignment = () => {
+    if (!alignmentForm.name) {
+      alert("Please enter alignment name");
       return;
     }
-    if (editing) {
-      setTemplates(prev => prev.map(t => t.id === editing ? form : t));
-    } else {
-      setTemplates(prev => [...prev, form]);
+    if (alignmentForm.positions.length !== 9) {
+      alert("Please fill all 9 positions");
+      return;
     }
-    setShowBuilder(false);
-    setEditing(null);
-    setForm(emptyTemplate());
+    if (editingAlignment) {
+      setAlignments(prev => prev.map(a => a.id === editingAlignment ? alignmentForm : a));
+    } else {
+      setAlignments(prev => [...prev, alignmentForm]);
+    }
+    setShowAlignmentBuilder(false);
+    setEditingAlignment(null);
+    setAlignmentForm(emptyAlignment());
   };
 
-  if (showBuilder) {
+  const saveTemplate = () => {
+    if (!templateForm.name) {
+      alert("Please enter template name");
+      return;
+    }
+    if (templateForm.battingLineup.length === 0) {
+      alert("Please add players to batting lineup");
+      return;
+    }
+    if (editingTemplate) {
+      setTemplates(prev => prev.map(t => t.id === editingTemplate ? templateForm : t));
+    } else {
+      setTemplates(prev => [...prev, templateForm]);
+    }
+    setShowTemplateBuilder(false);
+    setEditingTemplate(null);
+    setTemplateForm(emptyTemplate());
+  };
+
+  const setPrimary = (alignmentId) => {
+    setAlignments(prev => prev.map(a => ({ ...a, isPrimary: a.id === alignmentId })));
+  };
+
+  // ALIGNMENT BUILDER
+  if (showAlignmentBuilder) {
+    const filledPositions = alignmentForm.positions.map(p => p.position);
+
     return <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px 80px 16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
-            {editing ? "Edit Template" : "New Lineup Template"}
+            {editingAlignment ? "Edit Alignment" : "New Defensive Alignment"}
           </h2>
           <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>
-            Create a lineup idea without game details - just explore positions and batting order
+            Create a position configuration (e.g., "Lucy Pitching", "Rose Pitching")
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button onClick={() => { setShowBuilder(false); setEditing(null); setForm(emptyTemplate()); }}>Cancel</Button>
-          <Button onClick={save} style={{ background: THEME.green }}>Save Template</Button>
+          <Button onClick={() => { setShowAlignmentBuilder(false); setEditingAlignment(null); setAlignmentForm(emptyAlignment()); }}>Cancel</Button>
+          <Button onClick={saveAlignment} style={{ background: THEME.green }}>Save Alignment</Button>
+        </div>
+      </div>
+
+      <Card style={{ padding: 16, marginBottom: 16 }}>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Alignment Name</h3>
+        <input
+          type="text"
+          value={alignmentForm.name}
+          onChange={(e) => setAlignmentForm({ ...alignmentForm, name: e.target.value })}
+          placeholder="e.g., Lucy Pitching, Defensive Heavy"
+          style={{ width: "100%", padding: "8px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14 }}
+        />
+      </Card>
+
+      {/* Visual Field Grid */}
+      <Card style={{ padding: 16 }}>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⚾ Assign Positions</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+          {["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"].map(pos => {
+            const assignment = alignmentForm.positions.find(p => p.position === pos);
+            const player = assignment ? players.find(p => p.id === assignment.playerId) : null;
+
+            return (
+              <div key={pos} style={{
+                padding: 16,
+                background: player ? THEME.green : THEME.blackLight,
+                border: `2px solid ${player ? THEME.green : THEME.charcoal}`,
+                borderRadius: 8
+              }}>
+                <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{pos}</div>
+                <select
+                  value={assignment?.playerId || ""}
+                  onChange={(e) => {
+                    const newPositions = alignmentForm.positions.filter(p => p.position !== pos);
+                    if (e.target.value) {
+                      // Remove this player from any other position
+                      const filtered = newPositions.filter(p => p.playerId !== e.target.value);
+                      filtered.push({ playerId: e.target.value, position: pos });
+                      setAlignmentForm({ ...alignmentForm, positions: filtered });
+                    } else {
+                      setAlignmentForm({ ...alignmentForm, positions: newPositions });
+                    }
+                  }}
+                  style={{ width: "100%", padding: "6px 8px", background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 12 }}
+                >
+                  <option value="">-- Select --</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ color: THEME.gray, fontSize: 12 }}>
+          {alignmentForm.positions.length}/9 positions filled
+        </div>
+      </Card>
+    </div>;
+  }
+
+  // TEMPLATE BUILDER
+  if (showTemplateBuilder) {
+    return <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px 80px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>
+            {editingTemplate ? "Edit Template" : "New Game Template"}
+          </h2>
+          <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>
+            Create a game plan: batting lineup + alignments to use
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={() => { setShowTemplateBuilder(false); setEditingTemplate(null); setTemplateForm(emptyTemplate()); }}>Cancel</Button>
+          <Button onClick={saveTemplate} style={{ background: THEME.green }}>Save Template</Button>
         </div>
       </div>
 
@@ -2570,8 +2687,8 @@ const LineupPlanner = ({ players, onCreateGame }) => {
             <label style={{ display: "block", color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Template Name *</label>
             <input
               type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              value={templateForm.name}
+              onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
               placeholder="e.g., Aggressive Lineup, Defensive Setup"
               style={{ width: "100%", padding: "8px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14 }}
             />
@@ -2579,8 +2696,8 @@ const LineupPlanner = ({ players, onCreateGame }) => {
           <div>
             <label style={{ display: "block", color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Description (Optional)</label>
             <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              value={templateForm.description}
+              onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
               placeholder="e.g., Speed-focused lineup for sunny days"
               rows={2}
               style={{ width: "100%", padding: "8px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 14, fontFamily: "inherit", resize: "vertical" }}
@@ -2589,55 +2706,26 @@ const LineupPlanner = ({ players, onCreateGame }) => {
         </div>
       </Card>
 
-      {/* Lineup Builder - Same as current LineupBuilder but without game details */}
+      {/* Batting Lineup Builder (NO positions, just order) */}
       <Card style={{ padding: 16, marginBottom: 16 }}>
-        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Build Lineup</h3>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🥎 Batting Lineup</h3>
         <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
-          Set batting order and starting positions. Use arrows to reorder batting lineup.
+          Set batting order only. Positions will be assigned from alignments during game.
         </p>
 
-        {/* Visual Field Coverage */}
-        {form.lineup.length > 0 && (
-          <div style={{ marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8 }}>
-            <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 600, marginBottom: 12 }}>⚾ Field Coverage</h4>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              {["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"].map(pos => {
-                const spot = form.lineup.find(s => s.position === pos);
-                const player = spot ? players.find(p => p.id === spot.playerId) : null;
-                return (
-                  <div key={pos} style={{
-                    padding: "8px 12px",
-                    background: player ? THEME.green : THEME.charcoal,
-                    border: `2px solid ${player ? THEME.green : THEME.gray}`,
-                    borderRadius: 6,
-                    textAlign: "center",
-                    transition: "all 0.2s"
-                  }}>
-                    <div style={{ color: THEME.white, fontSize: 12, fontWeight: 700 }}>{pos}</div>
-                    <div style={{ color: player ? THEME.white : THEME.gray, fontSize: 10, marginTop: 2 }}>
-                      {player ? player.name : "Empty"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {form.lineup.length === 0 ? (
+        {templateForm.battingLineup.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8 }}>
-            <p style={{ color: THEME.gray, margin: 0 }}>No players in lineup yet.</p>
-            <p style={{ color: THEME.gray, margin: "8px 0 16px 0", fontSize: 13 }}>Add players below to start building your lineup.</p>
+            <p style={{ color: THEME.gray, margin: 0 }}>No players in batting lineup yet.</p>
+            <p style={{ color: THEME.gray, margin: "8px 0 16px 0", fontSize: 13 }}>Add players below to start building.</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-            {form.lineup
+            {templateForm.battingLineup
               .sort((a, b) => a.battingOrder - b.battingOrder)
               .map((spot, idx) => {
                 const player = players.find(p => p.id === spot.playerId);
-                const filledPositions = form.lineup.filter(s => s.playerId !== spot.playerId).map(s => s.position);
                 const isFirst = idx === 0;
-                const isLast = idx === form.lineup.length - 1;
+                const isLast = idx === templateForm.battingLineup.length - 1;
 
                 return (
                   <Card key={spot.playerId} style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2646,14 +2734,13 @@ const LineupPlanner = ({ players, onCreateGame }) => {
                         <button
                           disabled={isFirst}
                           onClick={() => {
-                            const newLineup = [...form.lineup];
+                            const newLineup = [...templateForm.battingLineup];
                             const currentIdx = newLineup.findIndex(s => s.playerId === spot.playerId);
                             if (currentIdx > 0) {
-                              // Swap batting orders
                               const temp = newLineup[currentIdx - 1].battingOrder;
                               newLineup[currentIdx - 1].battingOrder = newLineup[currentIdx].battingOrder;
                               newLineup[currentIdx].battingOrder = temp;
-                              setForm({ ...form, lineup: newLineup });
+                              setTemplateForm({ ...templateForm, battingLineup: newLineup });
                             }
                           }}
                           style={{
@@ -2675,14 +2762,13 @@ const LineupPlanner = ({ players, onCreateGame }) => {
                         <button
                           disabled={isLast}
                           onClick={() => {
-                            const newLineup = [...form.lineup];
+                            const newLineup = [...templateForm.battingLineup];
                             const currentIdx = newLineup.findIndex(s => s.playerId === spot.playerId);
-                            if (currentIdx < newLineup.length - 1) {
-                              // Swap batting orders
+                            if (currentIdx < newLineup.battingLineup.length - 1) {
                               const temp = newLineup[currentIdx + 1].battingOrder;
                               newLineup[currentIdx + 1].battingOrder = newLineup[currentIdx].battingOrder;
                               newLineup[currentIdx].battingOrder = temp;
-                              setForm({ ...form, lineup: newLineup });
+                              setTemplateForm({ ...templateForm, battingLineup: newLineup });
                             }
                           }}
                           style={{
@@ -2707,44 +2793,15 @@ const LineupPlanner = ({ players, onCreateGame }) => {
                       </div>
                       <div>
                         <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{player?.name}</div>
-                        <div style={{ color: THEME.gray, fontSize: 11 }}>{spot.position}</div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>Primary: {player?.primaryPosition || "None"}</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <select
-                        value={spot.position}
-                        onChange={(e) => {
-                          setForm({
-                            ...form,
-                            lineup: form.lineup.map(s => s.playerId === spot.playerId ? { ...s, position: e.target.value } : s)
-                          });
-                        }}
-                        style={{ padding: "4px 8px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 12 }}
-                      >
-                        {POSITIONS.filter(p => p !== "Bench").map(pos => {
-                          const isFilled = filledPositions.includes(pos);
-                          return (
-                            <option
-                              key={pos}
-                              value={pos}
-                              disabled={isFilled}
-                              style={{
-                                color: isFilled ? THEME.gray : THEME.white,
-                                background: isFilled ? THEME.charcoal : THEME.black
-                              }}
-                            >
-                              {pos}{isFilled ? " (taken)" : ""}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <Button small variant="danger" onClick={() => {
-                        setForm({
-                          ...form,
-                          lineup: form.lineup.filter(s => s.playerId !== spot.playerId).map((s, i) => ({ ...s, battingOrder: i + 1 }))
-                        });
-                      }}>✕</Button>
-                    </div>
+                    <Button small variant="danger" onClick={() => {
+                      setTemplateForm({
+                        ...templateForm,
+                        battingLineup: templateForm.battingLineup.filter(s => s.playerId !== spot.playerId).map((s, i) => ({ ...s, battingOrder: i + 1 }))
+                      });
+                    }}>✕</Button>
                   </Card>
                 );
               })}
@@ -2754,15 +2811,15 @@ const LineupPlanner = ({ players, onCreateGame }) => {
         <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>Available Players</h4>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
           {players
-            .filter(p => !form.lineup.find(l => l.playerId === p.id))
+            .filter(p => !templateForm.battingLineup.find(l => l.playerId === p.id))
             .map(player => (
               <Card
                 key={player.id}
                 onClick={() => {
-                  const nextOrder = form.lineup.length + 1;
-                  setForm({
-                    ...form,
-                    lineup: [...form.lineup, { playerId: player.id, battingOrder: nextOrder, position: player.primaryPosition || "P" }]
+                  const nextOrder = templateForm.battingLineup.length + 1;
+                  setTemplateForm({
+                    ...templateForm,
+                    battingLineup: [...templateForm.battingLineup, { playerId: player.id, battingOrder: nextOrder }]
                   });
                 }}
                 style={{ padding: 12, cursor: "pointer", transition: "all 0.2s", border: `1px solid ${THEME.charcoal}` }}
@@ -2774,110 +2831,194 @@ const LineupPlanner = ({ players, onCreateGame }) => {
         </div>
       </Card>
 
-      {/* Defensive Alignments */}
+      {/* Select Alignments to Include */}
       <Card style={{ padding: 16 }}>
-        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Defensive Alignments</h3>
+        <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⚾ Include Alignments</h3>
         <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
-          Save defensive alignments (e.g., "Lucy Pitching") to quickly load during games.
+          Select which defensive alignments to include with this template. You'll be able to load them during games.
         </p>
 
-        {form.alignments.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8, marginBottom: 16 }}>
-            <p style={{ color: THEME.gray, margin: 0 }}>No alignments saved yet.</p>
+        {alignments.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8 }}>
+            <p style={{ color: THEME.gray, margin: 0 }}>No alignments in library yet.</p>
+            <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Create alignments first, then select them here.</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-            {form.alignments.map((alignment, idx) => (
-              <Card key={idx} style={{ padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{alignment.name}</div>
-                  <Button small variant="danger" onClick={() => {
-                    setForm({ ...form, alignments: form.alignments.filter((_, i) => i !== idx) });
-                  }}>Delete</Button>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, fontSize: 11, color: THEME.gray }}>
-                  {alignment.positions.map((pos, i) => {
-                    const player = players.find(p => p.id === pos.playerId);
-                    return (
-                      <div key={i}>
-                        <span style={{ color: THEME.gold, fontWeight: 600 }}>{pos.position}:</span> {player?.name}
+          <div style={{ display: "grid", gap: 8 }}>
+            {alignments.map(alignment => {
+              const isSelected = templateForm.alignmentIds.includes(alignment.id);
+              return (
+                <Card
+                  key={alignment.id}
+                  onClick={() => {
+                    if (isSelected) {
+                      setTemplateForm({
+                        ...templateForm,
+                        alignmentIds: templateForm.alignmentIds.filter(id => id !== alignment.id)
+                      });
+                    } else {
+                      setTemplateForm({
+                        ...templateForm,
+                        alignmentIds: [...templateForm.alignmentIds, alignment.id]
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: 12,
+                    cursor: "pointer",
+                    background: isSelected ? THEME.green : THEME.blackLight,
+                    border: `2px solid ${isSelected ? THEME.green : THEME.charcoal}`,
+                    transition: "all 0.2s"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>
+                        {alignment.name} {alignment.isPrimary && "⭐"}
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            ))}
+                      <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                        {alignment.positions.length} positions filled
+                      </div>
+                    </div>
+                    {isSelected && <div style={{ color: THEME.white, fontSize: 18 }}>✓</div>}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
-
-        <Button onClick={() => {
-          if (form.lineup.length === 0) {
-            alert("Add players to lineup first");
-            return;
-          }
-          const name = prompt("Alignment name (e.g., 'Lucy Pitching'):");
-          if (!name) return;
-          setForm({
-            ...form,
-            alignments: [...form.alignments, {
-              name,
-              positions: form.lineup.map(spot => ({ playerId: spot.playerId, position: spot.position }))
-            }]
-          });
-        }}>+ Save Current Lineup as Alignment</Button>
       </Card>
     </div>;
   }
 
+  // MAIN VIEW: Alignment Library + Game Templates
   return <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 16px 80px 16px" }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-      <div>
-        <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>💡 Lineup Planner</h2>
-        <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>Explore lineup ideas before creating games</p>
-      </div>
-      <Button onClick={() => { setForm(emptyTemplate()); setEditing(null); setShowBuilder(true); }}>+ New Template</Button>
+    <div style={{ marginBottom: 32 }}>
+      <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0 }}>💡 Lineup Planner</h2>
+      <p style={{ color: THEME.gray, fontSize: 13, margin: "4px 0 0 0" }}>Build defensive alignments and game templates</p>
     </div>
 
-    {templates.length === 0 ? (
-      <Card style={{ textAlign: "center", padding: 40 }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>💡</div>
-        <p style={{ color: THEME.gray, margin: 0 }}>No lineup templates yet.</p>
-        <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Create templates to explore different lineup strategies.</p>
-      </Card>
-    ) : (
-      <div style={{ display: "grid", gap: 12 }}>
-        {templates.map(template => (
-          <Card key={template.id} style={{ padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, margin: 0 }}>{template.name}</h3>
-                {template.description && (
-                  <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>{template.description}</p>
-                )}
-                <div style={{ color: THEME.gray, fontSize: 11, marginTop: 8 }}>
-                  {template.lineup.length} players • {template.alignments.length} alignment{template.alignments.length !== 1 ? "s" : ""}
+    {/* ALIGNMENT LIBRARY */}
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>⚾ Defensive Alignments</h3>
+          <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>Position configurations (e.g., "Lucy Pitching", "Rose Pitching")</p>
+        </div>
+        <Button onClick={() => { setAlignmentForm(emptyAlignment()); setEditingAlignment(null); setShowAlignmentBuilder(true); }}>+ New Alignment</Button>
+      </div>
+
+      {alignments.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>⚾</div>
+          <p style={{ color: THEME.gray, margin: 0 }}>No alignments yet.</p>
+          <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Create alignments to quickly load positions during games.</p>
+        </Card>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {alignments.map(alignment => (
+            <Card key={alignment.id} style={{ padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, margin: 0 }}>
+                    {alignment.name} {alignment.isPrimary && <span style={{ color: THEME.gold }}>⭐</span>}
+                  </h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 12, fontSize: 12, color: THEME.gray }}>
+                    {alignment.positions.map((pos, idx) => {
+                      const player = players.find(p => p.id === pos.playerId);
+                      return (
+                        <div key={idx}>
+                          <span style={{ color: THEME.gold, fontWeight: 600 }}>{pos.position}:</span> {player?.name || "Unknown"}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  {!alignment.isPrimary && (
+                    <Button small onClick={() => setPrimary(alignment.id)} style={{ background: THEME.gold, color: THEME.black }}>⭐ Set Primary</Button>
+                  )}
+                  <Button small onClick={() => {
+                    setAlignmentForm(alignment);
+                    setEditingAlignment(alignment.id);
+                    setShowAlignmentBuilder(true);
+                  }}>Edit</Button>
+                  <Button small variant="danger" onClick={() => {
+                    if (confirm(`Delete alignment "${alignment.name}"?`)) {
+                      setAlignments(prev => prev.filter(a => a.id !== alignment.id));
+                    }
+                  }}>✕</Button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 4 }}>
-                <Button small onClick={() => {
-                  if (onCreateGame) {
-                    onCreateGame(template);
-                  } else {
-                    alert("Create game functionality coming soon!");
-                  }
-                }} style={{ background: THEME.green }}>🎮 Create Game</Button>
-                <Button small onClick={() => { setForm(template); setEditing(template.id); setShowBuilder(true); }}>Edit</Button>
-                <Button small variant="danger" onClick={() => {
-                  if (confirm(`Delete template "${template.name}"?`)) {
-                    setTemplates(prev => prev.filter(t => t.id !== template.id));
-                  }
-                }}>✕</Button>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* GAME TEMPLATES */}
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>🥎 Game Templates</h3>
+          <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>Batting lineups + alignments for games</p>
+        </div>
+        <Button onClick={() => { setTemplateForm(emptyTemplate()); setEditingTemplate(null); setShowTemplateBuilder(true); }}>+ New Template</Button>
       </div>
-    )}
+
+      {templates.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🥎</div>
+          <p style={{ color: THEME.gray, margin: 0 }}>No game templates yet.</p>
+          <p style={{ color: THEME.gray, margin: "8px 0 0 0", fontSize: 13 }}>Create templates to quickly set up games.</p>
+        </Card>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {templates.map(template => {
+            const includedAlignments = alignments.filter(a => template.alignmentIds.includes(a.id));
+            return (
+              <Card key={template.id} style={{ padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, margin: 0 }}>{template.name}</h4>
+                    {template.description && (
+                      <p style={{ color: THEME.gray, fontSize: 12, margin: "4px 0 0 0" }}>{template.description}</p>
+                    )}
+                    <div style={{ color: THEME.gray, fontSize: 11, marginTop: 8 }}>
+                      {template.battingLineup.length} batter{template.battingLineup.length !== 1 ? "s" : ""} • {includedAlignments.length} alignment{includedAlignments.length !== 1 ? "s" : ""}
+                    </div>
+                    {includedAlignments.length > 0 && (
+                      <div style={{ marginTop: 8, fontSize: 11, color: THEME.gray }}>
+                        Alignments: {includedAlignments.map(a => a.name + (a.isPrimary ? " ⭐" : "")).join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <Button small onClick={() => {
+                      if (onCreateGame) {
+                        onCreateGame(template);
+                      } else {
+                        alert("Create game functionality coming soon!");
+                      }
+                    }} style={{ background: THEME.green, color: THEME.black }}>🎮 Create Game</Button>
+                    <Button small onClick={() => {
+                      setTemplateForm(template);
+                      setEditingTemplate(template.id);
+                      setShowTemplateBuilder(true);
+                    }}>Edit</Button>
+                    <Button small variant="danger" onClick={() => {
+                      if (confirm(`Delete template "${template.name}"?`)) {
+                        setTemplates(prev => prev.filter(t => t.id !== template.id));
+                      }
+                    }}>✕</Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
   </div>;
 };
 
