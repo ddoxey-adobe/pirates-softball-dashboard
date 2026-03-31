@@ -4966,6 +4966,42 @@ const GameLog = ({ players }) => {
           <Input label="Our Score" type="number" value={form.ourScore} onChange={e => setForm({ ...form, ourScore: e.target.value })} />
           <Input label="Their Score" type="number" value={form.theirScore} onChange={e => setForm({ ...form, theirScore: e.target.value })} />
         </div>
+
+        {/* READ-ONLY Pitch Count Summary */}
+        {Object.keys(form.defensiveStats || {}).some(pid => (form.defensiveStats[pid]?.pitches || 0) > 0) && (
+          <Card style={{ marginTop: 16, padding: 12, background: THEME.blackLight }}>
+            <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>⚾ Pitcher Stats (Read-Only from Scorer)</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {Object.keys(form.defensiveStats || {}).filter(pid => (form.defensiveStats[pid]?.pitches || 0) > 0).map(pid => {
+                const pitcher = getPlayer(pid);
+                const stats = form.defensiveStats[pid];
+                const pitches = stats.pitches || 0;
+                const strikes = inningPitchers ? Object.values(inningPitchers).flat().filter(p => p.playerId === pid).reduce((sum, p) => sum + p.strikes, 0) : 0;
+                const balls = inningPitchers ? Object.values(inningPitchers).flat().filter(p => p.playerId === pid).reduce((sum, p) => sum + p.balls, 0) : 0;
+                const statusColor = pitches >= 60 ? THEME.red : pitches >= 40 ? THEME.gold : THEME.green;
+                const statusLabel = pitches >= 60 ? "RED" : pitches >= 40 ? "YELLOW" : "GREEN";
+
+                return (
+                  <div key={pid} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: THEME.black, borderRadius: 4, border: `2px solid ${statusColor}` }}>
+                    <div>
+                      <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{pitcher?.name}</div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>
+                        {pitches} pitches ({strikes} strikes, {balls} balls)
+                      </div>
+                    </div>
+                    <Badge color={statusColor} bg={`${statusColor}20`} style={{ fontSize: 10 }}>
+                      {statusLabel}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ color: THEME.gray, fontSize: 10, marginTop: 8, textAlign: "center" }}>
+              Track pitches in "Live Scorer" tab • Green: 0-40 | Yellow: 41-60 | Red: 61+
+            </div>
+          </Card>
+        )}
+
         <div style={{ marginTop: 16 }}><SL>Who's Playing?</SL><ToggleChips players={players} selected={form.attendance} onToggle={id => setForm({ ...form, attendance: { ...form.attendance, [id]: !form.attendance[id] } })} /></div>
         <div style={{ marginTop: 16 }}><SL>Batting Order</SL>
           <div style={{ border: `1px solid ${THEME.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
