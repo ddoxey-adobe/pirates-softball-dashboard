@@ -2577,6 +2577,7 @@ const LineupBuilder = ({ players }) => {
   const [subModal, setSubModal] = useState(null); // { playerId, position }
   const [injuryNotes, setInjuryNotes] = useState("");
   const [multiGameInjury, setMultiGameInjury] = useState(false);
+  const [expandedInjuries, setExpandedInjuries] = useState([]); // Track which injury histories are expanded
 
   const [form, setForm] = useState(emptyLineup());
 
@@ -2637,9 +2638,25 @@ const LineupBuilder = ({ players }) => {
       !activelyInjuredPlayerIds.includes(p.id)
     );
 
-    const injuredPlayers = (gameState.injuredPlayers || []).map(injury => {
-      const player = players.find(p => p.id === injury.playerId);
-      return { ...player, ...injury };
+    // Group injuries by player - show latest injury per player with count
+    const injuredPlayersMap = {};
+    (gameState.injuredPlayers || []).forEach(injury => {
+      if (!injuredPlayersMap[injury.playerId]) {
+        injuredPlayersMap[injury.playerId] = [];
+      }
+      injuredPlayersMap[injury.playerId].push(injury);
+    });
+
+    const injuredPlayers = Object.keys(injuredPlayersMap).map(playerId => {
+      const playerInjuries = injuredPlayersMap[playerId];
+      const latestInjury = playerInjuries[playerInjuries.length - 1]; // Last one is latest
+      const player = players.find(p => p.id === playerId);
+      return {
+        ...player,
+        ...latestInjury,
+        injuryCount: playerInjuries.length,
+        allInjuries: playerInjuries
+      };
     });
 
     return <div>
@@ -2781,6 +2798,7 @@ const LineupBuilder = ({ players }) => {
                 {injuredPlayers.map(injury => {
                   const canReturn = !injury.multiGame && !injury.returnedInning;
                   const hasReturned = injury.returnedInning;
+                  const isExpanded = expandedInjuries.includes(injury.playerId);
 
                   return (
                     <div key={injury.playerId} style={{
@@ -2804,7 +2822,21 @@ const LineupBuilder = ({ players }) => {
                           fontSize: 18
                         }}>{hasReturned ? "✓" : "🚑"}</div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{injury.name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{injury.name}</div>
+                            {injury.injuryCount > 1 && (
+                              <div style={{
+                                background: THEME.gold,
+                                color: THEME.black,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: 4
+                              }}>
+                                ⚠️ {injury.injuryCount}x injured today
+                              </div>
+                            )}
+                          </div>
                           <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
                             Injured inning {injury.inning} • Was playing {injury.position}
                           </div>
@@ -2866,6 +2898,73 @@ const LineupBuilder = ({ players }) => {
                               padding: "4px 0"
                             }}>
                               👆 Click to sub back in when cleared
+                            </div>
+                          )}
+
+                          {/* View Full History - only show if multiple injuries */}
+                          {injury.injuryCount > 1 && (
+                            <div style={{ marginTop: 8 }}>
+                              <div
+                                onClick={() => {
+                                  setExpandedInjuries(prev =>
+                                    isExpanded
+                                      ? prev.filter(id => id !== injury.playerId)
+                                      : [...prev, injury.playerId]
+                                  );
+                                }}
+                                style={{
+                                  color: THEME.blue,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4
+                                }}
+                              >
+                                {isExpanded ? "▼" : "▶"} View Full History ({injury.injuryCount} injuries)
+                              </div>
+
+                              {/* Expandable history */}
+                              {isExpanded && (
+                                <div style={{
+                                  marginTop: 8,
+                                  paddingLeft: 12,
+                                  borderLeft: `2px solid ${THEME.gray}`,
+                                  display: "grid",
+                                  gap: 6
+                                }}>
+                                  {injury.allInjuries.map((historyItem, idx) => (
+                                    <div key={idx} style={{
+                                      fontSize: 11,
+                                      color: THEME.gray,
+                                      padding: 6,
+                                      background: THEME.black,
+                                      borderRadius: 4
+                                    }}>
+                                      <div style={{ fontWeight: 600, color: THEME.white }}>
+                                        Injury #{idx + 1} - Inning {historyItem.inning}
+                                      </div>
+                                      <div>Position: {historyItem.position}</div>
+                                      {historyItem.notes && (
+                                        <div style={{ fontStyle: "italic", marginTop: 2 }}>
+                                          "{historyItem.notes}"
+                                        </div>
+                                      )}
+                                      {historyItem.multiGame && (
+                                        <div style={{ color: THEME.red, marginTop: 2 }}>
+                                          🚫 Marked as multi-game injury
+                                        </div>
+                                      )}
+                                      {historyItem.returnedInning && (
+                                        <div style={{ color: THEME.green, marginTop: 2 }}>
+                                          ✅ Returned in inning {historyItem.returnedInning}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
