@@ -2658,9 +2658,23 @@ const LineupBuilder = ({ players }) => {
                         <div style={{ color: THEME.gray, fontSize: 10 }}>{inningsPlayed} innings</div>
                       </div>
                     </div>
-                    <Button small style={{ width: "100%", marginTop: 8 }} onClick={() => {
-                      setSubModal({ playerId: spot.playerId, position: spot.position });
-                    }}>Substitute</Button>
+                    <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                      <Button small style={{ flex: 1 }} onClick={() => {
+                        setSubModal({ playerId: spot.playerId, position: spot.position });
+                      }}>Substitute</Button>
+                      <button onClick={() => {
+                        setSubModal({ playerId: spot.playerId, position: spot.position, isInjury: true });
+                      }} style={{
+                        background: THEME.red,
+                        border: "none",
+                        color: THEME.white,
+                        borderRadius: 6,
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>🚑</button>
+                    </div>
                   </div>
                 );
               })}
@@ -2920,6 +2934,14 @@ const LineupBuilder = ({ players }) => {
               ...gameState.inningData,
               [gameState.currentInning]: updatedPositions
             },
+            injuredPlayers: subModal.isInjury
+              ? [...(gameState.injuredPlayers || []), {
+                  playerId: subModal.playerId,
+                  inning: gameState.currentInning,
+                  position: subModal.position,
+                  timestamp: new Date().toISOString()
+                }]
+              : (gameState.injuredPlayers || []),
             substitutionHistory: [
               ...gameState.substitutionHistory,
               {
@@ -2927,6 +2949,7 @@ const LineupBuilder = ({ players }) => {
                 out: subModal.playerId,
                 in: incomingPlayerId,
                 position: subModal.position,
+                isInjury: subModal.isInjury || false,
                 timestamp: new Date().toISOString()
               }
             ]
@@ -2954,15 +2977,15 @@ const LineupBuilder = ({ players }) => {
               background: THEME.blackLight,
               borderRadius: 12,
               padding: 24,
-              border: `2px solid ${THEME.gold}`,
+              border: `2px solid ${subModal.isInjury ? THEME.red : THEME.gold}`,
               maxWidth: 600,
               width: "100%",
               maxHeight: "80vh",
               overflowY: "auto"
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <h3 style={{ margin: 0, color: THEME.gold, fontFamily: "'Oswald',sans-serif", fontSize: 20 }}>
-                  🔄 Substitute {subModal.position}
+                <h3 style={{ margin: 0, color: subModal.isInjury ? THEME.red : THEME.gold, fontFamily: "'Oswald',sans-serif", fontSize: 20 }}>
+                  {subModal.isInjury ? "🚑 INJURY SUBSTITUTION" : `🔄 Substitute ${subModal.position}`}
                 </h3>
                 <button onClick={() => setSubModal(null)} style={{
                   background: "none",
@@ -2973,9 +2996,19 @@ const LineupBuilder = ({ players }) => {
                 }}>✕</button>
               </div>
 
+              {subModal.isInjury && (
+                <Card style={{ padding: 12, marginBottom: 16, background: "rgba(231,76,60,0.1)", border: `1px solid ${THEME.red}` }}>
+                  <div style={{ color: THEME.red, fontSize: 12, fontWeight: 700 }}>
+                    ⚠️ EMERGENCY: Player injured and needs immediate replacement
+                  </div>
+                </Card>
+              )}
+
               {/* Outgoing Player */}
               <Card style={{ padding: 16, marginBottom: 16, background: THEME.black }}>
-                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 8 }}>Coming Out</div>
+                <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase", marginBottom: 8 }}>
+                  {subModal.isInjury ? "Injured Player" : "Coming Out"}
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
                     minWidth: 40,
@@ -2989,9 +3022,14 @@ const LineupBuilder = ({ players }) => {
                     fontWeight: 700,
                     fontSize: 16
                   }}>{subModal.position}</div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ color: THEME.white, fontSize: 16, fontWeight: 700 }}>{outgoingPlayer?.name}</div>
                     <div style={{ color: THEME.gray, fontSize: 12 }}>{outgoingInnings} innings played</div>
+                    {subModal.isInjury && (
+                      <div style={{ color: THEME.red, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                        🚑 Marked as injured for this game
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -3136,7 +3174,8 @@ const LineupBuilder = ({ players }) => {
                       },
                       playingTime: lineup.lineup.reduce((acc, spot) => ({ ...acc, [spot.playerId]: 1 }), {}),
                       benchTime: {},
-                      substitutionHistory: []
+                      substitutionHistory: [],
+                      injuredPlayers: []
                     };
                     setActiveGame({ ...lineup, gameState: initialGameState });
                   }} style={{ background: THEME.green }}>
