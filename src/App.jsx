@@ -5540,6 +5540,7 @@ const Reports = ({ players }) => {
   const [practices, setPractices] = useState([]);
   const [games, setGames] = useState([]);
   const [dateRange, setDateRange] = useState("all"); // "all", "30", "60", "90"
+  const [attendanceFilter, setAttendanceFilter] = useState("all"); // "all", "at-risk"
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -6356,62 +6357,117 @@ const Reports = ({ players }) => {
           </CollapsibleSection>
         )}
 
-        {/* Attendance Summary */}
+        {/* Attendance Summary - Enhanced */}
         <CollapsibleSection
           id="attendance"
-          title="Attendance Summary"
+          title="Attendance Insights"
           icon="📅"
           badge={`${players.length} players`}
           isCollapsed={collapsedSections["attendance"]}
           onToggle={toggleSection}
         >
           <Card style={{ padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button small variant={attendanceFilter === "all" ? "primary" : "ghost"} onClick={() => setAttendanceFilter("all")}>All</Button>
+                <Button small variant={attendanceFilter === "at-risk" ? "primary" : "ghost"} onClick={() => setAttendanceFilter("at-risk")}>At Risk Only</Button>
+              </div>
               <Button small onClick={() => {
                 const csvData = [
-                  ['Player', 'Practices Attended', 'Total Practices', 'Attendance %'],
+                  ['Player', 'Practices Attended', 'Total Practices', 'Attendance %', 'First Half %', 'Second Half %', 'Trend'],
                   ...players.map(player => {
                     const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
                     const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
-                    return [player.name, attended, totalPractices, percentage + '%'];
+
+                    // Calculate first half vs second half
+                    const midpoint = Math.floor(completedPractices.length / 2);
+                    const firstHalf = completedPractices.slice(0, midpoint);
+                    const secondHalf = completedPractices.slice(midpoint);
+                    const firstHalfAttended = firstHalf.filter(p => p.attendance?.[player.id]).length;
+                    const secondHalfAttended = secondHalf.filter(p => p.attendance?.[player.id]).length;
+                    const firstHalfPct = firstHalf.length > 0 ? ((firstHalfAttended / firstHalf.length) * 100).toFixed(0) : 0;
+                    const secondHalfPct = secondHalf.length > 0 ? ((secondHalfAttended / secondHalf.length) * 100).toFixed(0) : 0;
+                    const trend = secondHalfPct > firstHalfPct ? "↗ Improving" : secondHalfPct < firstHalfPct ? "↘ Declining" : "→ Stable";
+
+                    return [player.name, attended, totalPractices, percentage + '%', firstHalfPct + '%', secondHalfPct + '%', trend];
                   })
                 ];
-                exportToCSV(csvData, 'attendance_summary.csv');
+                exportToCSV(csvData, 'attendance_insights.csv');
               }}>📥 Export CSV</Button>
             </div>
             <div style={{ display: "grid", gap: 8 }}>
-              {players.map(player => {
-                const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
-                const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100).toFixed(0) : 0;
+              {players
+                .map(player => {
+                  const attended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+                  const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100) : 0;
+                  const isAtRisk = percentage < 70;
 
-                return (
-                  <div key={player.id} style={{
+                  // Calculate first half vs second half
+                  const midpoint = Math.floor(completedPractices.length / 2);
+                  const firstHalf = completedPractices.slice(0, midpoint);
+                  const secondHalf = completedPractices.slice(midpoint);
+                  const firstHalfAttended = firstHalf.filter(p => p.attendance?.[player.id]).length;
+                  const secondHalfAttended = secondHalf.filter(p => p.attendance?.[player.id]).length;
+                  const firstHalfPct = firstHalf.length > 0 ? ((firstHalfAttended / firstHalf.length) * 100) : 0;
+                  const secondHalfPct = secondHalf.length > 0 ? ((secondHalfAttended / secondHalf.length) * 100) : 0;
+
+                  let trendIcon = "→";
+                  let trendColor = THEME.gray;
+                  if (completedPractices.length >= 4) {
+                    if (secondHalfPct > firstHalfPct + 5) {
+                      trendIcon = "↗";
+                      trendColor = THEME.green;
+                    } else if (secondHalfPct < firstHalfPct - 5) {
+                      trendIcon = "↘";
+                      trendColor = THEME.red;
+                    }
+                  }
+
+                  return { player, attended, percentage, isAtRisk, trendIcon, trendColor, firstHalfPct, secondHalfPct };
+                })
+                .filter(data => attendanceFilter === "all" || (attendanceFilter === "at-risk" && data.isAtRisk))
+                .map(data => (
+                  <div key={data.player.id} style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "8px 12px",
-                    background: "transparent",
+                    background: data.isAtRisk ? "rgba(231, 76, 60, 0.05)" : "transparent",
                     borderRadius: 4,
-                    border: `1px solid ${THEME.charcoal}`
+                    border: `1px solid ${data.isAtRisk ? THEME.red : THEME.charcoal}`
                   }}>
-                    <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{player.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{data.player.name}</span>
+                      {data.isAtRisk && <Badge color={THEME.red} bg="rgba(231, 76, 60, 0.15)" style={{ fontSize: 10 }}>AT RISK</Badge>}
+                      {completedPractices.length >= 4 && (
+                        <span style={{ color: data.trendColor, fontSize: 16 }}>{data.trendIcon}</span>
+                      )}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 120, height: 8, background: THEME.charcoal, borderRadius: 4, overflow: "hidden" }}>
                         <div style={{
-                          width: `${percentage}%`,
+                          width: `${data.percentage}%`,
                           height: "100%",
-                          background: `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.goldLight} 100%)`,
+                          background: data.isAtRisk ? THEME.red : `linear-gradient(90deg, ${THEME.gold} 0%, ${THEME.goldLight} 100%)`,
                           transition: "width 0.3s ease"
                         }} />
                       </div>
                       <span style={{ color: THEME.gray, fontSize: 12, minWidth: 70, textAlign: "right" }}>
-                        {attended}/{totalPractices} ({percentage}%)
+                        {data.attended}/{totalPractices} ({data.percentage.toFixed(0)}%)
                       </span>
                     </div>
                   </div>
-                );
-              })}
+                ))}
             </div>
+            {attendanceFilter === "at-risk" && players.filter(p => {
+              const attended = completedPractices.filter(pr => pr.attendance?.[p.id]).length;
+              const percentage = totalPractices > 0 ? ((attended / totalPractices) * 100) : 0;
+              return percentage < 70;
+            }).length === 0 && (
+              <div style={{ textAlign: "center", padding: 20, color: THEME.gray, fontSize: 13 }}>
+                No players at risk (all above 70% attendance) ✓
+              </div>
+            )}
           </Card>
         </CollapsibleSection>
 
