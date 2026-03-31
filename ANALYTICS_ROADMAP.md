@@ -1,7 +1,7 @@
 # Pirates Softball Dashboard - Analytics Features Roadmap
 
-**Status:** In Progress - Phase 1
-**Last Updated:** 2026-03-30
+**Status:** In Progress - Phase 2
+**Last Updated:** 2026-03-31
 **Estimated Total Time:** ~62 hours
 
 ---
@@ -12,48 +12,51 @@ Implementing 12 new analytics and UX features to transform the dashboard into a 
 
 ---
 
-## Current Status: Phase 1 - Foundation (8 hours)
+## Current Status: Phase 2 - Visualization Core (16 hours)
 
-### ✅ Completed
-- None yet
+### ✅ Completed (Phase 1 & 2)
+- Feature #5: Attendance Insights ✅
+- Feature #8: Quick Practice Notes ✅
+- Feature #9: Drill Performance by Date ✅
+- Feature #4: Visual Trend Charts ✅
+- Feature #7: Season Goals ✅
 
 ### 🔄 In Progress
-- Feature #6: Practice Templates (Task #55)
+- None
 
 ### ⏳ Next Up
-- Feature #5: Attendance Insights (Task #52)
-- Feature #8: Quick Practice Notes (Task #50)
-- Feature #9: Drill Performance by Date (Task #54)
+- Feature #6: Practice Templates (Task #55) - MOVED TO NEXT
+- Feature #1: Practice Timeline View (Task #53)
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Foundation (4 features, ~8 hours) 🔄 IN PROGRESS
+### Phase 1: Foundation (3 features, ~6 hours) ✅ COMPLETE
 **Goal:** Add immediate-value features with no dependencies
 
 | # | Feature | Task | Time | Complexity | Status |
 |---|---------|------|------|------------|--------|
-| 6 | Practice Templates | #55 | 2h | Simple | 🔄 In Progress |
-| 5 | Attendance Insights | #52 | 2h | Simple | ⏳ Pending |
-| 8 | Quick Practice Notes | #50 | 2h | Simple | ⏳ Pending |
-| 9 | Drill Performance by Date | #54 | 2h | Simple | ⏳ Pending |
+| 5 | Attendance Insights | #52 | 2h | Simple | ✅ Complete |
+| 8 | Quick Practice Notes | #50 | 2h | Simple | ✅ Complete |
+| 9 | Drill Performance by Date | #54 | 2h | Simple | ✅ Complete |
+
+**Note:** Feature #6 (Practice Templates) moved to later - requires more design work.
 
 **Deliverables:**
-- Save practice plans as reusable templates
-- Per-player attendance percentages with trend indicators
-- Quick "highlight" notes during active practices
-- Drill usage analytics showing frequency and last run date
+- ✅ Per-player attendance percentages with trend indicators (first half vs second half)
+- ✅ Quick "highlight" notes during active practices with player tagging
+- ✅ Drill usage analytics showing frequency and last run date with stale warnings
 
 ---
 
-### Phase 2: Visualization Core (3 features, ~16 hours)
+### Phase 2: Visualization Core (2 features, ~12 hours) 🔄 IN PROGRESS
 **Goal:** Build charting system that other features depend on
 
 | # | Feature | Task | Time | Complexity | Status |
 |---|---------|------|------|------------|--------|
-| 4 | Visual Trend Charts | #48 | 8h | Complex | ⏳ Pending |
-| 7 | Season Goals | #44 | 4h | Medium | ⏳ Pending |
+| 4 | Visual Trend Charts | #48 | 8h | Complex | ✅ Complete |
+| 7 | Season Goals | #44 | 4h | Medium | ✅ Complete |
 | 1 | Practice Timeline View | #53 | 4h | Medium | ⏳ Pending |
 
 **Dependencies:**
@@ -458,5 +461,5 @@ I'll:
 
 ---
 
-**Last worked on:** 2026-03-30 - Feature #6 (Practice Templates) in progress
-**Next session:** Continue with Feature #6, then #5, #8, #9 to complete Phase 1
+**Last worked on:** 2026-03-31 - Feature #7 (Season Goals) complete ✅
+**Next session:** Continue with Feature #1 (Practice Timeline View) to complete Phase 2, then Feature #6 (Practice Templates)
