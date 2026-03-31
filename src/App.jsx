@@ -748,6 +748,43 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
+// ─── PITCH COUNT UTILITIES ──────────────────────────────────────
+// Calculate weekly pitch counts for arm safety tracking
+const getWeeklyPitchCounts = (practices, playerId) => {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const recentPractices = practices.filter(p => {
+    if (!p.date || p.status !== "completed") return false;
+    const practiceDate = new Date(p.date + "T12:00:00");
+    return practiceDate >= sevenDaysAgo;
+  });
+
+  let totalPitches = 0;
+  let lastPracticePitched = null;
+  let lastPitchCount = 0;
+
+  recentPractices.forEach(practice => {
+    // Check p3 (Pitch Count Simulated Innings) tracking
+    if (practice.drillTracking?.p3?.[playerId]) {
+      const count = parseInt(practice.drillTracking.p3[playerId]) || 0;
+      totalPitches += count;
+      if (!lastPracticePitched || new Date(practice.date) > new Date(lastPracticePitched)) {
+        lastPracticePitched = practice.date;
+        lastPitchCount = count;
+      }
+    }
+  });
+
+  return {
+    weeklyTotal: totalPitches,
+    lastPitched: lastPracticePitched,
+    lastCount: lastPitchCount,
+    approaching Limit: totalPitches >= 80, // Warning at 80 pitches (100 is max)
+    overLimit: totalPitches > 100
+  };
+};
+
 // ─── UNIFIED PRACTICE LOG ───────────────────────────────────────
 const PracticeLog = ({ players, coaches }) => {
   const [list, setList] = useState([]);
@@ -1822,52 +1859,81 @@ const PracticeLog = ({ players, coaches }) => {
                       );
                     }
 
-                    // p3: Pitch Count - Simple counter per pitcher
+                    // p3: Pitch Count - Simple counter per pitcher with weekly totals
                     if (drill.id === "p3") {
                       return (
                         <div key={drill.id} style={{ background: THEME.black, borderRadius: 6, padding: 12, border: `1px solid ${THEME.charcoal}` }}>
                           <div style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>⚾ {drill.name}</div>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Track total pitch count per pitcher</div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 12 }}>Track total pitch count per pitcher (weekly limit: 100 pitches)</div>
 
-                          {filteredPlayers.map(p => {
+                          {filteredPlayers.filter(p => p.isPitcher).map(p => {
                             const count = tracking[p.id] || 0;
+                            const weeklyData = getWeeklyPitchCounts(list, p.id);
+                            const projectedTotal = weeklyData.weeklyTotal + count;
+                            const showWarning = projectedTotal >= 80;
+                            const overLimit = projectedTotal > 100;
+
                             return (
-                              <div key={p.id} style={{ marginBottom: 8, padding: 10, background: THEME.blackLight, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{p.name.split(" ")[0]}</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <button
-                                    onClick={() => {
-                                      setForm({
-                                        ...form,
-                                        drillTracking: {
-                                          ...(form.drillTracking || {}),
-                                          [drill.id]: { ...tracking, [p.id]: Math.max(0, count - 1) }
-                                        }
-                                      });
-                                    }}
-                                    style={{ padding: "4px 10px", background: THEME.charcoal, border: "none", borderRadius: 4, color: THEME.white, cursor: "pointer", fontSize: 16 }}
-                                  >
-                                    −
-                                  </button>
-                                  <span style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, minWidth: 40, textAlign: "center" }}>{count}</span>
-                                  <button
-                                    onClick={() => {
-                                      setForm({
-                                        ...form,
-                                        drillTracking: {
-                                          ...(form.drillTracking || {}),
-                                          [drill.id]: { ...tracking, [p.id]: count + 1 }
-                                        }
-                                      });
-                                    }}
-                                    style={{ padding: "4px 10px", background: THEME.gold, border: "none", borderRadius: 4, color: THEME.black, cursor: "pointer", fontSize: 16, fontWeight: 700 }}
-                                  >
-                                    +
-                                  </button>
+                              <div key={p.id} style={{ marginBottom: 8 }}>
+                                <div style={{ marginBottom: 4, padding: 10, background: THEME.blackLight, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center", border: showWarning ? `2px solid ${overLimit ? THEME.red : THEME.gold}` : "none" }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{p.name.split(" ")[0]}</div>
+                                    {weeklyData.lastPitched && (
+                                      <div style={{ color: THEME.gray, fontSize: 10, marginTop: 2 }}>
+                                        Last: {new Date(weeklyData.lastPitched).toLocaleDateString()} ({weeklyData.lastCount} pitches)
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <button
+                                      onClick={() => {
+                                        setForm({
+                                          ...form,
+                                          drillTracking: {
+                                            ...(form.drillTracking || {}),
+                                            [drill.id]: { ...tracking, [p.id]: Math.max(0, count - 1) }
+                                          }
+                                        });
+                                      }}
+                                      style={{ padding: "4px 10px", background: THEME.charcoal, border: "none", borderRadius: 4, color: THEME.white, cursor: "pointer", fontSize: 16 }}
+                                    >
+                                      −
+                                    </button>
+                                    <span style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, minWidth: 40, textAlign: "center" }}>{count}</span>
+                                    <button
+                                      onClick={() => {
+                                        setForm({
+                                          ...form,
+                                          drillTracking: {
+                                            ...(form.drillTracking || {}),
+                                            [drill.id]: { ...tracking, [p.id]: count + 1 }
+                                          }
+                                        });
+                                      }}
+                                      style={{ padding: "4px 10px", background: THEME.gold, border: "none", borderRadius: 4, color: THEME.black, cursor: "pointer", fontSize: 16, fontWeight: 700 }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
                                 </div>
+                                {showWarning && (
+                                  <div style={{ padding: "6px 10px", background: overLimit ? "rgba(231, 76, 60, 0.15)" : "rgba(253, 181, 21, 0.15)", borderRadius: 4, fontSize: 11 }}>
+                                    <span style={{ color: overLimit ? THEME.red : THEME.gold, fontWeight: 700 }}>
+                                      {overLimit ? "⚠️ OVER LIMIT" : "⚠️ WARNING"}
+                                    </span>
+                                    <span style={{ color: THEME.gray, marginLeft: 8 }}>
+                                      Weekly total: {weeklyData.weeklyTotal} + {count} today = {projectedTotal} pitches
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
+                          {filteredPlayers.filter(p => p.isPitcher).length === 0 && (
+                            <div style={{ textAlign: "center", padding: 20, color: THEME.gray, fontSize: 12 }}>
+                              No pitchers marked in roster. Mark players as pitchers in Roster tab.
+                            </div>
+                          )}
                         </div>
                       );
                     }
@@ -5328,7 +5394,7 @@ const Reports = ({ players }) => {
 
   // Collapse/Expand functions (defined after trackedDrills)
   const collapseAll = () => {
-    const allSections = ["stats", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
+    const allSections = ["stats", "pitchers", "attendance", "injuries", "playing-time", "games", ...trackedDrills.map(d => d.id)];
     const collapsed = {};
     allSections.forEach(id => collapsed[id] = true);
     setCollapsedSections(collapsed);
@@ -5625,6 +5691,61 @@ const Reports = ({ players }) => {
             </Card>
           </div>
         </CollapsibleSection>
+
+        {/* Pitcher Stats - Arm Safety Tracking */}
+        {players.filter(p => p.isPitcher).length > 0 && (
+          <CollapsibleSection
+            id="pitchers"
+            title="Pitcher Arm Safety"
+            icon="⚾"
+            badge={`${players.filter(p => p.isPitcher).length} pitchers`}
+            isCollapsed={collapsedSections["pitchers"]}
+            onToggle={toggleSection}
+          >
+            <Card style={{ padding: 16 }}>
+              <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
+                Weekly pitch count tracking for arm safety. Recommended max: 100 pitches per week.
+              </div>
+              <div style={{ display: "grid", gap: 12 }}>
+                {players.filter(p => p.isPitcher).map(pitcher => {
+                  const weeklyData = getWeeklyPitchCounts(completedPractices, pitcher.id);
+                  const statusColor = weeklyData.overLimit ? THEME.red : weeklyData.approachingLimit ? THEME.gold : THEME.green;
+                  const statusLabel = weeklyData.overLimit ? "OVER LIMIT" : weeklyData.approachingLimit ? "WARNING" : "OK";
+
+                  return (
+                    <Card key={pitcher.id} style={{ padding: 12, background: THEME.blackLight, border: `2px solid ${statusColor}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{pitcher.name}</div>
+                          {weeklyData.lastPitched ? (
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                              Last pitched: {new Date(weeklyData.lastPitched).toLocaleDateString()} ({weeklyData.lastCount} pitches)
+                            </div>
+                          ) : (
+                            <div style={{ color: THEME.gray, fontSize: 11, marginTop: 2 }}>
+                              No pitching data in last 7 days
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ color: statusColor, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>
+                            {weeklyData.weeklyTotal}
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase" }}>
+                            pitches/week
+                          </div>
+                          <Badge color={statusColor} bg={`${statusColor}20`} style={{ marginTop: 4, fontSize: 10 }}>
+                            {statusLabel}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </Card>
+          </CollapsibleSection>
+        )}
 
         {/* Drill Leaderboards - Each drill is collapsible */}
 
