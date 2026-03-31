@@ -2593,8 +2593,36 @@ const LineupPlanner = ({ players, onCreateGame }) => {
       <Card style={{ padding: 16, marginBottom: 16 }}>
         <h3 style={{ color: THEME.white, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Build Lineup</h3>
         <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 16 }}>
-          Set batting order and starting positions. Drag to reorder batting lineup.
+          Set batting order and starting positions. Use arrows to reorder batting lineup.
         </p>
+
+        {/* Visual Field Coverage */}
+        {form.lineup.length > 0 && (
+          <div style={{ marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8 }}>
+            <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 600, marginBottom: 12 }}>⚾ Field Coverage</h4>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"].map(pos => {
+                const spot = form.lineup.find(s => s.position === pos);
+                const player = spot ? players.find(p => p.id === spot.playerId) : null;
+                return (
+                  <div key={pos} style={{
+                    padding: "8px 12px",
+                    background: player ? THEME.green : THEME.charcoal,
+                    border: `2px solid ${player ? THEME.green : THEME.gray}`,
+                    borderRadius: 6,
+                    textAlign: "center",
+                    transition: "all 0.2s"
+                  }}>
+                    <div style={{ color: THEME.white, fontSize: 12, fontWeight: 700 }}>{pos}</div>
+                    <div style={{ color: player ? THEME.white : THEME.gray, fontSize: 10, marginTop: 2 }}>
+                      {player ? player.name : "Empty"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {form.lineup.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, background: THEME.blackLight, borderRadius: 8 }}>
@@ -2605,11 +2633,75 @@ const LineupPlanner = ({ players, onCreateGame }) => {
           <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
             {form.lineup
               .sort((a, b) => a.battingOrder - b.battingOrder)
-              .map(spot => {
+              .map((spot, idx) => {
                 const player = players.find(p => p.id === spot.playerId);
+                const filledPositions = form.lineup.filter(s => s.playerId !== spot.playerId).map(s => s.position);
+                const isFirst = idx === 0;
+                const isLast = idx === form.lineup.length - 1;
+
                 return (
                   <Card key={spot.playerId} style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <button
+                          disabled={isFirst}
+                          onClick={() => {
+                            const newLineup = [...form.lineup];
+                            const currentIdx = newLineup.findIndex(s => s.playerId === spot.playerId);
+                            if (currentIdx > 0) {
+                              // Swap batting orders
+                              const temp = newLineup[currentIdx - 1].battingOrder;
+                              newLineup[currentIdx - 1].battingOrder = newLineup[currentIdx].battingOrder;
+                              newLineup[currentIdx].battingOrder = temp;
+                              setForm({ ...form, lineup: newLineup });
+                            }
+                          }}
+                          style={{
+                            background: isFirst ? THEME.charcoal : THEME.gold,
+                            border: "none",
+                            color: isFirst ? THEME.gray : THEME.black,
+                            width: 24,
+                            height: 20,
+                            borderRadius: 4,
+                            cursor: isFirst ? "not-allowed" : "pointer",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: isFirst ? 0.5 : 1
+                          }}
+                        >▲</button>
+                        <button
+                          disabled={isLast}
+                          onClick={() => {
+                            const newLineup = [...form.lineup];
+                            const currentIdx = newLineup.findIndex(s => s.playerId === spot.playerId);
+                            if (currentIdx < newLineup.length - 1) {
+                              // Swap batting orders
+                              const temp = newLineup[currentIdx + 1].battingOrder;
+                              newLineup[currentIdx + 1].battingOrder = newLineup[currentIdx].battingOrder;
+                              newLineup[currentIdx].battingOrder = temp;
+                              setForm({ ...form, lineup: newLineup });
+                            }
+                          }}
+                          style={{
+                            background: isLast ? THEME.charcoal : THEME.gold,
+                            border: "none",
+                            color: isLast ? THEME.gray : THEME.black,
+                            width: 24,
+                            height: 20,
+                            borderRadius: 4,
+                            cursor: isLast ? "not-allowed" : "pointer",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: isLast ? 0.5 : 1
+                          }}
+                        >▼</button>
+                      </div>
                       <div style={{ minWidth: 32, height: 32, background: THEME.gold, color: THEME.black, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, fontSize: 16, fontWeight: 700 }}>
                         {spot.battingOrder}
                       </div>
@@ -2629,14 +2721,27 @@ const LineupPlanner = ({ players, onCreateGame }) => {
                         }}
                         style={{ padding: "4px 8px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 12 }}
                       >
-                        {POSITIONS.filter(p => p !== "Bench").map(pos => (
-                          <option key={pos} value={pos}>{pos}</option>
-                        ))}
+                        {POSITIONS.filter(p => p !== "Bench").map(pos => {
+                          const isFilled = filledPositions.includes(pos);
+                          return (
+                            <option
+                              key={pos}
+                              value={pos}
+                              disabled={isFilled}
+                              style={{
+                                color: isFilled ? THEME.gray : THEME.white,
+                                background: isFilled ? THEME.charcoal : THEME.black
+                              }}
+                            >
+                              {pos}{isFilled ? " (taken)" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       <Button small variant="danger" onClick={() => {
                         setForm({
                           ...form,
-                          lineup: form.lineup.filter(s => s.playerId !== spot.playerId)
+                          lineup: form.lineup.filter(s => s.playerId !== spot.playerId).map((s, i) => ({ ...s, battingOrder: i + 1 }))
                         });
                       }}>✕</Button>
                     </div>
