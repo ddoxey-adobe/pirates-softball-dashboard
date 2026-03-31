@@ -780,7 +780,7 @@ const getWeeklyPitchCounts = (practices, playerId) => {
     weeklyTotal: totalPitches,
     lastPitched: lastPracticePitched,
     lastCount: lastPitchCount,
-    approaching Limit: totalPitches >= 80, // Warning at 80 pitches (100 is max)
+    approachingLimit: totalPitches >= 80, // Warning at 80 pitches (100 is max)
     overLimit: totalPitches > 100
   };
 };
