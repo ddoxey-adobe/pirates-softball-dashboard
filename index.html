@@ -5772,6 +5772,16 @@ const Reports = ({ players }) => {
   const [showPlayerProfile, setShowPlayerProfile] = useState(null); // player object
   const [profileTab, setProfileTab] = useState("overview"); // "overview", "practice", "game", "goals"
   const [compareToTeam, setCompareToTeam] = useState(false);
+  const [showExportReport, setShowExportReport] = useState(false);
+  const [exportConfig, setExportConfig] = useState({
+    teamSummary: true,
+    practiceTimeline: true,
+    drillLeaderboards: true,
+    playerProfiles: true,
+    gameStats: true,
+    goals: true,
+    injuries: true
+  });
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const saved = localStorage.getItem("pirates-reports-collapsed");
     return saved ? JSON.parse(saved) : {};
@@ -6273,11 +6283,18 @@ const Reports = ({ players }) => {
           <Button small onClick={expandAll}>⬇️ Expand All</Button>
           <Button small onClick={collapseAll}>⬆️ Collapse All</Button>
         </div>
-        {players.length >= 2 && (
-          <Button onClick={() => { setComparePlayerIds([]); setShowCompareModal(true); }}>
-            🔍 Compare Players
-          </Button>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {completedPractices.length > 0 && (
+            <Button onClick={() => setShowExportReport(true)}>
+              📄 Export Season Report
+            </Button>
+          )}
+          {players.length >= 2 && (
+            <Button onClick={() => { setComparePlayerIds([]); setShowCompareModal(true); }}>
+              🔍 Compare Players
+            </Button>
+          )}
+        </div>
       </div>
     )}
 
@@ -8594,6 +8611,257 @@ const Reports = ({ players }) => {
             </Modal>
           );
         })()}
+
+        {/* Export Season Report Modal */}
+        {showExportReport && (
+          <Modal open={true} title="Export Season Report" onClose={() => setShowExportReport(false)} wide={true}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ color: THEME.gray, fontSize: 13, marginBottom: 16 }}>
+                Generate a comprehensive PDF report with all season data. Select which sections to include:
+              </p>
+
+              {/* Section checkboxes */}
+              <div style={{ display: "grid", gap: 12 }}>
+                {[
+                  { key: "teamSummary", label: "Team Summary", icon: "📊", desc: "Season overview, record, key stats" },
+                  { key: "practiceTimeline", label: "Practice Timeline", icon: "📅", desc: "Chronological practice history with PRs" },
+                  { key: "drillLeaderboards", label: "Drill Leaderboards", icon: "🏆", desc: "Top performers in each drill category" },
+                  { key: "playerProfiles", label: "Player Profiles", icon: "👤", desc: "Individual stats for all players" },
+                  { key: "gameStats", label: "Game Statistics", icon: "⚾", desc: "Batting, pitching, fielding stats" },
+                  { key: "goals", label: "Season Goals", icon: "🎯", desc: "Team and player goals progress" },
+                  { key: "injuries", label: "Injury Report", icon: "🚑", desc: "Injury metrics and history" }
+                ].map(section => (
+                  <label
+                    key={section.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: 12,
+                      background: exportConfig[section.key] ? `${THEME.gold}10` : THEME.blackLight,
+                      border: `1px solid ${exportConfig[section.key] ? THEME.gold : THEME.charcoal}`,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportConfig[section.key]}
+                      onChange={e => setExportConfig({ ...exportConfig, [section.key]: e.target.checked })}
+                      style={{ width: 18, height: 18, cursor: "pointer" }}
+                    />
+                    <div style={{ fontSize: 20 }}>{section.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>{section.label}</div>
+                      <div style={{ color: THEME.gray, fontSize: 11 }}>{section.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <Button variant="ghost" onClick={() => setShowExportReport(false)}>Cancel</Button>
+              <Button onClick={() => {
+                // Generate and print report
+                const reportWindow = window.open("", "_blank");
+                if (!reportWindow) {
+                  alert("Please allow popups to generate the report.");
+                  return;
+                }
+
+                // Build report HTML
+                let reportHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pirates Softball - 2026 Season Report</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 20px; }
+      .page-break { page-break-before: always; }
+    }
+    body {
+      font-family: 'Arial', sans-serif;
+      color: #1B1B1B;
+      background: white;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1 { color: #FDB515; font-size: 32px; margin: 0 0 8px 0; text-transform: uppercase; }
+    h2 { color: #FDB515; font-size: 24px; margin: 30px 0 12px 0; border-bottom: 2px solid #FDB515; padding-bottom: 8px; }
+    h3 { color: #1B1B1B; font-size: 18px; margin: 20px 0 8px 0; }
+    .header { text-align: center; margin-bottom: 40px; border-bottom: 3px solid #FDB515; padding-bottom: 20px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+    .stat-card { padding: 12px; background: #F5F0E6; border-radius: 6px; text-align: center; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #FDB515; }
+    .stat-label { font-size: 12px; color: #8E8E8E; text-transform: uppercase; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th { background: #FDB515; color: #1B1B1B; padding: 8px; text-align: left; font-weight: bold; }
+    td { padding: 8px; border-bottom: 1px solid #E0E0E0; }
+    tr:nth-child(even) { background: #F9F9F9; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #FDB515; text-align: center; color: #8E8E8E; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏴‍☠️ Pirates Softball</h1>
+    <div style="font-size: 18px; color: #8E8E8E;">2026 Season Report</div>
+    <div style="font-size: 14px; color: #8E8E8E; margin-top: 8px;">Generated ${new Date().toLocaleDateString()}</div>
+  </div>
+`;
+
+                // Team Summary
+                if (exportConfig.teamSummary) {
+                  const gameWins = filteredGames.filter(g => g.result === "W").length;
+                  const gameLosses = filteredGames.filter(g => g.result === "L").length;
+                  const winPct = filteredGames.length > 0 ? ((gameWins / filteredGames.length) * 100).toFixed(0) : 0;
+
+                  reportHTML += `
+  <h2>Team Summary</h2>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${players.length}</div><div class="stat-label">Players</div></div>
+    <div class="stat-card"><div class="stat-value">${completedPractices.length}</div><div class="stat-label">Practices</div></div>
+    <div class="stat-card"><div class="stat-value">${filteredGames.length}</div><div class="stat-label">Games</div></div>
+    <div class="stat-card"><div class="stat-value">${gameWins}-${gameLosses}</div><div class="stat-label">Record</div></div>
+    <div class="stat-card"><div class="stat-value">${winPct}%</div><div class="stat-label">Win %</div></div>
+  </div>
+`;
+                }
+
+                // Practice Timeline
+                if (exportConfig.practiceTimeline && completedPractices.length > 0) {
+                  reportHTML += `
+  <div class="page-break"></div>
+  <h2>Practice Timeline</h2>
+  <table>
+    <tr><th>Date</th><th>Focus</th><th>Attendance</th><th>Drills</th></tr>
+`;
+                  completedPractices.slice(0, 20).forEach(p => {
+                    const attendance = p.attendance ? Object.values(p.attendance).filter(Boolean).length : 0;
+                    const drillCount = p.drills?.length || 0;
+                    reportHTML += `
+    <tr>
+      <td>${p.date ? new Date(p.date + "T12:00:00").toLocaleDateString() : "N/A"}</td>
+      <td>${(p.focus || "").substring(0, 50)}${p.focus?.length > 50 ? "..." : ""}</td>
+      <td>${attendance} players</td>
+      <td>${drillCount} drills</td>
+    </tr>
+`;
+                  });
+                  reportHTML += `</table>`;
+                }
+
+                // Drill Leaderboards
+                if (exportConfig.drillLeaderboards && trackedDrills.length > 0) {
+                  reportHTML += `
+  <div class="page-break"></div>
+  <h2>Drill Leaderboards</h2>
+`;
+                  trackedDrills.slice(0, 5).forEach(drill => {
+                    const leaderboard = getLeaderboard(drill.id).slice(0, 10);
+                    if (leaderboard.length > 0) {
+                      reportHTML += `
+  <h3>${drill.name}</h3>
+  <table>
+    <tr><th>Rank</th><th>Player</th><th>Best</th><th>Average</th><th>Attempts</th></tr>
+`;
+                      leaderboard.forEach((stat, idx) => {
+                        reportHTML += `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${stat.player.name}</td>
+      <td>${formatValue(stat.bestValue, drill.config)}</td>
+      <td>${formatValue(stat.avgValue, drill.config)}</td>
+      <td>${stat.attempts}</td>
+    </tr>
+`;
+                      });
+                      reportHTML += `</table>`;
+                    }
+                  });
+                }
+
+                // Player Profiles
+                if (exportConfig.playerProfiles) {
+                  reportHTML += `
+  <div class="page-break"></div>
+  <h2>Player Profiles</h2>
+`;
+                  players.slice(0, 15).forEach(player => {
+                    const practicesAttended = completedPractices.filter(p => p.attendance?.[player.id]).length;
+                    const attendancePct = totalPractices > 0 ? ((practicesAttended / totalPractices) * 100).toFixed(0) : 0;
+
+                    reportHTML += `
+  <h3>${player.name} - ${player.primaryPosition || "No Position"}</h3>
+  <div style="display: flex; gap: 20px; margin: 8px 0 12px 0;">
+    <div><strong>Grade:</strong> ${player.grade}</div>
+    <div><strong>Status:</strong> ${player.returning ? "Returning" : "New"}</div>
+    <div><strong>Attendance:</strong> ${attendancePct}% (${practicesAttended}/${totalPractices})</div>
+  </div>
+`;
+                  });
+                }
+
+                // Game Statistics
+                if (exportConfig.gameStats && filteredGames.length > 0) {
+                  reportHTML += `
+  <div class="page-break"></div>
+  <h2>Game Statistics</h2>
+  <table>
+    <tr><th>Date</th><th>Opponent</th><th>Result</th><th>Score</th></tr>
+`;
+                  filteredGames.slice(0, 20).forEach(game => {
+                    reportHTML += `
+    <tr>
+      <td>${game.date ? new Date(game.date + "T12:00:00").toLocaleDateString() : "N/A"}</td>
+      <td>${game.opponent || "Unknown"}</td>
+      <td>${game.result === "W" ? "Win" : game.result === "L" ? "Loss" : "Tie"}</td>
+      <td>${game.ourScore || 0} - ${game.theirScore || 0}</td>
+    </tr>
+`;
+                  });
+                  reportHTML += `</table>`;
+                }
+
+                // Goals
+                if (exportConfig.goals && (goals.team.length > 0 || Object.keys(goals.players).length > 0)) {
+                  reportHTML += `
+  <div class="page-break"></div>
+  <h2>Season Goals</h2>
+`;
+                  if (goals.team.length > 0) {
+                    reportHTML += `<h3>Team Goals</h3><ul>`;
+                    goals.team.forEach(goal => {
+                      const { current, progress } = calculateGoalProgress(goal);
+                      reportHTML += `<li><strong>${goal.goal}</strong> - ${progress.toFixed(0)}% complete (${current.toFixed(1)}/${goal.target})</li>`;
+                    });
+                    reportHTML += `</ul>`;
+                  }
+                }
+
+                reportHTML += `
+  <div class="footer">
+    <div>Pirates Softball 2026 Season</div>
+    <div>Generated with Claude Code by Anthropic</div>
+  </div>
+</body>
+</html>
+`;
+
+                reportWindow.document.write(reportHTML);
+                reportWindow.document.close();
+                reportWindow.print();
+                setShowExportReport(false);
+              }}>
+                📄 Generate & Print Report
+              </Button>
+            </div>
+          </Modal>
+        )}
 
         {/* Attendance Summary - Enhanced */}
         <CollapsibleSection
