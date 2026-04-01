@@ -5714,7 +5714,11 @@ const Scouting = () => {
   const [editing, setEditing] = useState(null); // report id
   const [form, setForm] = useState(emptyScoutingReport());
   const [showForm, setShowForm] = useState(false);
-  const [activeSection, setActiveSection] = useState("batting"); // "batting", "pitching", "defense", "notes"
+  const [activeSection, setActiveSection] = useState("defense"); // "defense", "liveTracking", "insights", "notes"
+  const [showStatsSidebar, setShowStatsSidebar] = useState(() => {
+    const saved = localStorage.getItem('pirates-stats-sidebar-open');
+    return saved === 'true';
+  });
 
   // Opponent Teams Management
   const [opponentTeams, setOpponentTeams] = useState([]);
@@ -5984,6 +5988,65 @@ const Scouting = () => {
         }
       });
     }
+  };
+
+  // Stats sidebar toggle
+  const toggleStatsSidebar = () => {
+    const newValue = !showStatsSidebar;
+    setShowStatsSidebar(newValue);
+    localStorage.setItem('pirates-stats-sidebar-open', newValue.toString());
+  };
+
+  // Calculate quick batting stats for sidebar
+  const calculateQuickBattingStats = () => {
+    const stats = {};
+
+    form.liveTracking.atBats.forEach(ab => {
+      const key = ab.jersey;
+      if (!stats[key]) {
+        stats[key] = { jersey: ab.jersey, name: ab.name, hits: 0, abs: 0, avg: 0 };
+      }
+
+      // Count at-bats (everything except BB, HBP)
+      if (!["BB", "HBP"].includes(ab.result)) {
+        stats[key].abs++;
+      }
+
+      // Count hits
+      if (["1B", "2B", "3B", "HR"].includes(ab.result)) {
+        stats[key].hits++;
+      }
+    });
+
+    // Calculate AVG
+    Object.values(stats).forEach(s => {
+      s.avg = s.abs > 0 ? (s.hits / s.abs).toFixed(3) : ".000";
+    });
+
+    // Sort by AVG, then return top 5
+    return Object.values(stats).sort((a, b) => parseFloat(b.avg) - parseFloat(a.avg)).slice(0, 5);
+  };
+
+  // Calculate quick pitching stats for sidebar
+  const calculateQuickPitchingStats = () => {
+    const stats = {};
+
+    form.liveTracking.pitching.forEach(p => {
+      if (!stats[p.pitcher]) {
+        stats[p.pitcher] = { pitcher: p.pitcher, strikes: 0, balls: 0, total: 0, strikePercent: 0 };
+      }
+
+      stats[p.pitcher].total++;
+      if (p.pitch === "strike") stats[p.pitcher].strikes++;
+      if (p.pitch === "ball") stats[p.pitcher].balls++;
+    });
+
+    // Calculate strike %
+    Object.values(stats).forEach(s => {
+      s.strikePercent = s.total > 0 ? Math.round((s.strikes / s.total) * 100) : 0;
+    });
+
+    return Object.values(stats);
   };
 
   // Batter selection handlers
@@ -7001,8 +7064,6 @@ const Scouting = () => {
             {/* Section Tabs */}
             <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: `1px solid ${THEME.charcoal}`, paddingBottom: 8, flexWrap: "wrap" }}>
               {[
-                ["batting", "⚾ Batting"],
-                ["pitching", "⚡ Pitching"],
                 ["defense", "🛡️ Defense"],
                 ["liveTracking", "📊 Live Tracking"],
                 ["insights", "💡 Insights"],
@@ -7027,301 +7088,6 @@ const Scouting = () => {
                 </button>
               ))}
             </div>
-
-            {/* Batting Section */}
-            {activeSection === "batting" && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
-                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Batting Lineup</h4>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Button small onClick={quickAddBatters}>⚡ Quick Add</Button>
-                    <Button small onClick={addBatter}>+ Add Batter</Button>
-                  </div>
-                </div>
-                {form.batting.length === 0 ? (
-                  <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                    <p style={{ color: THEME.gray, margin: 0 }}>No batters added yet. Use Quick Add for jersey numbers only.</p>
-                  </Card>
-                ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {form.batting.map((batter, idx) => (
-                      <Card key={idx} style={{ padding: 16, background: THEME.black }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <input
-                              type="text"
-                              value={batter.jersey}
-                              onChange={e => updateBatter(idx, "jersey", e.target.value)}
-                              placeholder="#"
-                              style={{
-                                width: 50,
-                                padding: "8px",
-                                background: THEME.blackLight,
-                                border: `1px solid ${THEME.charcoal}`,
-                                borderRadius: 4,
-                                color: THEME.white,
-                                fontSize: 14,
-                                textAlign: "center",
-                                fontWeight: 700
-                              }}
-                            />
-                            <input
-                              type="text"
-                              value={batter.name}
-                              onChange={e => updateBatter(idx, "name", e.target.value)}
-                              placeholder="Name (optional)"
-                              style={{
-                                width: 180,
-                                padding: "8px",
-                                background: THEME.blackLight,
-                                border: `1px solid ${THEME.charcoal}`,
-                                borderRadius: 4,
-                                color: THEME.white,
-                                fontSize: 13
-                              }}
-                            />
-                          </div>
-                          <button
-                            onClick={() => removeBatter(idx)}
-                            style={{
-                              padding: "6px 10px",
-                              background: "none",
-                              border: "none",
-                              color: THEME.red,
-                              fontSize: 18,
-                              cursor: "pointer",
-                              lineHeight: 1
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Strengths</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {BATTING_STRENGTH_TAGS.map(tag => (
-                              <button
-                                key={tag}
-                                onClick={() => toggleBatterTag(idx, "strengths", tag)}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: (batter.strengths || []).includes(tag) ? THEME.green : THEME.blackLight,
-                                  border: `1px solid ${(batter.strengths || []).includes(tag) ? THEME.green : THEME.charcoal}`,
-                                  borderRadius: 16,
-                                  color: THEME.white,
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Weaknesses</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {BATTING_WEAKNESS_TAGS.map(tag => (
-                              <button
-                                key={tag}
-                                onClick={() => toggleBatterTag(idx, "weaknesses", tag)}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: (batter.weaknesses || []).includes(tag) ? THEME.red : THEME.blackLight,
-                                  border: `1px solid ${(batter.weaknesses || []).includes(tag) ? THEME.red : THEME.charcoal}`,
-                                  borderRadius: 16,
-                                  color: THEME.white,
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Notes</div>
-                          <textarea
-                            value={batter.notes}
-                            onChange={e => updateBatter(idx, "notes", e.target.value)}
-                            placeholder="Optional notes..."
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13,
-                              fontFamily: "inherit",
-                              resize: "vertical",
-                              minHeight: 60
-                            }}
-                          />
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Pitching Section */}
-            {activeSection === "pitching" && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Pitching Staff</h4>
-                  <Button small onClick={addPitcher}>+ Add Pitcher</Button>
-                </div>
-                {form.pitching.length === 0 ? (
-                  <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                    <p style={{ color: THEME.gray, margin: 0 }}>No pitchers added yet.</p>
-                  </Card>
-                ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {form.pitching.map((pitcher, idx) => (
-                      <Card key={idx} style={{ padding: 16, background: THEME.black }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <input
-                            type="text"
-                            value={pitcher.name}
-                            onChange={e => updatePitcher(idx, "name", e.target.value)}
-                            placeholder="Pitcher name or jersey #"
-                            style={{
-                              flex: 1,
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 600
-                            }}
-                          />
-                          <button
-                            onClick={() => removePitcher(idx)}
-                            style={{
-                              padding: "6px 10px",
-                              background: "none",
-                              border: "none",
-                              color: THEME.red,
-                              fontSize: 18,
-                              cursor: "pointer",
-                              lineHeight: 1,
-                              marginLeft: 12
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Speed</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {PITCHING_SPEED_TAGS.map(tag => (
-                              <button
-                                key={tag}
-                                onClick={() => togglePitcherTag(idx, "speed", tag)}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: (pitcher.speed || []).includes(tag) ? THEME.gold : THEME.blackLight,
-                                  border: `1px solid ${(pitcher.speed || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
-                                  borderRadius: 16,
-                                  color: (pitcher.speed || []).includes(tag) ? THEME.black : THEME.white,
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s",
-                                  fontWeight: (pitcher.speed || []).includes(tag) ? 700 : 400
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Control</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {PITCHING_CONTROL_TAGS.map(tag => (
-                              <button
-                                key={tag}
-                                onClick={() => togglePitcherTag(idx, "control", tag)}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: (pitcher.control || []).includes(tag) ? THEME.gold : THEME.blackLight,
-                                  border: `1px solid ${(pitcher.control || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
-                                  borderRadius: 16,
-                                  color: (pitcher.control || []).includes(tag) ? THEME.black : THEME.white,
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s",
-                                  fontWeight: (pitcher.control || []).includes(tag) ? 700 : 400
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Pitch Types</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {PITCH_TYPE_TAGS.map(tag => (
-                              <button
-                                key={tag}
-                                onClick={() => togglePitcherTag(idx, "pitches", tag)}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: (pitcher.pitches || []).includes(tag) ? THEME.gold : THEME.blackLight,
-                                  border: `1px solid ${(pitcher.pitches || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
-                                  borderRadius: 16,
-                                  color: (pitcher.pitches || []).includes(tag) ? THEME.black : THEME.white,
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s",
-                                  fontWeight: (pitcher.pitches || []).includes(tag) ? 700 : 400
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Notes</div>
-                          <textarea
-                            value={pitcher.notes}
-                            onChange={e => updatePitcher(idx, "notes", e.target.value)}
-                            placeholder="Optional notes..."
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13,
-                              fontFamily: "inherit",
-                              resize: "vertical",
-                              minHeight: 60
-                            }}
-                          />
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Defense Section */}
             {activeSection === "defense" && (
@@ -7378,7 +7144,29 @@ const Scouting = () => {
 
             {/* Live Tracking Section */}
             {activeSection === "liveTracking" && (
-              <div>
+              <div style={{ position: "relative" }}>
+                {/* Stats Sidebar Toggle */}
+                <button
+                  onClick={toggleStatsSidebar}
+                  style={{
+                    position: "absolute",
+                    top: -48,
+                    right: 0,
+                    padding: "8px 16px",
+                    background: showStatsSidebar ? THEME.gold : THEME.blackLight,
+                    border: `1px solid ${showStatsSidebar ? THEME.gold : THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: showStatsSidebar ? THEME.black : THEME.white,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    zIndex: 10
+                  }}
+                >
+                  📊 {showStatsSidebar ? "Hide" : "Show"} Stats
+                </button>
+
                 {/* Header with Inning, Team Batting, and Pitcher */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}`, flexWrap: "wrap", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -8519,6 +8307,328 @@ const Scouting = () => {
                             </div>
                           )}
                         </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Stats Sidebar */}
+                {showStatsSidebar && (
+                  <div
+                    style={{
+                      position: "fixed",
+                      right: 0,
+                      top: 60,
+                      width: 280,
+                      height: "calc(100vh - 60px)",
+                      background: THEME.black,
+                      borderLeft: `2px solid ${THEME.gold}`,
+                      overflowY: "auto",
+                      padding: 16,
+                      zIndex: 1000,
+                      transition: "all 0.3s ease",
+                      ...(window.innerWidth <= 768 && {
+                        position: "fixed",
+                        bottom: 0,
+                        right: 0,
+                        left: 0,
+                        top: "auto",
+                        width: "100%",
+                        height: "50vh",
+                        borderTop: `2px solid ${THEME.gold}`,
+                        borderLeft: "none"
+                      })
+                    }}
+                  >
+                    {/* Close button */}
+                    <button
+                      onClick={toggleStatsSidebar}
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        background: "none",
+                        border: "none",
+                        color: THEME.gray,
+                        fontSize: 20,
+                        cursor: "pointer",
+                        padding: 4
+                      }}
+                    >
+                      ×
+                    </button>
+
+                    <h4 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>
+                      📊 Quick Stats
+                    </h4>
+
+                    {/* Batting Quick View */}
+                    {(() => {
+                      const battingStats = calculateQuickBattingStats();
+                      return battingStats.length > 0 ? (
+                        <div style={{ marginBottom: 20 }}>
+                          <h5 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚾ Batting</h5>
+                          <div style={{ borderTop: `1px solid ${THEME.charcoal}`, paddingTop: 8 }}>
+                            {battingStats.map(s => (
+                              <div key={s.jersey} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${THEME.charcoal}` }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ color: THEME.gold, fontSize: 13, fontWeight: 700 }}>#{s.jersey}</span>
+                                  <span style={{ color: THEME.white, fontSize: 12 }}>{s.name || "Unknown"}</span>
+                                </div>
+                                <span style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{s.avg}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ marginTop: 8, padding: "8px 12px", background: THEME.blackLight, borderRadius: 4 }}>
+                            <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 2 }}>Team AVG</div>
+                            <div style={{ color: THEME.white, fontSize: 16, fontWeight: 700 }}>
+                              {(() => {
+                                const totalHits = form.liveTracking.atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length;
+                                const totalAbs = form.liveTracking.atBats.filter(ab => !["BB", "HBP"].includes(ab.result)).length;
+                                return totalAbs > 0 ? (totalHits / totalAbs).toFixed(3) : ".000";
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Pitching Quick View */}
+                    {(() => {
+                      const pitchingStats = calculateQuickPitchingStats();
+                      return pitchingStats.length > 0 ? (
+                        <div style={{ marginBottom: 20 }}>
+                          <h5 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🥎 Pitching</h5>
+                          {pitchingStats.map(s => (
+                            <Card key={s.pitcher} style={{ padding: 12, background: THEME.blackLight, marginBottom: 12 }}>
+                              <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{s.pitcher}</div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                <span style={{ color: THEME.gray, fontSize: 12 }}>Pitches:</span>
+                                <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{s.total}</span>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                <span style={{ color: THEME.gray, fontSize: 12 }}>Strikes:</span>
+                                <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{s.strikes}</span>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ color: THEME.gray, fontSize: 12 }}>Strike %:</span>
+                                <span style={{
+                                  color: s.strikePercent >= 65 ? THEME.green : s.strikePercent >= 50 ? THEME.gold : THEME.red,
+                                  fontSize: 16,
+                                  fontWeight: 700
+                                }}>
+                                  {s.strikePercent}%
+                                </span>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Game Stats */}
+                    <div>
+                      <h5 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📊 Game Stats</h5>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: THEME.blackLight, borderRadius: 4 }}>
+                          <span style={{ color: THEME.gray, fontSize: 12 }}>At-Bats:</span>
+                          <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>{form.liveTracking.atBats.length}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: THEME.blackLight, borderRadius: 4 }}>
+                          <span style={{ color: THEME.gray, fontSize: 12 }}>Hits:</span>
+                          <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>
+                            {form.liveTracking.atBats.filter(ab => ["1B", "2B", "3B", "HR"].includes(ab.result)).length}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: THEME.blackLight, borderRadius: 4 }}>
+                          <span style={{ color: THEME.gray, fontSize: 12 }}>Walks:</span>
+                          <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>
+                            {form.liveTracking.atBats.filter(ab => ab.result === "BB").length}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: THEME.blackLight, borderRadius: 4 }}>
+                          <span style={{ color: THEME.gray, fontSize: 12 }}>Strikeouts:</span>
+                          <span style={{ color: THEME.white, fontSize: 13, fontWeight: 600 }}>
+                            {form.liveTracking.atBats.filter(ab => ["K", "ꓘ"].includes(ab.result)).length}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Insights Section */}
+            {activeSection === "insights" && (
+              <div>
+                <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Game Insights & Stats</h4>
+
+                {form.liveTracking.atBats.length === 0 && form.liveTracking.pitching.length === 0 ? (
+                  <Card style={{ textAlign: "center", padding: 40, background: THEME.black }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>💡</div>
+                    <p style={{ color: THEME.gray, margin: 0 }}>No live tracking data yet. Start logging at-bats in Live Tracking to see stats here.</p>
+                  </Card>
+                ) : (
+                  <div style={{ display: "grid", gap: 20 }}>
+                    {/* Full Batting Stats Table */}
+                    {form.liveTracking.atBats.length > 0 && (() => {
+                      const battingStats = {};
+
+                      form.liveTracking.atBats.forEach(ab => {
+                        const key = ab.jersey;
+                        if (!battingStats[key]) {
+                          battingStats[key] = {
+                            jersey: ab.jersey,
+                            name: ab.name,
+                            abs: 0,
+                            hits: 0,
+                            singles: 0,
+                            doubles: 0,
+                            triples: 0,
+                            hrs: 0,
+                            walks: 0,
+                            strikeouts: 0,
+                            avg: 0,
+                            obp: 0,
+                            slg: 0,
+                            ops: 0
+                          };
+                        }
+
+                        // Count at-bats (everything except BB, HBP)
+                        if (!["BB", "HBP"].includes(ab.result)) {
+                          battingStats[key].abs++;
+                        }
+
+                        // Count hits
+                        if (ab.result === "1B") { battingStats[key].hits++; battingStats[key].singles++; }
+                        if (ab.result === "2B") { battingStats[key].hits++; battingStats[key].doubles++; }
+                        if (ab.result === "3B") { battingStats[key].hits++; battingStats[key].triples++; }
+                        if (ab.result === "HR") { battingStats[key].hits++; battingStats[key].hrs++; }
+
+                        // Count walks and strikeouts
+                        if (ab.result === "BB") battingStats[key].walks++;
+                        if (["K", "ꓘ"].includes(ab.result)) battingStats[key].strikeouts++;
+                      });
+
+                      // Calculate stats
+                      Object.values(battingStats).forEach(s => {
+                        s.avg = s.abs > 0 ? (s.hits / s.abs).toFixed(3) : ".000";
+                        s.obp = (s.abs + s.walks) > 0 ? ((s.hits + s.walks) / (s.abs + s.walks)).toFixed(3) : ".000";
+                        const totalBases = s.singles + (s.doubles * 2) + (s.triples * 3) + (s.hrs * 4);
+                        s.slg = s.abs > 0 ? (totalBases / s.abs).toFixed(3) : ".000";
+                        s.ops = (parseFloat(s.obp) + parseFloat(s.slg)).toFixed(3);
+                      });
+
+                      const sortedStats = Object.values(battingStats).sort((a, b) => parseFloat(b.avg) - parseFloat(a.avg));
+
+                      return (
+                        <div>
+                          <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>⚾ Batting Statistics</h5>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ borderBottom: `2px solid ${THEME.gold}` }}>
+                                  <th style={{ padding: "12px 8px", textAlign: "left", color: THEME.gray, fontWeight: 600 }}>Player</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>AB</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>H</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>1B</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>2B</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>3B</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>HR</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>BB</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>K</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>AVG</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>OBP</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>SLG</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>OPS</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedStats.map(s => (
+                                  <tr key={s.jersey} style={{ borderBottom: `1px solid ${THEME.charcoal}` }}>
+                                    <td style={{ padding: "10px 8px", color: THEME.white, fontWeight: 600 }}>
+                                      #{s.jersey} {s.name}
+                                    </td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white }}>{s.abs}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white }}>{s.hits}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.singles}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.doubles}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.triples}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.hrs}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.walks}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gray }}>{s.strikeouts}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white, fontWeight: 700 }}>{s.avg}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white }}>{s.obp}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white }}>{s.slg}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.gold, fontWeight: 700 }}>{s.ops}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Full Pitching Stats Table */}
+                    {form.liveTracking.pitching.length > 0 && (() => {
+                      const pitchingStats = {};
+
+                      form.liveTracking.pitching.forEach(p => {
+                        if (!pitchingStats[p.pitcher]) {
+                          pitchingStats[p.pitcher] = { pitcher: p.pitcher, strikes: 0, balls: 0, total: 0, strikePercent: 0 };
+                        }
+
+                        pitchingStats[p.pitcher].total++;
+                        if (p.pitch === "strike") pitchingStats[p.pitcher].strikes++;
+                        if (p.pitch === "ball") pitchingStats[p.pitcher].balls++;
+                      });
+
+                      // Calculate strike %
+                      Object.values(pitchingStats).forEach(s => {
+                        s.strikePercent = s.total > 0 ? Math.round((s.strikes / s.total) * 100) : 0;
+                      });
+
+                      const sortedStats = Object.values(pitchingStats).sort((a, b) => b.strikePercent - a.strikePercent);
+
+                      return (
+                        <div>
+                          <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>🥎 Pitching Statistics</h5>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ borderBottom: `2px solid ${THEME.gold}` }}>
+                                  <th style={{ padding: "12px 8px", textAlign: "left", color: THEME.gray, fontWeight: 600 }}>Pitcher</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>Total Pitches</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>Strikes</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>Balls</th>
+                                  <th style={{ padding: "12px 8px", textAlign: "center", color: THEME.gray, fontWeight: 600 }}>Strike %</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedStats.map(s => (
+                                  <tr key={s.pitcher} style={{ borderBottom: `1px solid ${THEME.charcoal}` }}>
+                                    <td style={{ padding: "10px 8px", color: THEME.white, fontWeight: 600 }}>{s.pitcher}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.white }}>{s.total}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.green }}>{s.strikes}</td>
+                                    <td style={{ padding: "10px 8px", textAlign: "center", color: THEME.red }}>{s.balls}</td>
+                                    <td style={{
+                                      padding: "10px 8px",
+                                      textAlign: "center",
+                                      color: s.strikePercent >= 65 ? THEME.green : s.strikePercent >= 50 ? THEME.gold : THEME.red,
+                                      fontWeight: 700,
+                                      fontSize: 15
+                                    }}>
+                                      {s.strikePercent}%
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       );
                     })()}
                   </div>
