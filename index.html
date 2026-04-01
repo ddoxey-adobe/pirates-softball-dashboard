@@ -5912,7 +5912,6 @@ const Scouting = () => {
   const [liveInning, setLiveInning] = useState(1);
   const [selectedJersey, setSelectedJersey] = useState("");
   const [selectedPitcher, setSelectedPitcher] = useState("");
-  const [rbiCount, setRbiCount] = useState(0);
   const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
   const [baserunners, setBaserunners] = useState({ first: null, second: null, third: null }); // { jersey: "", name: "" }
   const [selectedRunner, setSelectedRunner] = useState(null); // { base: "first"|"second"|"third", jersey: "", name: "" }
@@ -5967,7 +5966,6 @@ const Scouting = () => {
       jersey: selectedJersey,
       name: playerName,
       result,
-      rbi: rbiCount,
       pitchCount: currentPitchCount,
       inning: liveInning,
       timestamp: new Date().toISOString()
@@ -6005,7 +6003,6 @@ const Scouting = () => {
 
     // Reset for next at-bat
     setSelectedJersey("");
-    setRbiCount(0);
     setCurrentPitchCount({ strikes: 0, balls: 0 });
     // Pitcher stays selected
   };
@@ -6165,37 +6162,6 @@ const Scouting = () => {
     setSelectedRunner(null);
   };
 
-  const logBaserunning = (type) => {
-    const jersey = selectedJersey.trim();
-    if (!jersey) {
-      alert("Please enter a jersey number for baserunning");
-      return;
-    }
-
-    // Get player name from roster if available
-    const roster = getOpponentRoster();
-    const player = roster.find(p => p.jersey === jersey);
-    const playerName = player?.name || "";
-
-    const baserun = {
-      jersey,
-      name: playerName,
-      type,
-      inning: liveInning,
-      timestamp: new Date().toISOString()
-    };
-
-    setForm({
-      ...form,
-      liveTracking: {
-        ...form.liveTracking,
-        baserunning: [...form.liveTracking.baserunning, baserun]
-      }
-    });
-
-    // Don't clear jersey - they might still be at bat
-  };
-
   const deleteAtBat = (index) => {
     setForm({
       ...form,
@@ -6223,8 +6189,7 @@ const Scouting = () => {
           triples: 0,
           hrs: 0,
           walks: 0,
-          strikeouts: 0,
-          rbi: 0
+          strikeouts: 0
         };
       }
 
@@ -6241,7 +6206,6 @@ const Scouting = () => {
       if (ab.result === "HR") stats.hrs++;
       if (ab.result === "BB") stats.walks++;
       if (ab.result === "K") stats.strikeouts++;
-      stats.rbi += ab.rbi || 0;
     });
 
     // Calculate BA, OBP, SLG
@@ -6907,7 +6871,7 @@ const Scouting = () => {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            <div style={{ marginBottom: 20 }}>
               <div>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Date Scouted
@@ -6916,26 +6880,6 @@ const Scouting = () => {
                   type="date"
                   value={form.dateScoutted}
                   onChange={e => setForm({ ...form, dateScoutted: e.target.value })}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    background: THEME.blackLight,
-                    border: `1px solid ${THEME.charcoal}`,
-                    borderRadius: 6,
-                    color: THEME.white,
-                    fontSize: 13
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Location/Field
-                </label>
-                <input
-                  type="text"
-                  value={form.location}
-                  onChange={e => setForm({ ...form, location: e.target.value })}
-                  placeholder="e.g., Lincoln Park Field 3"
                   style={{
                     width: "100%",
                     padding: "10px 12px",
@@ -7490,43 +7434,6 @@ const Scouting = () => {
                     </div>
                   </div>
 
-                  {/* Baserunning Buttons */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Baserunning</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <button
-                        onClick={() => logBaserunning("SB")}
-                        style={{
-                          padding: "10px",
-                          background: THEME.blackLight,
-                          border: `2px solid ${THEME.green}`,
-                          borderRadius: 6,
-                          color: THEME.white,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: "pointer"
-                        }}
-                      >
-                        Stolen Base (SB)
-                      </button>
-                      <button
-                        onClick={() => logBaserunning("CS")}
-                        style={{
-                          padding: "10px",
-                          background: THEME.blackLight,
-                          border: `2px solid ${THEME.red}`,
-                          borderRadius: 6,
-                          color: THEME.white,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: "pointer"
-                        }}
-                      >
-                        Caught Stealing (CS)
-                      </button>
-                    </div>
-                  </div>
-
                   {/* At-Bat Result Buttons */}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>At-Bat Result</div>
@@ -7561,32 +7468,6 @@ const Scouting = () => {
                           }}
                         >
                           {result}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* RBI Selector */}
-                  <div>
-                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>RBIs (optional)</div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[0, 1, 2, 3, 4].map(num => (
-                        <button
-                          key={num}
-                          onClick={() => setRbiCount(num)}
-                          style={{
-                            flex: 1,
-                            padding: "12px",
-                            background: rbiCount === num ? THEME.gold : THEME.blackLight,
-                            border: `2px solid ${rbiCount === num ? THEME.gold : THEME.charcoal}`,
-                            borderRadius: 6,
-                            color: rbiCount === num ? THEME.black : THEME.white,
-                            fontSize: 16,
-                            fontWeight: 700,
-                            cursor: "pointer"
-                          }}
-                        >
-                          {num}
                         </button>
                       ))}
                     </div>
@@ -7912,7 +7793,6 @@ const Scouting = () => {
                               {ab.name && <span style={{ color: THEME.white, fontSize: 14 }}>{ab.name}</span>}
                               <span style={{ color: resultColor, fontSize: 15, fontWeight: 700 }}>{ab.result}</span>
                               {pitchCountDisplay && <span style={{ color: THEME.gray, fontSize: 12 }}>{pitchCountDisplay}</span>}
-                              {ab.rbi > 0 && <span style={{ color: THEME.blue, fontSize: 12, fontWeight: 600 }}>{ab.rbi} RBI</span>}
                               <span style={{ color: THEME.gray, fontSize: 11 }}>Inn {ab.inning}</span>
                             </div>
                             <button
@@ -7983,7 +7863,7 @@ const Scouting = () => {
                                       </div>
                                       <div style={{ color: THEME.gray, fontSize: 11 }}>
                                         {stats.hits}-{stats.atBats} • {stats.singles ? `${stats.singles} 1B ` : ""}{stats.doubles ? `${stats.doubles} 2B ` : ""}{stats.triples ? `${stats.triples} 3B ` : ""}{stats.hrs ? `${stats.hrs} HR ` : ""}
-                                        {stats.strikeouts ? `• ${stats.strikeouts} K ` : ""}{stats.walks ? `• ${stats.walks} BB ` : ""}{stats.rbi ? `• ${stats.rbi} RBI` : ""}
+                                        {stats.strikeouts ? `• ${stats.strikeouts} K ` : ""}{stats.walks ? `• ${stats.walks} BB` : ""}
                                       </div>
                                     </Card>
                                   ))}
