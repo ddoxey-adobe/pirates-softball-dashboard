@@ -10467,11 +10467,11 @@ const usePullToRefresh = (onRefresh) => {
 
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
+  { id: "scouting", label: "Scouting", icon: "🔍" },
   { id: "practicelog", label: "Practice", icon: "📋" },
   { id: "planner", label: "Planner", icon: "💡" },
   { id: "lineup", label: "Lineup", icon: "📋" },
   { id: "gamelog", label: "Game", icon: "⚾" },
-  { id: "scouting", label: "Scouting", icon: "🔍" },
   { id: "reports", label: "Reports", icon: "📊" },
   { id: "comms", label: "Comms", icon: "✉️" },
 ];
