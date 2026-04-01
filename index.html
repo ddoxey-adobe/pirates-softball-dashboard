@@ -5892,12 +5892,27 @@ const Scouting = () => {
     });
   };
 
+  // Get opponent roster (for live tracking player selection)
+  const getOpponentRoster = () => {
+    if (!form.opponentTeamId) return [];
+    const team = opponentTeams.find(t => t.id === form.opponentTeamId);
+    return team?.players || [];
+  };
+
   // Live Tracking functions
   const [liveInning, setLiveInning] = useState(1);
-  const [liveTrackingTab, setLiveTrackingTab] = useState("atBats"); // "atBats", "pitching", "baserunning"
   const [selectedJersey, setSelectedJersey] = useState("");
   const [selectedPitcher, setSelectedPitcher] = useState("");
   const [rbiCount, setRbiCount] = useState(0);
+  const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
+
+  const logPitchToCount = (pitchType) => {
+    if (pitchType === "strike") {
+      setCurrentPitchCount({ ...currentPitchCount, strikes: currentPitchCount.strikes + 1 });
+    } else if (pitchType === "ball") {
+      setCurrentPitchCount({ ...currentPitchCount, balls: currentPitchCount.balls + 1 });
+    }
+  };
 
   const logAtBat = (result) => {
     if (!selectedJersey.trim()) {
@@ -5905,13 +5920,44 @@ const Scouting = () => {
       return;
     }
 
+    if (!selectedPitcher.trim()) {
+      alert("Please set current pitcher");
+      return;
+    }
+
+    // Get player name from roster if available
+    const roster = getOpponentRoster();
+    const player = roster.find(p => p.jersey === selectedJersey);
+    const playerName = player?.name || "";
+
     const atBat = {
       jersey: selectedJersey,
+      name: playerName,
       result,
       rbi: rbiCount,
+      pitchCount: currentPitchCount,
       inning: liveInning,
       timestamp: new Date().toISOString()
     };
+
+    // Also log pitches to pitching stats
+    const totalPitches = currentPitchCount.strikes + currentPitchCount.balls;
+    for (let i = 0; i < currentPitchCount.strikes; i++) {
+      form.liveTracking.pitching.push({
+        pitcher: selectedPitcher,
+        pitch: "strike",
+        inning: liveInning,
+        timestamp: new Date().toISOString()
+      });
+    }
+    for (let i = 0; i < currentPitchCount.balls; i++) {
+      form.liveTracking.pitching.push({
+        pitcher: selectedPitcher,
+        pitch: "ball",
+        inning: liveInning,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     setForm({
       ...form,
@@ -5924,38 +5970,26 @@ const Scouting = () => {
     // Reset for next at-bat
     setSelectedJersey("");
     setRbiCount(0);
+    setCurrentPitchCount({ strikes: 0, balls: 0 });
+    // Pitcher stays selected
   };
 
-  const logPitch = (pitchType) => {
-    if (!selectedPitcher.trim()) {
-      alert("Please select a pitcher");
-      return;
-    }
-
-    const pitch = {
-      pitcher: selectedPitcher,
-      pitch: pitchType,
-      inning: liveInning,
-      timestamp: new Date().toISOString()
-    };
-
-    setForm({
-      ...form,
-      liveTracking: {
-        ...form.liveTracking,
-        pitching: [...form.liveTracking.pitching, pitch]
-      }
-    });
-  };
 
   const logBaserunning = (type) => {
-    if (!selectedJersey.trim()) {
-      alert("Please enter a jersey number");
+    const jersey = selectedJersey.trim();
+    if (!jersey) {
+      alert("Please enter a jersey number for baserunning");
       return;
     }
 
+    // Get player name from roster if available
+    const roster = getOpponentRoster();
+    const player = roster.find(p => p.jersey === jersey);
+    const playerName = player?.name || "";
+
     const baserun = {
-      jersey: selectedJersey,
+      jersey,
+      name: playerName,
       type,
       inning: liveInning,
       timestamp: new Date().toISOString()
@@ -5969,7 +6003,7 @@ const Scouting = () => {
       }
     });
 
-    setSelectedJersey("");
+    // Don't clear jersey - they might still be at bat
   };
 
   const deleteAtBat = (index) => {
@@ -7058,389 +7092,283 @@ const Scouting = () => {
             {/* Live Tracking Section */}
             {activeSection === "liveTracking" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Live Game Tracking</h4>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ color: THEME.gray, fontSize: 12 }}>Inning:</span>
+                {/* Header with Inning and Pitcher */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ color: THEME.gray, fontSize: 13 }}>Inning:</span>
                     <input
                       type="number"
                       value={liveInning}
                       onChange={e => setLiveInning(Math.max(1, parseInt(e.target.value) || 1))}
                       min="1"
                       style={{
-                        width: 50,
-                        padding: "6px",
-                        background: THEME.blackLight,
+                        width: 60,
+                        padding: "8px",
+                        background: THEME.black,
                         border: `1px solid ${THEME.charcoal}`,
                         borderRadius: 4,
                         color: THEME.white,
-                        fontSize: 13,
+                        fontSize: 16,
+                        fontWeight: 700,
                         textAlign: "center"
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, marginLeft: 24 }}>
+                    <span style={{ color: THEME.gray, fontSize: 13 }}>Current Pitcher:</span>
+                    <input
+                      type="text"
+                      value={selectedPitcher}
+                      onChange={e => setSelectedPitcher(e.target.value)}
+                      placeholder="Enter pitcher name or #"
+                      style={{
+                        flex: 1,
+                        maxWidth: 300,
+                        padding: "8px 12px",
+                        background: THEME.black,
+                        border: `1px solid ${THEME.gold}`,
+                        borderRadius: 4,
+                        color: THEME.white,
+                        fontSize: 14,
+                        fontWeight: 600
                       }}
                     />
                   </div>
                 </div>
 
-                {/* Live Tracking Sub-Tabs */}
-                <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: `1px solid ${THEME.charcoal}`, paddingBottom: 8 }}>
-                  {[
-                    ["atBats", "At-Bats"],
-                    ["pitching", "Pitching"],
-                    ["baserunning", "Baserunning"]
-                  ].map(([tab, label]) => (
-                    <button
-                      key={tab}
-                      onClick={() => setLiveTrackingTab(tab)}
-                      style={{
-                        padding: "6px 12px",
-                        background: liveTrackingTab === tab ? THEME.green : "transparent",
-                        border: `1px solid ${liveTrackingTab === tab ? THEME.green : THEME.charcoal}`,
-                        borderRadius: 4,
-                        color: THEME.white,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                {/* Current At-Bat Card */}
+                <Card style={{ padding: 20, background: THEME.black, marginBottom: 16 }}>
+                  <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Current At-Bat</h5>
 
-                {/* At-Bats Tab */}
-                {liveTrackingTab === "atBats" && (
-                  <div>
-                    <Card style={{ padding: 16, background: THEME.black, marginBottom: 12 }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Jersey #</div>
-                        <input
-                          type="text"
-                          value={selectedJersey}
-                          onChange={e => setSelectedJersey(e.target.value)}
-                          placeholder="Enter jersey number"
+                  {/* Batter Jersey */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Batter Jersey #</div>
+                    <input
+                      type="text"
+                      value={selectedJersey}
+                      onChange={e => setSelectedJersey(e.target.value)}
+                      placeholder="Enter jersey number"
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        background: THEME.blackLight,
+                        border: `2px solid ${THEME.charcoal}`,
+                        borderRadius: 6,
+                        color: THEME.white,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        textAlign: "center"
+                      }}
+                    />
+                  </div>
+
+                  {/* Pitch Count Display */}
+                  <div style={{ marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 6 }}>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Pitch Count</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[...Array(currentPitchCount.strikes)].map((_, i) => (
+                          <span key={`strike-${i}`} style={{ fontSize: 24 }}>⚾</span>
+                        ))}
+                      </div>
+                      <span style={{ color: THEME.white, fontSize: 20, fontWeight: 700 }}>
+                        {currentPitchCount.strikes}-{currentPitchCount.balls}
+                      </span>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[...Array(currentPitchCount.balls)].map((_, i) => (
+                          <span key={`ball-${i}`} style={{ fontSize: 24, color: THEME.red }}>🔴</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        onClick={() => logPitchToCount("strike")}
+                        style={{
+                          padding: "12px",
+                          background: THEME.green,
+                          border: "none",
+                          borderRadius: 6,
+                          color: THEME.white,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Strike
+                      </button>
+                      <button
+                        onClick={() => logPitchToCount("ball")}
+                        style={{
+                          padding: "12px",
+                          background: THEME.red,
+                          border: "none",
+                          borderRadius: 6,
+                          color: THEME.white,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Ball
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Baserunning Buttons */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Baserunning</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        onClick={() => logBaserunning("SB")}
+                        style={{
+                          padding: "10px",
+                          background: THEME.blackLight,
+                          border: `2px solid ${THEME.green}`,
+                          borderRadius: 6,
+                          color: THEME.white,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Stolen Base (SB)
+                      </button>
+                      <button
+                        onClick={() => logBaserunning("CS")}
+                        style={{
+                          padding: "10px",
+                          background: THEME.blackLight,
+                          border: `2px solid ${THEME.red}`,
+                          borderRadius: 6,
+                          color: THEME.white,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Caught Stealing (CS)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* At-Bat Result Buttons */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>At-Bat Result</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                      {[
+                        ["1B", THEME.green],
+                        ["2B", THEME.green],
+                        ["3B", THEME.green],
+                        ["HR", THEME.green],
+                        ["K", THEME.red],
+                        ["GO", THEME.red],
+                        ["FO", THEME.red],
+                        ["SAC", THEME.red],
+                        ["BB", THEME.blue],
+                        ["HBP", THEME.blue],
+                        ["FC", THEME.blue],
+                        ["E", "orange"]
+                      ].map(([result, color]) => (
+                        <button
+                          key={result}
+                          onClick={() => logAtBat(result)}
                           style={{
-                            width: "100%",
-                            padding: "10px",
+                            padding: "14px",
                             background: THEME.blackLight,
-                            border: `1px solid ${THEME.charcoal}`,
-                            borderRadius: 4,
+                            border: `2px solid ${color}`,
+                            borderRadius: 6,
                             color: THEME.white,
                             fontSize: 14,
                             fontWeight: 700,
-                            textAlign: "center"
+                            cursor: "pointer",
+                            transition: "all 0.2s"
                           }}
-                        />
-                      </div>
+                        >
+                          {result}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Result</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-                          {[
-                            ["1B", THEME.green],
-                            ["2B", THEME.green],
-                            ["3B", THEME.green],
-                            ["HR", THEME.green],
-                            ["K", THEME.red],
-                            ["GO", THEME.red],
-                            ["FO", THEME.red],
-                            ["SAC", THEME.red],
-                            ["BB", THEME.blue],
-                            ["HBP", THEME.blue],
-                            ["FC", THEME.blue],
-                            ["E", THEME.orange]
-                          ].map(([result, color]) => (
-                            <button
-                              key={result}
-                              onClick={() => logAtBat(result)}
-                              style={{
-                                padding: "12px",
-                                background: THEME.blackLight,
-                                border: `2px solid ${color}`,
-                                borderRadius: 6,
-                                color: THEME.white,
-                                fontSize: 13,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                transition: "all 0.2s"
-                              }}
-                            >
-                              {result}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                  {/* RBI Selector */}
+                  <div>
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>RBIs (optional)</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[0, 1, 2, 3, 4].map(num => (
+                        <button
+                          key={num}
+                          onClick={() => setRbiCount(num)}
+                          style={{
+                            flex: 1,
+                            padding: "12px",
+                            background: rbiCount === num ? THEME.gold : THEME.blackLight,
+                            border: `2px solid ${rbiCount === num ? THEME.gold : THEME.charcoal}`,
+                            borderRadius: 6,
+                            color: rbiCount === num ? THEME.black : THEME.white,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            cursor: "pointer"
+                          }}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
 
-                      <div>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>RBIs (optional)</div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {[0, 1, 2, 3, 4].map(num => (
+                {/* Recent At-Bats Log */}
+                <div>
+                  <h5 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>
+                    Recent At-Bats ({form.liveTracking.atBats.length})
+                  </h5>
+                  {form.liveTracking.atBats.length === 0 ? (
+                    <Card style={{ textAlign: "center", padding: 40, background: THEME.black }}>
+                      <p style={{ color: THEME.gray, margin: 0, fontSize: 14 }}>
+                        No at-bats logged yet. Start tracking above!
+                      </p>
+                    </Card>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 400, overflowY: "auto" }}>
+                      {[...form.liveTracking.atBats].reverse().map((ab, idx) => {
+                        const actualIndex = form.liveTracking.atBats.length - 1 - idx;
+                        const resultColor = ["1B", "2B", "3B", "HR"].includes(ab.result) ? THEME.green :
+                          ["K", "GO", "FO", "SAC"].includes(ab.result) ? THEME.red :
+                          ["BB", "HBP", "FC"].includes(ab.result) ? THEME.blue : "orange";
+
+                        const pitchCountDisplay = ab.pitchCount
+                          ? `(${ab.pitchCount.strikes}-${ab.pitchCount.balls})`
+                          : "";
+
+                        return (
+                          <Card key={actualIndex} style={{ padding: 12, background: THEME.black, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <span style={{ color: THEME.gold, fontSize: 16, fontWeight: 700 }}>#{ab.jersey}</span>
+                              {ab.name && <span style={{ color: THEME.white, fontSize: 14 }}>{ab.name}</span>}
+                              <span style={{ color: resultColor, fontSize: 15, fontWeight: 700 }}>{ab.result}</span>
+                              {pitchCountDisplay && <span style={{ color: THEME.gray, fontSize: 12 }}>{pitchCountDisplay}</span>}
+                              {ab.rbi > 0 && <span style={{ color: THEME.blue, fontSize: 12, fontWeight: 600 }}>{ab.rbi} RBI</span>}
+                              <span style={{ color: THEME.gray, fontSize: 11 }}>Inn {ab.inning}</span>
+                            </div>
                             <button
-                              key={num}
-                              onClick={() => setRbiCount(num)}
+                              onClick={() => deleteAtBat(actualIndex)}
                               style={{
-                                flex: 1,
-                                padding: "10px",
-                                background: rbiCount === num ? THEME.gold : THEME.blackLight,
-                                border: `1px solid ${rbiCount === num ? THEME.gold : THEME.charcoal}`,
-                                borderRadius: 4,
-                                color: rbiCount === num ? THEME.black : THEME.white,
-                                fontSize: 14,
-                                fontWeight: 700,
+                                padding: "4px 8px",
+                                background: "none",
+                                border: "none",
+                                color: THEME.red,
+                                fontSize: 16,
                                 cursor: "pointer"
                               }}
                             >
-                              {num}
+                              ×
                             </button>
-                          ))}
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* At-Bats Log */}
-                    <div style={{ marginTop: 16 }}>
-                      <h5 style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>At-Bat Log ({form.liveTracking.atBats.length})</h5>
-                      {form.liveTracking.atBats.length === 0 ? (
-                        <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                          <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>No at-bats logged yet</p>
-                        </Card>
-                      ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[...form.liveTracking.atBats].reverse().map((ab, idx) => {
-                            const actualIndex = form.liveTracking.atBats.length - 1 - idx;
-                            const resultColor = ["1B", "2B", "3B", "HR"].includes(ab.result) ? THEME.green :
-                              ["K", "GO", "FO", "SAC"].includes(ab.result) ? THEME.red :
-                              ["BB", "HBP", "FC"].includes(ab.result) ? THEME.blue : THEME.orange;
-                            return (
-                              <Card key={actualIndex} style={{ padding: 8, background: THEME.black, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                  <span style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, width: 30 }}>#{ab.jersey}</span>
-                                  <span style={{ color: resultColor, fontSize: 13, fontWeight: 700 }}>{ab.result}</span>
-                                  {ab.rbi > 0 && <span style={{ color: THEME.blue, fontSize: 11 }}>{ab.rbi} RBI</span>}
-                                  <span style={{ color: THEME.gray, fontSize: 11 }}>Inn {ab.inning}</span>
-                                </div>
-                                <button
-                                  onClick={() => deleteAtBat(actualIndex)}
-                                  style={{
-                                    padding: "4px 8px",
-                                    background: "none",
-                                    border: "none",
-                                    color: THEME.red,
-                                    fontSize: 14,
-                                    cursor: "pointer"
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      )}
+                          </Card>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
-
-                {/* Pitching Tab */}
-                {liveTrackingTab === "pitching" && (
-                  <div>
-                    <Card style={{ padding: 16, background: THEME.black, marginBottom: 12 }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Current Pitcher</div>
-                        <select
-                          value={selectedPitcher}
-                          onChange={e => setSelectedPitcher(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "10px",
-                            background: THEME.blackLight,
-                            border: `1px solid ${THEME.charcoal}`,
-                            borderRadius: 4,
-                            color: THEME.white,
-                            fontSize: 14,
-                            fontWeight: 700
-                          }}
-                        >
-                          <option value="">Select pitcher...</option>
-                          {form.pitching.map((p, idx) => (
-                            <option key={idx} value={p.name}>{p.name || `Pitcher ${idx + 1}`}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Log Pitch</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                          <button
-                            onClick={() => logPitch("strike")}
-                            style={{
-                              padding: "16px",
-                              background: THEME.blackLight,
-                              border: `2px solid ${THEME.green}`,
-                              borderRadius: 6,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 700,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Strike
-                          </button>
-                          <button
-                            onClick={() => logPitch("ball")}
-                            style={{
-                              padding: "16px",
-                              background: THEME.blackLight,
-                              border: `2px solid ${THEME.red}`,
-                              borderRadius: 6,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 700,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Ball
-                          </button>
-                          <button
-                            onClick={() => logPitch("hit")}
-                            style={{
-                              padding: "16px",
-                              background: THEME.blackLight,
-                              border: `2px solid ${THEME.orange}`,
-                              borderRadius: 6,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 700,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Hit
-                          </button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* Pitching Stats Summary */}
-                    <div style={{ marginTop: 16 }}>
-                      <h5 style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>Pitching Stats</h5>
-                      {form.pitching.length === 0 ? (
-                        <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                          <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>Add pitchers in the Pitching tab first</p>
-                        </Card>
-                      ) : (
-                        <div style={{ display: "grid", gap: 8 }}>
-                          {form.pitching.map((pitcher, idx) => {
-                            const pitches = form.liveTracking.pitching.filter(p => p.pitcher === pitcher.name);
-                            const strikes = pitches.filter(p => p.pitch === "strike").length;
-                            const balls = pitches.filter(p => p.pitch === "ball").length;
-                            const hits = pitches.filter(p => p.pitch === "hit").length;
-                            const total = strikes + balls + hits;
-                            const strikePercent = total > 0 ? ((strikes / total) * 100).toFixed(1) : "0";
-
-                            return (
-                              <Card key={idx} style={{ padding: 12, background: THEME.black }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                  <div>
-                                    <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{pitcher.name || `Pitcher ${idx + 1}`}</div>
-                                    <div style={{ color: THEME.gray, fontSize: 11 }}>
-                                      {total} pitches • {strikes} strikes • {balls} balls • {hits} hits • {strikePercent}% strikes
-                                    </div>
-                                  </div>
-                                </div>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Baserunning Tab */}
-                {liveTrackingTab === "baserunning" && (
-                  <div>
-                    <Card style={{ padding: 16, background: THEME.black, marginBottom: 12 }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Jersey #</div>
-                        <input
-                          type="text"
-                          value={selectedJersey}
-                          onChange={e => setSelectedJersey(e.target.value)}
-                          placeholder="Enter jersey number"
-                          style={{
-                            width: "100%",
-                            padding: "10px",
-                            background: THEME.blackLight,
-                            border: `1px solid ${THEME.charcoal}`,
-                            borderRadius: 4,
-                            color: THEME.white,
-                            fontSize: 14,
-                            fontWeight: 700,
-                            textAlign: "center"
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Log Attempt</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <button
-                            onClick={() => logBaserunning("SB")}
-                            style={{
-                              padding: "16px",
-                              background: THEME.blackLight,
-                              border: `2px solid ${THEME.green}`,
-                              borderRadius: 6,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 700,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Stolen Base (SB)
-                          </button>
-                          <button
-                            onClick={() => logBaserunning("CS")}
-                            style={{
-                              padding: "16px",
-                              background: THEME.blackLight,
-                              border: `2px solid ${THEME.red}`,
-                              borderRadius: 6,
-                              color: THEME.white,
-                              fontSize: 14,
-                              fontWeight: 700,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Caught Stealing (CS)
-                          </button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* Baserunning Log */}
-                    <div style={{ marginTop: 16 }}>
-                      <h5 style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>Baserunning Log ({form.liveTracking.baserunning.length})</h5>
-                      {form.liveTracking.baserunning.length === 0 ? (
-                        <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                          <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>No baserunning attempts logged yet</p>
-                        </Card>
-                      ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[...form.liveTracking.baserunning].reverse().map((br, idx) => (
-                            <Card key={idx} style={{ padding: 8, background: THEME.black, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <span style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, width: 30 }}>#{br.jersey}</span>
-                                <span style={{ color: br.type === "SB" ? THEME.green : THEME.red, fontSize: 13, fontWeight: 700 }}>{br.type}</span>
-                                <span style={{ color: THEME.gray, fontSize: 11 }}>Inn {br.inning}</span>
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
