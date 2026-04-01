@@ -7938,10 +7938,30 @@ const Scouting = () => {
                   {/* Roster Grid */}
                   {(() => {
                     const roster = getOpponentRoster();
+                    const playersWithJerseys = roster.filter(p => p.jersey);
+
                     if (roster.length === 0) {
                       return (
-                        <div style={{ padding: 20, textAlign: "center", color: THEME.gray, fontSize: 14, marginBottom: 16 }}>
-                          No roster loaded for this team. Use manual entry below.
+                        <div style={{ padding: 20, textAlign: "center", marginBottom: 16 }}>
+                          <div style={{ color: THEME.gray, fontSize: 14, marginBottom: 8 }}>
+                            No roster loaded for this team
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 12 }}>
+                            Use manual entry below to track jerseys
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (playersWithJerseys.length === 0) {
+                      return (
+                        <div style={{ padding: 20, marginBottom: 16, background: THEME.blackLight, borderRadius: 6, border: `1px solid ${THEME.charcoal}` }}>
+                          <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                            📋 {roster.length} players in roster, but no jersey numbers yet
+                          </div>
+                          <div style={{ color: THEME.gray, fontSize: 12, lineHeight: 1.5 }}>
+                            Use <strong>Manual Entry</strong> below to enter jersey numbers during the game. After the game, you'll be able to link jerseys to player names.
+                          </div>
                         </div>
                       );
                     }
@@ -7949,7 +7969,7 @@ const Scouting = () => {
                     return (
                       <div style={{ marginBottom: 20 }}>
                         <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>
-                          Known Roster:
+                          Known Roster ({playersWithJerseys.length} with jerseys):
                         </div>
                         <div style={{
                           display: "grid",
@@ -7957,8 +7977,7 @@ const Scouting = () => {
                           gap: 8,
                           marginBottom: 16
                         }}>
-                          {roster
-                            .filter(p => p.jersey) // Only show players with jersey numbers
+                          {playersWithJerseys
                             .sort((a, b) => parseInt(a.jersey) - parseInt(b.jersey))
                             .map(player => (
                               <button
