@@ -5907,6 +5907,18 @@ const Scouting = () => {
   const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
 
   const logPitchToCount = (pitchType) => {
+    // Check if jersey is filled before allowing count to reach auto-complete
+    if (!selectedJersey.trim()) {
+      if (pitchType === "strike" && currentPitchCount.strikes >= 2) {
+        alert("Please enter batter jersey number before strike 3");
+        return;
+      }
+      if (pitchType === "ball" && currentPitchCount.balls >= 3) {
+        alert("Please enter batter jersey number before ball 4");
+        return;
+      }
+    }
+
     const newCount = {
       strikes: currentPitchCount.strikes + (pitchType === "strike" ? 1 : 0),
       balls: currentPitchCount.balls + (pitchType === "ball" ? 1 : 0)
