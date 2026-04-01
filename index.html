@@ -795,7 +795,7 @@ const Sparkline = ({ data, width = 60, height = 20, color = THEME.gold, showArea
 
 const Modal = ({ open, onClose, title, children, wide }) => { if (!open) return null; return <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }} onClick={onClose}><div onClick={e => e.stopPropagation()} style={{ background: THEME.blackLight, borderRadius: 12, padding: 24, border: `1px solid ${THEME.gold}`, maxWidth: wide ? 800 : 520, width: "100%", maxHeight: "85vh", overflowY: "auto" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h3 style={{ margin: 0, color: THEME.gold, fontFamily: "'Oswald',sans-serif", fontSize: 20, textTransform: "uppercase" }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", color: THEME.gray, fontSize: 22, cursor: "pointer" }}>✕</button></div>{children}</div></div>; };
 
-const Tabs = ({ tabs, active, onSelect }) => <div style={{ display: "flex", gap: 0, borderBottom: `2px solid ${THEME.charcoal}`, marginBottom: 20, overflowX: "auto" }}>{tabs.map(t => <button key={t.id} onClick={() => onSelect(t.id)} style={{ padding: "10px 14px", background: active === t.id ? THEME.gold : "transparent", color: active === t.id ? THEME.black : THEME.gray, border: "none", fontFamily: "'Oswald',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5, borderBottom: active === t.id ? `2px solid ${THEME.gold}` : "2px solid transparent", whiteSpace: "nowrap" }}>{t.icon} {t.label}</button>)}</div>;
+const Tabs = ({ tabs, active, onSelect }) => <div style={{ display: "flex", gap: 0, borderBottom: `2px solid ${THEME.charcoal}`, marginBottom: 20, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>{tabs.map(t => <button key={t.id} onClick={() => onSelect(t.id)} style={{ padding: "14px 16px", minHeight: 48, background: active === t.id ? THEME.gold : "transparent", color: active === t.id ? THEME.black : THEME.gray, border: "none", fontFamily: "'Oswald',sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5, borderBottom: active === t.id ? `2px solid ${THEME.gold}` : "2px solid transparent", whiteSpace: "nowrap", transition: "all 0.2s ease" }}>{t.icon} {t.label}</button>)}</div>;
 
 const ToggleChips = ({ players, selected, onToggle }) => <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{players.map(p => <button key={p.id} onClick={() => onToggle(p.id)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 12, fontWeight: 700, fontFamily: "'Oswald',sans-serif", cursor: "pointer", background: selected[p.id] ? THEME.gold : THEME.black, color: selected[p.id] ? THEME.black : THEME.gray, border: `1px solid ${selected[p.id] ? THEME.gold : THEME.charcoal}` }}>{p.name.split(" ")[0]}</button>)}</div>;
 
@@ -9481,6 +9481,73 @@ const Reports = ({ players }) => {
 };
 
 // ─── MAIN ───────────────────────────────────────────────────────
+// ─── MOBILE GESTURES ────────────────────────────────────────────
+// Custom hook for swipe detection
+const useSwipe = (onSwipeLeft, onSwipeRight) => {
+  const touchStart = useRef(null);
+  const touchEnd = useRef(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    touchEnd.current = null;
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart.current || !touchEnd.current) return;
+    const distance = touchStart.current - touchEnd.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe && onSwipeLeft) onSwipeLeft();
+    if (isRightSwipe && onSwipeRight) onSwipeRight();
+  };
+
+  return { onTouchStart, onTouchMove, onTouchEnd };
+};
+
+// Custom hook for pull-to-refresh
+const usePullToRefresh = (onRefresh) => {
+  const [pulling, setPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStart = useRef(null);
+  const maxPullDistance = 100;
+  const triggerDistance = 70;
+
+  const onTouchStart = (e) => {
+    if (window.scrollY === 0) {
+      touchStart.current = e.targetTouches[0].clientY;
+    }
+  };
+
+  const onTouchMove = (e) => {
+    if (touchStart.current === null || window.scrollY > 0) return;
+    const currentTouch = e.targetTouches[0].clientY;
+    const distance = currentTouch - touchStart.current;
+    if (distance > 0) {
+      setPullDistance(Math.min(distance, maxPullDistance));
+      setPulling(distance > triggerDistance);
+      // Prevent default scroll when pulling
+      if (distance > 10) e.preventDefault();
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (pulling && onRefresh) {
+      onRefresh();
+    }
+    touchStart.current = null;
+    setPullDistance(0);
+    setPulling(false);
+  };
+
+  return { pullDistance, pulling, onTouchStart, onTouchMove, onTouchEnd };
+};
+
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
   { id: "practicelog", label: "Practice", icon: "📋" },
@@ -9496,6 +9563,40 @@ function App() {
   const [players, setPlayers] = useState(SEED_PLAYERS);
   const [coaches, setCoaches] = useState(SEED_COACHES);
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState(null);
+
+  // Swipe navigation for tabs
+  const handleSwipeLeft = () => {
+    const currentIndex = TABS.findIndex(t => t.id === tab);
+    if (currentIndex < TABS.length - 1) {
+      setSwipeDirection("left");
+      setTimeout(() => setSwipeDirection(null), 300);
+      setTab(TABS[currentIndex + 1].id);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    const currentIndex = TABS.findIndex(t => t.id === tab);
+    if (currentIndex > 0) {
+      setSwipeDirection("right");
+      setTimeout(() => setSwipeDirection(null), 300);
+      setTab(TABS[currentIndex - 1].id);
+    }
+  };
+
+  const swipeHandlers = useSwipe(handleSwipeLeft, handleSwipeRight);
+
+  // Pull-to-refresh for reports tab
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+      window.location.reload();
+    }, 1000);
+  };
+
+  const pullToRefreshHandlers = usePullToRefresh(handleRefresh);
 
   useEffect(() => {
     (async () => {
@@ -9533,8 +9634,75 @@ function App() {
   useEffect(() => { if (loaded) { try { window.storage.set(STORAGE_KEYS.PLAYERS, JSON.stringify(players)); } catch{} } }, [players, loaded]);
   useEffect(() => { if (loaded) { try { window.storage.set(STORAGE_KEYS.COACHES, JSON.stringify(coaches)); } catch{} } }, [coaches, loaded]);
 
-  return <div style={{ minHeight: "100vh", background: THEME.black, color: THEME.white, fontFamily: "'Source Sans 3',sans-serif", padding: "0 0 40px 0" }}>
+  return <div
+    style={{ minHeight: "100vh", background: THEME.black, color: THEME.white, fontFamily: "'Source Sans 3',sans-serif", padding: "0 0 40px 0", position: "relative" }}
+    {...swipeHandlers}
+    {...(tab === "reports" ? pullToRefreshHandlers : {})}
+  >
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+    {/* Pull-to-refresh indicator */}
+    {tab === "reports" && pullToRefreshHandlers.pullDistance > 0 && (
+      <div style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: pullToRefreshHandlers.pullDistance,
+        background: `linear-gradient(to bottom, ${THEME.gold}${Math.floor((pullToRefreshHandlers.pullDistance / 100) * 255).toString(16).padStart(2, '0')}, transparent)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 999,
+        transition: "height 0.1s ease"
+      }}>
+        <div style={{
+          color: THEME.white,
+          fontSize: 24,
+          transform: `rotate(${(pullToRefreshHandlers.pullDistance / 100) * 360}deg)`,
+          transition: "transform 0.1s ease"
+        }}>
+          {pullToRefreshHandlers.pulling ? "↻" : "↓"}
+        </div>
+      </div>
+    )}
+
+    {/* Refreshing overlay */}
+    {refreshing && (
+      <div style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        padding: 16,
+        background: THEME.gold,
+        color: THEME.black,
+        textAlign: "center",
+        fontWeight: 700,
+        zIndex: 1000,
+        animation: "fadeIn 0.3s ease"
+      }}>
+        Refreshing...
+      </div>
+    )}
+
+    {/* Swipe indicator */}
+    {swipeDirection && (
+      <div style={{
+        position: "fixed",
+        top: "50%",
+        [swipeDirection === "left" ? "right" : "left"]: 20,
+        transform: "translateY(-50%)",
+        fontSize: 48,
+        color: THEME.gold,
+        opacity: 0.7,
+        zIndex: 999,
+        pointerEvents: "none",
+        animation: swipeDirection === "left" ? "slideInRight 0.3s ease" : "slideInLeft 0.3s ease"
+      }}>
+        {swipeDirection === "left" ? "→" : "←"}
+      </div>
+    )}
     <div style={{ background: `linear-gradient(135deg, ${THEME.black} 0%, ${THEME.blackLight} 100%)`, borderBottom: `3px solid ${THEME.gold}`, padding: "20px 24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: THEME.black, border: `3px solid ${THEME.gold}`, display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxShadow: `0 0 20px ${THEME.gold}40` }}>
