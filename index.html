@@ -5711,7 +5711,9 @@ const PITCH_TYPE_TAGS = ["Fastball", "Changeup", "Drop", "Rise", "Curveball", "S
 
 const emptyScoutingReport = () => ({
   id: Date.now().toString(),
-  opponentTeamId: "", // NEW: Reference to opponent team ID
+  homeTeamId: "", // Home team ID
+  awayTeamId: "", // Away team ID
+  opponentTeamId: "", // LEGACY: Keep for backwards compatibility with old reports
   opponent: "", // LEGACY: Keep for backwards compatibility with old reports
   dateScoutted: new Date().toISOString().split("T")[0],
   location: "",
@@ -5730,6 +5732,7 @@ const emptyScoutingReport = () => ({
     RF: { rating: 3, notes: "" }
   },
   liveTracking: {
+    activeTeam: "away", // Which team's offense is currently batting: "home" or "away"
     atBats: [], // [{ jersey: "", name: "", result: "1B"|"2B"|"3B"|"HR"|"K"|"GO"|"FO"|"BB"|"HBP"|"FC"|"E", rbi: 0, inning: 1, timestamp: "" }]
     pitching: [], // [{ pitcher: "", pitch: "strike"|"ball"|"hit", inning: 1, timestamp: "" }]
     baserunning: [] // [{ jersey: "", name: "", type: "SB"|"CS", inning: 1, timestamp: "" }]
@@ -5894,8 +5897,14 @@ const Scouting = () => {
 
   // Get opponent roster (for live tracking player selection)
   const getOpponentRoster = () => {
-    if (!form.opponentTeamId) return [];
-    const team = opponentTeams.find(t => t.id === form.opponentTeamId);
+    // Determine which team's roster to use based on activeTeam
+    const activeTeamId = form.liveTracking.activeTeam === "home" ? form.homeTeamId : form.awayTeamId;
+
+    // Fallback to legacy opponentTeamId for backwards compatibility
+    const teamId = activeTeamId || form.opponentTeamId;
+
+    if (!teamId) return [];
+    const team = opponentTeams.find(t => t.id === teamId);
     return team?.players || [];
   };
 
@@ -6766,17 +6775,26 @@ const Scouting = () => {
       {!showForm && reports.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
           {reports.map(report => {
-            // Get opponent name (from team ID or legacy opponent field)
-            const opponentName = report.opponentTeamId
-              ? opponentTeams.find(t => t.id === report.opponentTeamId)?.name || report.opponent
-              : report.opponent;
+            // Get matchup display (home vs away, or legacy opponent)
+            let matchupDisplay;
+            if (report.homeTeamId && report.awayTeamId) {
+              const homeName = opponentTeams.find(t => t.id === report.homeTeamId)?.name || "Home";
+              const awayName = opponentTeams.find(t => t.id === report.awayTeamId)?.name || "Away";
+              matchupDisplay = `${homeName} vs ${awayName}`;
+            } else if (report.opponentTeamId) {
+              // Legacy: single opponent
+              matchupDisplay = opponentTeams.find(t => t.id === report.opponentTeamId)?.name || report.opponent;
+            } else {
+              // Fallback to legacy opponent field
+              matchupDisplay = report.opponent;
+            }
 
             return (
               <Card key={report.id} style={{ padding: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>{opponentName}</h3>
+                      <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>{matchupDisplay}</h3>
                       <Badge>{new Date(report.dateScoutted).toLocaleDateString()}</Badge>
                       {report.location && <Badge color={THEME.gray} bg={`${THEME.gray}20`}>{report.location}</Badge>}
                     </div>
@@ -6796,8 +6814,13 @@ const Scouting = () => {
                     // Ensure liveTracking exists for backwards compatibility
                     const loadedReport = { ...report };
                     if (!loadedReport.liveTracking) {
-                      loadedReport.liveTracking = { atBats: [], pitching: [], baserunning: [] };
+                      loadedReport.liveTracking = { activeTeam: "away", atBats: [], pitching: [], baserunning: [] };
+                    } else if (!loadedReport.liveTracking.activeTeam) {
+                      loadedReport.liveTracking.activeTeam = "away";
                     }
+                    // Ensure homeTeamId and awayTeamId exist (backwards compatibility)
+                    if (!loadedReport.homeTeamId) loadedReport.homeTeamId = "";
+                    if (!loadedReport.awayTeamId) loadedReport.awayTeamId = "";
                     setForm(loadedReport);
                     setEditing(report.id);
                     setShowForm(true);
@@ -6817,10 +6840,10 @@ const Scouting = () => {
         <div>
           <Card style={{ padding: 20, marginBottom: 16 }}>
             {/* Basic Info */}
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Opponent Team *
+                  🏠 Home Team *
                 </label>
                 {opponentTeams.length === 0 ? (
                   <div style={{ padding: "10px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.gray, fontSize: 13 }}>
@@ -6828,11 +6851,10 @@ const Scouting = () => {
                   </div>
                 ) : (
                   <select
-                    value={form.opponentTeamId}
+                    value={form.homeTeamId}
                     onChange={e => {
                       const teamId = e.target.value;
-                      const team = opponentTeams.find(t => t.id === teamId);
-                      setForm({ ...form, opponentTeamId: teamId, opponent: team?.name || "" });
+                      setForm({ ...form, homeTeamId: teamId });
                     }}
                     style={{
                       width: "100%",
@@ -6844,13 +6866,48 @@ const Scouting = () => {
                       fontSize: 13
                     }}
                   >
-                    <option value="">Select opponent team...</option>
+                    <option value="">Select home team...</option>
                     {opponentTeams.map(team => (
                       <option key={team.id} value={team.id}>{team.name}</option>
                     ))}
                   </select>
                 )}
               </div>
+              <div>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  ✈️ Away Team *
+                </label>
+                {opponentTeams.length === 0 ? (
+                  <div style={{ padding: "10px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.gray, fontSize: 13 }}>
+                    No teams yet. <button onClick={() => setShowTeamsModal(true)} style={{ color: THEME.gold, textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}>Add teams first</button>
+                  </div>
+                ) : (
+                  <select
+                    value={form.awayTeamId}
+                    onChange={e => {
+                      const teamId = e.target.value;
+                      setForm({ ...form, awayTeamId: teamId });
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: THEME.blackLight,
+                      border: `1px solid ${THEME.charcoal}`,
+                      borderRadius: 6,
+                      color: THEME.white,
+                      fontSize: 13
+                    }}
+                  >
+                    <option value="">Select away team...</option>
+                    {opponentTeams.map(team => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Date Scouted
@@ -7273,8 +7330,8 @@ const Scouting = () => {
             {/* Live Tracking Section */}
             {activeSection === "liveTracking" && (
               <div>
-                {/* Header with Inning and Pitcher */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}` }}>
+                {/* Header with Inning, Team Batting, and Pitcher */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, padding: 16, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}`, flexWrap: "wrap", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{ color: THEME.gray, fontSize: 13 }}>Inning:</span>
                     <input
@@ -7295,7 +7352,46 @@ const Scouting = () => {
                       }}
                     />
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, marginLeft: 24 }}>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: THEME.gray, fontSize: 13 }}>Batting:</span>
+                    <div style={{ display: "flex", gap: 4, background: THEME.black, borderRadius: 4, padding: 2 }}>
+                      <button
+                        onClick={() => setForm({ ...form, liveTracking: { ...form.liveTracking, activeTeam: "home" } })}
+                        style={{
+                          padding: "6px 12px",
+                          background: form.liveTracking.activeTeam === "home" ? THEME.gold : "transparent",
+                          border: "none",
+                          borderRadius: 3,
+                          color: form.liveTracking.activeTeam === "home" ? THEME.black : THEME.white,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        🏠 {opponentTeams.find(t => t.id === form.homeTeamId)?.name || "Home"}
+                      </button>
+                      <button
+                        onClick={() => setForm({ ...form, liveTracking: { ...form.liveTracking, activeTeam: "away" } })}
+                        style={{
+                          padding: "6px 12px",
+                          background: form.liveTracking.activeTeam === "away" ? THEME.gold : "transparent",
+                          border: "none",
+                          borderRadius: 3,
+                          color: form.liveTracking.activeTeam === "away" ? THEME.black : THEME.white,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        ✈️ {opponentTeams.find(t => t.id === form.awayTeamId)?.name || "Away"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 250 }}>
                     <span style={{ color: THEME.gray, fontSize: 13 }}>Current Pitcher:</span>
                     <input
                       type="text"
@@ -7304,7 +7400,6 @@ const Scouting = () => {
                       placeholder="Enter pitcher name or #"
                       style={{
                         flex: 1,
-                        maxWidth: 300,
                         padding: "8px 12px",
                         background: THEME.black,
                         border: `1px solid ${THEME.gold}`,
