@@ -5871,6 +5871,8 @@ const Scouting = () => {
   const [selectedPitcher, setSelectedPitcher] = useState("");
   const [rbiCount, setRbiCount] = useState(0);
   const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
+  const [baserunners, setBaserunners] = useState({ first: null, second: null, third: null }); // { jersey: "", name: "" }
+  const [selectedRunner, setSelectedRunner] = useState(null); // { base: "first"|"second"|"third", jersey: "", name: "" }
 
   const logPitchToCount = (pitchType) => {
     // Check if jersey is filled before allowing count to reach auto-complete
@@ -5955,6 +5957,9 @@ const Scouting = () => {
       }
     });
 
+    // Advance runners based on result
+    advanceRunners(result, selectedJersey, playerName);
+
     // Reset for next at-bat
     setSelectedJersey("");
     setRbiCount(0);
@@ -5962,6 +5967,168 @@ const Scouting = () => {
     // Pitcher stays selected
   };
 
+  // Advance runners based on at-bat result
+  const advanceRunners = (result, batterJersey, batterName) => {
+    const newRunners = { ...baserunners };
+    const batter = { jersey: batterJersey, name: batterName };
+
+    if (result === "HR") {
+      // Home run - everyone scores including batter
+      setBaserunners({ first: null, second: null, third: null });
+    } else if (result === "3B") {
+      // Triple - all runners score, batter to 3rd
+      newRunners.third = batter;
+      newRunners.second = null;
+      newRunners.first = null;
+      setBaserunners(newRunners);
+    } else if (result === "2B") {
+      // Double - runners on 2nd/3rd score, runner on 1st to 3rd, batter to 2nd
+      if (newRunners.first) {
+        newRunners.third = newRunners.first;
+      }
+      newRunners.second = batter;
+      newRunners.first = null;
+      setBaserunners(newRunners);
+    } else if (result === "1B") {
+      // Single - runner on 3rd scores, 2nd to 3rd, 1st to 2nd, batter to 1st
+      if (newRunners.second) {
+        newRunners.third = newRunners.second;
+      }
+      if (newRunners.first) {
+        newRunners.second = newRunners.first;
+      }
+      newRunners.first = batter;
+      setBaserunners(newRunners);
+    } else if (result === "BB" || result === "HBP") {
+      // Walk/HBP - force advances only
+      if (newRunners.first) {
+        if (newRunners.second) {
+          if (newRunners.third) {
+            // Bases loaded - runner on 3rd scores
+          }
+          newRunners.third = newRunners.second;
+        }
+        newRunners.second = newRunners.first;
+      }
+      newRunners.first = batter;
+      setBaserunners(newRunners);
+    } else if (result === "FC" || result === "E") {
+      // Fielder's choice or error - batter to 1st, runners stay (simplified)
+      if (!newRunners.first) {
+        newRunners.first = batter;
+      }
+      setBaserunners(newRunners);
+    }
+    // Outs (K, GO, FO, SAC) - runners stay in place (no advancement tracked here)
+  };
+
+  // Runner actions
+  const stealBase = (fromBase) => {
+    if (!selectedRunner) return;
+
+    const toBase = fromBase === "first" ? "second" : fromBase === "second" ? "third" : "home";
+    const runner = baserunners[fromBase];
+
+    // Log stolen base
+    const baserunEvent = {
+      jersey: runner.jersey,
+      name: runner.name,
+      type: "SB",
+      from: fromBase,
+      to: toBase,
+      inning: liveInning,
+      timestamp: new Date().toISOString()
+    };
+
+    setForm({
+      ...form,
+      liveTracking: {
+        ...form.liveTracking,
+        baserunning: [...form.liveTracking.baserunning, baserunEvent]
+      }
+    });
+
+    // Move runner
+    const newRunners = { ...baserunners };
+    newRunners[fromBase] = null;
+    if (toBase !== "home") {
+      newRunners[toBase] = runner;
+    }
+    setBaserunners(newRunners);
+    setSelectedRunner(null);
+  };
+
+  const caughtStealing = (fromBase) => {
+    if (!selectedRunner) return;
+
+    const toBase = fromBase === "first" ? "second" : fromBase === "second" ? "third" : "home";
+    const runner = baserunners[fromBase];
+
+    // Log caught stealing
+    const baserunEvent = {
+      jersey: runner.jersey,
+      name: runner.name,
+      type: "CS",
+      from: fromBase,
+      to: toBase,
+      inning: liveInning,
+      timestamp: new Date().toISOString()
+    };
+
+    setForm({
+      ...form,
+      liveTracking: {
+        ...form.liveTracking,
+        baserunning: [...form.liveTracking.baserunning, baserunEvent]
+      }
+    });
+
+    // Remove runner
+    const newRunners = { ...baserunners };
+    newRunners[fromBase] = null;
+    setBaserunners(newRunners);
+    setSelectedRunner(null);
+  };
+
+  const scoreRunner = (fromBase) => {
+    if (!selectedRunner) return;
+
+    // Log as scored (using SB to home for now)
+    const runner = baserunners[fromBase];
+    const baserunEvent = {
+      jersey: runner.jersey,
+      name: runner.name,
+      type: "SB",
+      from: fromBase,
+      to: "home",
+      inning: liveInning,
+      timestamp: new Date().toISOString()
+    };
+
+    setForm({
+      ...form,
+      liveTracking: {
+        ...form.liveTracking,
+        baserunning: [...form.liveTracking.baserunning, baserunEvent]
+      }
+    });
+
+    // Remove runner (scored)
+    const newRunners = { ...baserunners };
+    newRunners[fromBase] = null;
+    setBaserunners(newRunners);
+    setSelectedRunner(null);
+  };
+
+  const outOnBases = (fromBase) => {
+    if (!selectedRunner) return;
+
+    // Just remove runner (out recorded elsewhere)
+    const newRunners = { ...baserunners };
+    newRunners[fromBase] = null;
+    setBaserunners(newRunners);
+    setSelectedRunner(null);
+  };
 
   const logBaserunning = (type) => {
     const jersey = selectedJersey.trim();
@@ -7303,6 +7470,276 @@ const Scouting = () => {
                       ))}
                     </div>
                   </div>
+                </Card>
+
+                {/* Baseball Diamond - Baserunner Tracker */}
+                <Card style={{ padding: 20, background: THEME.black, marginBottom: 16 }}>
+                  <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Baserunners</h5>
+
+                  {/* Diamond Container */}
+                  <div style={{
+                    position: "relative",
+                    width: "100%",
+                    maxWidth: 400,
+                    margin: "0 auto",
+                    paddingBottom: "100%", // 1:1 aspect ratio
+                    background: THEME.blackLight,
+                    borderRadius: 8
+                  }}>
+                    {/* Diamond Shape (rotated square) */}
+                    <div style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      width: "70%",
+                      height: "70%",
+                      transform: "translate(-50%, -50%) rotate(45deg)",
+                      border: `3px solid ${THEME.charcoal}`,
+                      background: "rgba(251, 181, 21, 0.05)"
+                    }} />
+
+                    {/* Home Plate */}
+                    <div style={{
+                      position: "absolute",
+                      bottom: "5%",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 50,
+                      height: 50,
+                      background: THEME.charcoal,
+                      border: `2px solid ${THEME.gold}`,
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: THEME.gold
+                    }}>
+                      H
+                    </div>
+
+                    {/* First Base */}
+                    <div
+                      onClick={() => baserunners.first && setSelectedRunner({ base: "first", ...baserunners.first })}
+                      style={{
+                        position: "absolute",
+                        right: "5%",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: baserunners.first ? 90 : 50,
+                        height: 50,
+                        background: baserunners.first ? THEME.gold : THEME.charcoal,
+                        border: `2px solid ${baserunners.first ? THEME.gold : THEME.gray}`,
+                        borderRadius: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: baserunners.first ? 11 : 12,
+                        fontWeight: 700,
+                        color: baserunners.first ? THEME.black : THEME.gray,
+                        cursor: baserunners.first ? "pointer" : "default",
+                        transition: "all 0.2s",
+                        boxShadow: selectedRunner?.base === "first" ? `0 0 0 3px ${THEME.blue}` : "none"
+                      }}
+                    >
+                      {baserunners.first ? (
+                        <>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>#{baserunners.first.jersey}</div>
+                          {baserunners.first.name && <div style={{ fontSize: 9, marginTop: 2 }}>{baserunners.first.name.split(' ')[0]}</div>}
+                        </>
+                      ) : "1B"}
+                    </div>
+
+                    {/* Second Base */}
+                    <div
+                      onClick={() => baserunners.second && setSelectedRunner({ base: "second", ...baserunners.second })}
+                      style={{
+                        position: "absolute",
+                        top: "5%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: baserunners.second ? 90 : 50,
+                        height: 50,
+                        background: baserunners.second ? THEME.gold : THEME.charcoal,
+                        border: `2px solid ${baserunners.second ? THEME.gold : THEME.gray}`,
+                        borderRadius: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: baserunners.second ? 11 : 12,
+                        fontWeight: 700,
+                        color: baserunners.second ? THEME.black : THEME.gray,
+                        cursor: baserunners.second ? "pointer" : "default",
+                        transition: "all 0.2s",
+                        boxShadow: selectedRunner?.base === "second" ? `0 0 0 3px ${THEME.blue}` : "none"
+                      }}
+                    >
+                      {baserunners.second ? (
+                        <>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>#{baserunners.second.jersey}</div>
+                          {baserunners.second.name && <div style={{ fontSize: 9, marginTop: 2 }}>{baserunners.second.name.split(' ')[0]}</div>}
+                        </>
+                      ) : "2B"}
+                    </div>
+
+                    {/* Third Base */}
+                    <div
+                      onClick={() => baserunners.third && setSelectedRunner({ base: "third", ...baserunners.third })}
+                      style={{
+                        position: "absolute",
+                        left: "5%",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: baserunners.third ? 90 : 50,
+                        height: 50,
+                        background: baserunners.third ? THEME.gold : THEME.charcoal,
+                        border: `2px solid ${baserunners.third ? THEME.gold : THEME.gray}`,
+                        borderRadius: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: baserunners.third ? 11 : 12,
+                        fontWeight: 700,
+                        color: baserunners.third ? THEME.black : THEME.gray,
+                        cursor: baserunners.third ? "pointer" : "default",
+                        transition: "all 0.2s",
+                        boxShadow: selectedRunner?.base === "third" ? `0 0 0 3px ${THEME.blue}` : "none"
+                      }}
+                    >
+                      {baserunners.third ? (
+                        <>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>#{baserunners.third.jersey}</div>
+                          {baserunners.third.name && <div style={{ fontSize: 9, marginTop: 2 }}>{baserunners.third.name.split(' ')[0]}</div>}
+                        </>
+                      ) : "3B"}
+                    </div>
+                  </div>
+
+                  {/* Runner Action Menu */}
+                  {selectedRunner && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{
+                        padding: 12,
+                        background: THEME.blackLight,
+                        borderRadius: 6,
+                        border: `2px solid ${THEME.blue}`,
+                        marginBottom: 12
+                      }}>
+                        <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                          Selected: #{selectedRunner.jersey} {selectedRunner.name && `(${selectedRunner.name})`} on {selectedRunner.base.toUpperCase()}
+                        </div>
+                        <div style={{ color: THEME.gray, fontSize: 11 }}>
+                          Choose an action below
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <button
+                          onClick={() => stealBase(selectedRunner.base)}
+                          style={{
+                            padding: "12px",
+                            background: THEME.blackLight,
+                            border: `2px solid ${THEME.green}`,
+                            borderRadius: 6,
+                            color: THEME.white,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          🏃 Steal {selectedRunner.base === "first" ? "2nd" : selectedRunner.base === "second" ? "3rd" : "Home"}
+                        </button>
+                        <button
+                          onClick={() => caughtStealing(selectedRunner.base)}
+                          style={{
+                            padding: "12px",
+                            background: THEME.blackLight,
+                            border: `2px solid ${THEME.red}`,
+                            borderRadius: 6,
+                            color: THEME.white,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          ❌ Caught Stealing
+                        </button>
+                        <button
+                          onClick={() => scoreRunner(selectedRunner.base)}
+                          style={{
+                            padding: "12px",
+                            background: THEME.blackLight,
+                            border: `2px solid ${THEME.blue}`,
+                            borderRadius: 6,
+                            color: THEME.white,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          ⭐ Score
+                        </button>
+                        <button
+                          onClick={() => outOnBases(selectedRunner.base)}
+                          style={{
+                            padding: "12px",
+                            background: THEME.blackLight,
+                            border: `2px solid ${THEME.red}`,
+                            borderRadius: 6,
+                            color: THEME.white,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          🚫 Out on Bases
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedRunner(null)}
+                        style={{
+                          width: "100%",
+                          marginTop: 8,
+                          padding: "8px",
+                          background: "none",
+                          border: `1px solid ${THEME.charcoal}`,
+                          borderRadius: 4,
+                          color: THEME.gray,
+                          fontSize: 12,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {!selectedRunner && (baserunners.first || baserunners.second || baserunners.third) && (
+                    <div style={{
+                      marginTop: 16,
+                      textAlign: "center",
+                      color: THEME.gray,
+                      fontSize: 12
+                    }}>
+                      Click on a runner to take action
+                    </div>
+                  )}
+
+                  {!baserunners.first && !baserunners.second && !baserunners.third && (
+                    <div style={{
+                      marginTop: 16,
+                      textAlign: "center",
+                      color: THEME.gray,
+                      fontSize: 12
+                    }}>
+                      No runners on base
+                    </div>
+                  )}
                 </Card>
 
                 {/* Recent At-Bats Log */}
