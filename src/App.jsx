@@ -5969,55 +5969,47 @@ const Scouting = () => {
 
   // Advance runners based on at-bat result
   const advanceRunners = (result, batterJersey, batterName) => {
-    const newRunners = { ...baserunners };
     const batter = { jersey: batterJersey, name: batterName };
+
+    // Capture current base state before modifying
+    const runnerOn1st = baserunners.first;
+    const runnerOn2nd = baserunners.second;
+    const runnerOn3rd = baserunners.third;
 
     if (result === "HR") {
       // Home run - everyone scores including batter
       setBaserunners({ first: null, second: null, third: null });
     } else if (result === "3B") {
       // Triple - all runners score, batter to 3rd
-      newRunners.third = batter;
-      newRunners.second = null;
-      newRunners.first = null;
-      setBaserunners(newRunners);
+      setBaserunners({ first: null, second: null, third: batter });
     } else if (result === "2B") {
       // Double - runners on 2nd/3rd score, runner on 1st to 3rd, batter to 2nd
-      if (newRunners.first) {
-        newRunners.third = newRunners.first;
-      }
-      newRunners.second = batter;
-      newRunners.first = null;
-      setBaserunners(newRunners);
+      setBaserunners({
+        first: null,
+        second: batter,
+        third: runnerOn1st || null  // Runner from 1st advances to 3rd
+      });
     } else if (result === "1B") {
       // Single - runner on 3rd scores, 2nd to 3rd, 1st to 2nd, batter to 1st
-      if (newRunners.second) {
-        newRunners.third = newRunners.second;
-      }
-      if (newRunners.first) {
-        newRunners.second = newRunners.first;
-      }
-      newRunners.first = batter;
-      setBaserunners(newRunners);
+      setBaserunners({
+        first: batter,
+        second: runnerOn1st || null,   // Runner from 1st advances to 2nd
+        third: runnerOn2nd || null      // Runner from 2nd advances to 3rd
+      });
     } else if (result === "BB" || result === "HBP") {
       // Walk/HBP - force advances only
-      if (newRunners.first) {
-        if (newRunners.second) {
-          if (newRunners.third) {
-            // Bases loaded - runner on 3rd scores
-          }
-          newRunners.third = newRunners.second;
-        }
-        newRunners.second = newRunners.first;
-      }
-      newRunners.first = batter;
-      setBaserunners(newRunners);
+      setBaserunners({
+        first: batter,
+        second: runnerOn1st ? runnerOn1st : (runnerOn2nd || null),  // Force advance if 1st occupied
+        third: (runnerOn1st && runnerOn2nd) ? runnerOn2nd : (runnerOn3rd || null)  // Force advance if 1st+2nd occupied
+      });
     } else if (result === "FC" || result === "E") {
       // Fielder's choice or error - batter to 1st, runners stay (simplified)
-      if (!newRunners.first) {
-        newRunners.first = batter;
-      }
-      setBaserunners(newRunners);
+      setBaserunners({
+        first: batter,
+        second: runnerOn2nd || null,
+        third: runnerOn3rd || null
+      });
     }
     // Outs (K, GO, FO, SAC) - runners stay in place (no advancement tracked here)
   };
