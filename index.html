@@ -5908,23 +5908,71 @@ const Scouting = () => {
     return team?.players || [];
   };
 
+  // Get active team name for display
+  const getActiveTeamName = () => {
+    const activeTeamId = form.liveTracking.activeTeam === "home" ? form.homeTeamId : form.awayTeamId;
+    const team = opponentTeams.find(t => t.id === activeTeamId);
+    return team?.name || (form.liveTracking.activeTeam === "home" ? "Home" : "Away");
+  };
+
   // Live Tracking functions
   const [liveInning, setLiveInning] = useState(1);
   const [selectedJersey, setSelectedJersey] = useState("");
+  const [selectedBatterName, setSelectedBatterName] = useState("");
   const [selectedPitcher, setSelectedPitcher] = useState("");
   const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
   const [baserunners, setBaserunners] = useState({ first: null, second: null, third: null }); // { jersey: "", name: "" }
   const [selectedRunner, setSelectedRunner] = useState(null); // { base: "first"|"second"|"third", jersey: "", name: "" }
+  const [showBatterModal, setShowBatterModal] = useState(false);
+  const [manualJerseyEntry, setManualJerseyEntry] = useState("");
+
+  // Batter selection handlers
+  const selectBatterFromRoster = (player) => {
+    setSelectedJersey(player.jersey);
+    setSelectedBatterName(player.name);
+    setShowBatterModal(false);
+    setManualJerseyEntry("");
+  };
+
+  const selectManualJersey = () => {
+    const jersey = manualJerseyEntry.trim();
+    if (!jersey) {
+      alert("Please enter a jersey number");
+      return;
+    }
+
+    // Check if this jersey exists in roster (auto-link)
+    const roster = getOpponentRoster();
+    const matchedPlayer = roster.find(p => p.jersey === jersey);
+
+    if (matchedPlayer) {
+      // Auto-link to existing roster player
+      setSelectedJersey(jersey);
+      setSelectedBatterName(matchedPlayer.name);
+    } else {
+      // Unknown jersey - just use the number
+      setSelectedJersey(jersey);
+      setSelectedBatterName("");
+    }
+
+    setShowBatterModal(false);
+    setManualJerseyEntry("");
+  };
+
+  const clearBatterSelection = () => {
+    setSelectedJersey("");
+    setSelectedBatterName("");
+  };
 
   const logPitchToCount = (pitchType) => {
     // Check if jersey is filled before allowing count to reach auto-complete
     if (!selectedJersey.trim()) {
       if (pitchType === "strike" && currentPitchCount.strikes >= 2) {
-        alert("Please enter batter jersey number before strike 3");
+        alert("Please select a batter before strike 3");
         return;
       }
       if (pitchType === "ball" && currentPitchCount.balls >= 3) {
-        alert("Please enter batter jersey number before ball 4");
+        alert("Please select a batter before ball 4");
         return;
       }
     }
@@ -5948,7 +5996,7 @@ const Scouting = () => {
 
   const logAtBat = (result) => {
     if (!selectedJersey.trim()) {
-      alert("Please enter a jersey number");
+      alert("Please select a batter");
       return;
     }
 
@@ -5957,14 +6005,10 @@ const Scouting = () => {
       return;
     }
 
-    // Get player name from roster if available
-    const roster = getOpponentRoster();
-    const player = roster.find(p => p.jersey === selectedJersey);
-    const playerName = player?.name || "";
-
+    // Use selectedBatterName (already set from roster or manual entry)
     const atBat = {
       jersey: selectedJersey,
-      name: playerName,
+      name: selectedBatterName || "",
       result,
       pitchCount: currentPitchCount,
       inning: liveInning,
@@ -5999,10 +6043,11 @@ const Scouting = () => {
     });
 
     // Advance runners based on result
-    advanceRunners(result, selectedJersey, playerName);
+    advanceRunners(result, selectedJersey, selectedBatterName || "");
 
     // Reset for next at-bat
     setSelectedJersey("");
+    setSelectedBatterName("");
     setCurrentPitchCount({ strikes: 0, balls: 0 });
     // Pitcher stays selected
   };
@@ -7360,26 +7405,69 @@ const Scouting = () => {
                 <Card style={{ padding: 20, background: THEME.black, marginBottom: 16 }}>
                   <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Current At-Bat</h5>
 
-                  {/* Batter Jersey */}
+                  {/* Batter Selection */}
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Batter Jersey #</div>
-                    <input
-                      type="text"
-                      value={selectedJersey}
-                      onChange={e => setSelectedJersey(e.target.value)}
-                      placeholder="Enter jersey number"
-                      style={{
-                        width: "100%",
-                        padding: "12px",
+                    <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Current Batter</div>
+                    {!selectedJersey ? (
+                      <button
+                        onClick={() => setShowBatterModal(true)}
+                        style={{
+                          width: "100%",
+                          padding: "16px",
+                          background: THEME.gold,
+                          border: "none",
+                          borderRadius: 6,
+                          color: THEME.black,
+                          fontSize: 16,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        📋 Select Batter
+                      </button>
+                    ) : (
+                      <div style={{
+                        padding: "12px 16px",
                         background: THEME.blackLight,
-                        border: `2px solid ${THEME.charcoal}`,
+                        border: `2px solid ${THEME.gold}`,
                         borderRadius: 6,
-                        color: THEME.white,
-                        fontSize: 18,
-                        fontWeight: 700,
-                        textAlign: "center"
-                      }}
-                    />
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}>
+                        <div>
+                          <div style={{ color: THEME.gold, fontSize: 20, fontWeight: 700 }}>
+                            #{selectedJersey}
+                          </div>
+                          {selectedBatterName && (
+                            <div style={{ color: THEME.white, fontSize: 14, marginTop: 4 }}>
+                              {selectedBatterName}
+                            </div>
+                          )}
+                          {!selectedBatterName && (
+                            <div style={{ color: THEME.gray, fontSize: 12, marginTop: 4, fontStyle: "italic" }}>
+                              (unknown)
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={clearBatterSelection}
+                          style={{
+                            padding: "6px 12px",
+                            background: THEME.red,
+                            border: "none",
+                            borderRadius: 4,
+                            color: THEME.white,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Pitch Count Display */}
@@ -7814,6 +7902,180 @@ const Scouting = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Batter Selection Modal */}
+            {showBatterModal && (
+              <div style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(0, 0, 0, 0.8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                padding: 16
+              }}>
+                <Card style={{
+                  width: "100%",
+                  maxWidth: 500,
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                  padding: 20,
+                  background: THEME.black
+                }}>
+                  <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                    Select Batter - {getActiveTeamName()}
+                  </h3>
+                  <p style={{ color: THEME.gray, fontSize: 13, marginBottom: 16 }}>
+                    Choose from roster or enter manually
+                  </p>
+
+                  {/* Roster Grid */}
+                  {(() => {
+                    const roster = getOpponentRoster();
+                    if (roster.length === 0) {
+                      return (
+                        <div style={{ padding: 20, textAlign: "center", color: THEME.gray, fontSize: 14, marginBottom: 16 }}>
+                          No roster loaded for this team. Use manual entry below.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ marginBottom: 20 }}>
+                        <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>
+                          Known Roster:
+                        </div>
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                          gap: 8,
+                          marginBottom: 16
+                        }}>
+                          {roster
+                            .filter(p => p.jersey) // Only show players with jersey numbers
+                            .sort((a, b) => parseInt(a.jersey) - parseInt(b.jersey))
+                            .map(player => (
+                              <button
+                                key={player.id}
+                                onClick={() => selectBatterFromRoster(player)}
+                                style={{
+                                  padding: "12px 8px",
+                                  background: THEME.blackLight,
+                                  border: `2px solid ${THEME.gold}`,
+                                  borderRadius: 6,
+                                  color: THEME.white,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                <div style={{ fontSize: 16, fontWeight: 700, color: THEME.gold }}>
+                                  #{player.jersey}
+                                </div>
+                                {player.name && (
+                                  <div style={{ fontSize: 10, textAlign: "center", lineHeight: 1.2 }}>
+                                    {player.name.split(' ')[0]}
+                                  </div>
+                                )}
+                                {!player.name && (
+                                  <div style={{ fontSize: 9, color: THEME.gray, fontStyle: "italic" }}>
+                                    (unknown)
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Divider */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 16
+                  }}>
+                    <div style={{ flex: 1, height: 1, background: THEME.charcoal }} />
+                    <span style={{ color: THEME.gray, fontSize: 12, textTransform: "uppercase" }}>OR</span>
+                    <div style={{ flex: 1, height: 1, background: THEME.charcoal }} />
+                  </div>
+
+                  {/* Manual Entry */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>
+                      Manual Entry:
+                    </div>
+                    <p style={{ color: THEME.gray, fontSize: 12, marginBottom: 12 }}>
+                      If jersey not listed above, enter it manually
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        value={manualJerseyEntry}
+                        onChange={e => setManualJerseyEntry(e.target.value)}
+                        placeholder="Enter jersey # (e.g., 23)"
+                        onKeyPress={e => e.key === "Enter" && selectManualJersey()}
+                        style={{
+                          flex: 1,
+                          padding: "12px",
+                          background: THEME.blackLight,
+                          border: `2px solid ${THEME.charcoal}`,
+                          borderRadius: 6,
+                          color: THEME.white,
+                          fontSize: 16,
+                          fontWeight: 700
+                        }}
+                      />
+                      <button
+                        onClick={selectManualJersey}
+                        style={{
+                          padding: "12px 20px",
+                          background: THEME.gold,
+                          border: "none",
+                          borderRadius: 6,
+                          color: THEME.black,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Select
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cancel Button */}
+                  <button
+                    onClick={() => {
+                      setShowBatterModal(false);
+                      setManualJerseyEntry("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      background: "none",
+                      border: `1px solid ${THEME.charcoal}`,
+                      borderRadius: 6,
+                      color: THEME.gray,
+                      fontSize: 14,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </Card>
               </div>
             )}
 
