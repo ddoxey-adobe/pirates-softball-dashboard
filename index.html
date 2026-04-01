@@ -5701,14 +5701,21 @@ const Comms = ({ players }) => {
 };
 
 // ─── SCOUTING PORTAL ────────────────────────────────────────────
+// Tag options for quick selection
+const BATTING_STRENGTH_TAGS = ["Pull Hitter", "Power", "Speed", "Contact", "Bunt", "Patient", "Aggressive", "Clutch"];
+const BATTING_WEAKNESS_TAGS = ["Inside", "Outside", "High", "Low", "Fastball", "Off-speed", "Changeup", "Breaking Ball"];
+const PITCHING_SPEED_TAGS = ["Fast", "Medium", "Slow", "Very Fast", "Variable"];
+const PITCHING_CONTROL_TAGS = ["Excellent", "Good", "Average", "Wild", "Inconsistent"];
+const PITCH_TYPE_TAGS = ["Fastball", "Changeup", "Drop", "Rise", "Curveball", "Screwball"];
+
 const emptyScoutingReport = () => ({
   id: Date.now().toString(),
   opponent: "",
   dateScoutted: new Date().toISOString().split("T")[0],
   location: "",
   notes: "",
-  batting: [], // [{ jersey: "", name: "", notes: "", strengths: "", weaknesses: "" }]
-  pitching: [], // [{ name: "", speed: "", control: "", pitches: "", notes: "" }]
+  batting: [], // [{ jersey: "", name: "", notes: "", strengths: [], weaknesses: [] }] - strengths/weaknesses are tag arrays
+  pitching: [], // [{ name: "", speed: [], control: [], pitches: [], notes: "" }] - speed/control/pitches are tag arrays
   defense: { // position: { rating: 1-5, notes: "" }
     P: { rating: 3, notes: "" },
     C: { rating: 3, notes: "" },
@@ -5761,10 +5768,41 @@ const Scouting = () => {
     }
   };
 
+  const cloneReport = (report) => {
+    const cloned = {
+      ...report,
+      id: Date.now().toString(),
+      dateScoutted: new Date().toISOString().split("T")[0],
+      createdDate: new Date().toISOString()
+    };
+    setForm(cloned);
+    setEditing(null);
+    setShowForm(true);
+    setActiveSection("batting");
+  };
+
+  const quickAddBatters = () => {
+    const jerseys = prompt("Enter jersey numbers separated by commas (e.g., 12, 7, 23, 5):");
+    if (!jerseys) return;
+
+    const newBatters = jerseys.split(",").map(j => ({
+      jersey: j.trim(),
+      name: "",
+      notes: "",
+      strengths: [],
+      weaknesses: []
+    }));
+
+    setForm({
+      ...form,
+      batting: [...form.batting, ...newBatters]
+    });
+  };
+
   const addBatter = () => {
     setForm({
       ...form,
-      batting: [...form.batting, { jersey: "", name: "", notes: "", strengths: "", weaknesses: "" }]
+      batting: [...form.batting, { jersey: "", name: "", notes: "", strengths: [], weaknesses: [] }]
     });
   };
 
@@ -5781,10 +5819,21 @@ const Scouting = () => {
     setForm({ ...form, batting: newBatting });
   };
 
+  const toggleBatterTag = (index, field, tag) => {
+    const newBatting = [...form.batting];
+    const tags = newBatting[index][field];
+    if (tags.includes(tag)) {
+      newBatting[index][field] = tags.filter(t => t !== tag);
+    } else {
+      newBatting[index][field] = [...tags, tag];
+    }
+    setForm({ ...form, batting: newBatting });
+  };
+
   const addPitcher = () => {
     setForm({
       ...form,
-      pitching: [...form.pitching, { name: "", speed: "", control: "", pitches: "", notes: "" }]
+      pitching: [...form.pitching, { name: "", speed: [], control: [], pitches: [], notes: "" }]
     });
   };
 
@@ -5798,6 +5847,17 @@ const Scouting = () => {
   const updatePitcher = (index, field, value) => {
     const newPitching = [...form.pitching];
     newPitching[index] = { ...newPitching[index], [field]: value };
+    setForm({ ...form, pitching: newPitching });
+  };
+
+  const togglePitcherTag = (index, field, tag) => {
+    const newPitching = [...form.pitching];
+    const tags = newPitching[index][field];
+    if (tags.includes(tag)) {
+      newPitching[index][field] = tags.filter(t => t !== tag);
+    } else {
+      newPitching[index][field] = [...tags, tag];
+    }
     setForm({ ...form, pitching: newPitching });
   };
 
@@ -5853,12 +5913,14 @@ const Scouting = () => {
     <tr><th>#</th><th>Name</th><th>Strengths</th><th>Weaknesses</th><th>Notes</th></tr>
 `;
       report.batting.forEach(b => {
+        const strengths = Array.isArray(b.strengths) ? b.strengths.join(", ") : b.strengths || "-";
+        const weaknesses = Array.isArray(b.weaknesses) ? b.weaknesses.join(", ") : b.weaknesses || "-";
         html += `
     <tr>
       <td><strong>${b.jersey}</strong></td>
       <td>${b.name || "Unknown"}</td>
-      <td>${b.strengths || "-"}</td>
-      <td>${b.weaknesses || "-"}</td>
+      <td>${strengths}</td>
+      <td>${weaknesses}</td>
       <td>${b.notes || "-"}</td>
     </tr>
 `;
@@ -5873,12 +5935,15 @@ const Scouting = () => {
     <tr><th>Name</th><th>Speed</th><th>Control</th><th>Pitches</th><th>Notes</th></tr>
 `;
       report.pitching.forEach(p => {
+        const speed = Array.isArray(p.speed) ? p.speed.join(", ") : p.speed || "-";
+        const control = Array.isArray(p.control) ? p.control.join(", ") : p.control || "-";
+        const pitches = Array.isArray(p.pitches) ? p.pitches.join(", ") : p.pitches || "-";
         html += `
     <tr>
       <td><strong>${p.name}</strong></td>
-      <td>${p.speed || "-"}</td>
-      <td>${p.control || "-"}</td>
-      <td>${p.pitches || "-"}</td>
+      <td>${speed}</td>
+      <td>${control}</td>
+      <td>${pitches}</td>
       <td>${p.notes || "-"}</td>
     </tr>
 `;
@@ -5967,6 +6032,7 @@ const Scouting = () => {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
+                  <Button small onClick={() => cloneReport(report)}>📋 Clone</Button>
                   <Button small onClick={() => exportReport(report)}>📄 Export</Button>
                   <Button small onClick={() => { setForm(report); setEditing(report.id); setShowForm(true); setActiveSection("batting"); }}>Edit</Button>
                   <Button small danger onClick={() => deleteReport(report.id)}>Delete</Button>
@@ -6075,104 +6141,139 @@ const Scouting = () => {
             {/* Batting Section */}
             {activeSection === "batting" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8 }}>
                   <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Batting Lineup</h4>
-                  <Button small onClick={addBatter}>+ Add Batter</Button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button small onClick={quickAddBatters}>⚡ Quick Add</Button>
+                    <Button small onClick={addBatter}>+ Add Batter</Button>
+                  </div>
                 </div>
                 {form.batting.length === 0 ? (
                   <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
-                    <p style={{ color: THEME.gray, margin: 0 }}>No batters added yet.</p>
+                    <p style={{ color: THEME.gray, margin: 0 }}>No batters added yet. Use Quick Add for jersey numbers only.</p>
                   </Card>
                 ) : (
                   <div style={{ display: "grid", gap: 12 }}>
                     {form.batting.map((batter, idx) => (
-                      <Card key={idx} style={{ padding: 12, background: THEME.black }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 1fr 1fr 40px", gap: 8, alignItems: "center" }}>
-                          <input
-                            type="text"
-                            value={batter.jersey}
-                            onChange={e => updateBatter(idx, "jersey", e.target.value)}
-                            placeholder="#"
+                      <Card key={idx} style={{ padding: 16, background: THEME.black }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input
+                              type="text"
+                              value={batter.jersey}
+                              onChange={e => updateBatter(idx, "jersey", e.target.value)}
+                              placeholder="#"
+                              style={{
+                                width: 50,
+                                padding: "8px",
+                                background: THEME.blackLight,
+                                border: `1px solid ${THEME.charcoal}`,
+                                borderRadius: 4,
+                                color: THEME.white,
+                                fontSize: 14,
+                                textAlign: "center",
+                                fontWeight: 700
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={batter.name}
+                              onChange={e => updateBatter(idx, "name", e.target.value)}
+                              placeholder="Name (optional)"
+                              style={{
+                                width: 180,
+                                padding: "8px",
+                                background: THEME.blackLight,
+                                border: `1px solid ${THEME.charcoal}`,
+                                borderRadius: 4,
+                                color: THEME.white,
+                                fontSize: 13
+                              }}
+                            />
+                          </div>
+                          <button
+                            onClick={() => removeBatter(idx)}
                             style={{
+                              padding: "6px 10px",
+                              background: "none",
+                              border: "none",
+                              color: THEME.red,
+                              fontSize: 18,
+                              cursor: "pointer",
+                              lineHeight: 1
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Strengths</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {BATTING_STRENGTH_TAGS.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => toggleBatterTag(idx, "strengths", tag)}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: (batter.strengths || []).includes(tag) ? THEME.green : THEME.blackLight,
+                                  border: `1px solid ${(batter.strengths || []).includes(tag) ? THEME.green : THEME.charcoal}`,
+                                  borderRadius: 16,
+                                  color: THEME.white,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Weaknesses</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {BATTING_WEAKNESS_TAGS.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => toggleBatterTag(idx, "weaknesses", tag)}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: (batter.weaknesses || []).includes(tag) ? THEME.red : THEME.blackLight,
+                                  border: `1px solid ${(batter.weaknesses || []).includes(tag) ? THEME.red : THEME.charcoal}`,
+                                  borderRadius: 16,
+                                  color: THEME.white,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s"
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Notes</div>
+                          <textarea
+                            value={batter.notes}
+                            onChange={e => updateBatter(idx, "notes", e.target.value)}
+                            placeholder="Optional notes..."
+                            style={{
+                              width: "100%",
                               padding: "8px",
                               background: THEME.blackLight,
                               border: `1px solid ${THEME.charcoal}`,
                               borderRadius: 4,
                               color: THEME.white,
                               fontSize: 13,
-                              textAlign: "center",
-                              fontWeight: 700
+                              fontFamily: "inherit",
+                              resize: "vertical",
+                              minHeight: 60
                             }}
                           />
-                          <input
-                            type="text"
-                            value={batter.name}
-                            onChange={e => updateBatter(idx, "name", e.target.value)}
-                            placeholder="Name (optional)"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={batter.strengths}
-                            onChange={e => updateBatter(idx, "strengths", e.target.value)}
-                            placeholder="Strengths"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={batter.weaknesses}
-                            onChange={e => updateBatter(idx, "weaknesses", e.target.value)}
-                            placeholder="Weaknesses"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={batter.notes}
-                            onChange={e => updateBatter(idx, "notes", e.target.value)}
-                            placeholder="Notes"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <button
-                            onClick={() => removeBatter(idx)}
-                            style={{
-                              padding: "8px",
-                              background: "none",
-                              border: "none",
-                              color: THEME.red,
-                              fontSize: 16,
-                              cursor: "pointer"
-                            }}
-                          >
-                            ×
-                          </button>
                         </div>
                       </Card>
                     ))}
@@ -6195,91 +6296,135 @@ const Scouting = () => {
                 ) : (
                   <div style={{ display: "grid", gap: 12 }}>
                     {form.pitching.map((pitcher, idx) => (
-                      <Card key={idx} style={{ padding: 12, background: THEME.black }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1.5fr 2fr 40px", gap: 8, alignItems: "center" }}>
+                      <Card key={idx} style={{ padding: 16, background: THEME.black }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                           <input
                             type="text"
                             value={pitcher.name}
                             onChange={e => updatePitcher(idx, "name", e.target.value)}
-                            placeholder="Pitcher name"
+                            placeholder="Pitcher name or jersey #"
                             style={{
+                              flex: 1,
                               padding: "8px",
                               background: THEME.blackLight,
                               border: `1px solid ${THEME.charcoal}`,
                               borderRadius: 4,
                               color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={pitcher.speed}
-                            onChange={e => updatePitcher(idx, "speed", e.target.value)}
-                            placeholder="Speed"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={pitcher.control}
-                            onChange={e => updatePitcher(idx, "control", e.target.value)}
-                            placeholder="Control"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={pitcher.pitches}
-                            onChange={e => updatePitcher(idx, "pitches", e.target.value)}
-                            placeholder="Pitch types"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={pitcher.notes}
-                            onChange={e => updatePitcher(idx, "notes", e.target.value)}
-                            placeholder="Notes"
-                            style={{
-                              padding: "8px",
-                              background: THEME.blackLight,
-                              border: `1px solid ${THEME.charcoal}`,
-                              borderRadius: 4,
-                              color: THEME.white,
-                              fontSize: 13
+                              fontSize: 14,
+                              fontWeight: 600
                             }}
                           />
                           <button
                             onClick={() => removePitcher(idx)}
                             style={{
-                              padding: "8px",
+                              padding: "6px 10px",
                               background: "none",
                               border: "none",
                               color: THEME.red,
-                              fontSize: 16,
-                              cursor: "pointer"
+                              fontSize: 18,
+                              cursor: "pointer",
+                              lineHeight: 1,
+                              marginLeft: 12
                             }}
                           >
                             ×
                           </button>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Speed</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {PITCHING_SPEED_TAGS.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => togglePitcherTag(idx, "speed", tag)}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: (pitcher.speed || []).includes(tag) ? THEME.gold : THEME.blackLight,
+                                  border: `1px solid ${(pitcher.speed || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
+                                  borderRadius: 16,
+                                  color: (pitcher.speed || []).includes(tag) ? THEME.black : THEME.white,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s",
+                                  fontWeight: (pitcher.speed || []).includes(tag) ? 700 : 400
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Control</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {PITCHING_CONTROL_TAGS.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => togglePitcherTag(idx, "control", tag)}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: (pitcher.control || []).includes(tag) ? THEME.gold : THEME.blackLight,
+                                  border: `1px solid ${(pitcher.control || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
+                                  borderRadius: 16,
+                                  color: (pitcher.control || []).includes(tag) ? THEME.black : THEME.white,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s",
+                                  fontWeight: (pitcher.control || []).includes(tag) ? 700 : 400
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Pitch Types</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {PITCH_TYPE_TAGS.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => togglePitcherTag(idx, "pitches", tag)}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: (pitcher.pitches || []).includes(tag) ? THEME.gold : THEME.blackLight,
+                                  border: `1px solid ${(pitcher.pitches || []).includes(tag) ? THEME.gold : THEME.charcoal}`,
+                                  borderRadius: 16,
+                                  color: (pitcher.pitches || []).includes(tag) ? THEME.black : THEME.white,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s",
+                                  fontWeight: (pitcher.pitches || []).includes(tag) ? 700 : 400
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>Notes</div>
+                          <textarea
+                            value={pitcher.notes}
+                            onChange={e => updatePitcher(idx, "notes", e.target.value)}
+                            placeholder="Optional notes..."
+                            style={{
+                              width: "100%",
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13,
+                              fontFamily: "inherit",
+                              resize: "vertical",
+                              minHeight: 60
+                            }}
+                          />
                         </div>
                       </Card>
                     ))}
