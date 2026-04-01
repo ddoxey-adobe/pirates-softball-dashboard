@@ -5701,7 +5701,10 @@ const emptyScoutingReport = () => ({
     activeTeam: "away", // Which team's offense is currently batting: "home" or "away"
     atBats: [], // [{ jersey: "", name: "", result: "1B"|"2B"|"3B"|"HR"|"K"|"GO"|"FO"|"BB"|"HBP"|"FC"|"E", rbi: 0, inning: 1, timestamp: "" }]
     pitching: [], // [{ pitcher: "", pitch: "strike"|"ball"|"hit", inning: 1, timestamp: "" }]
-    baserunning: [] // [{ jersey: "", name: "", type: "SB"|"CS", inning: 1, timestamp: "" }]
+    baserunning: [], // [{ jersey: "", name: "", type: "SB"|"CS", inning: 1, timestamp: "" }]
+    battingOrder: [], // [{ jersey: "", name: "" }] - batting lineup in order
+    currentBatterIndex: 0, // Current position in lineup
+    battingOrderActive: false // true after lineup is confirmed
   },
   createdDate: new Date().toISOString()
 });
@@ -5891,6 +5894,97 @@ const Scouting = () => {
   const [selectedRunner, setSelectedRunner] = useState(null); // { base: "first"|"second"|"third", jersey: "", name: "" }
   const [showBatterModal, setShowBatterModal] = useState(false);
   const [manualJerseyEntry, setManualJerseyEntry] = useState("");
+  const [showLineupModal, setShowLineupModal] = useState(false);
+  const [lineupDraft, setLineupDraft] = useState([]); // Temporary lineup being edited
+
+  // Lineup management functions
+  const detectBattingOrder = () => {
+    // Extract unique batters from at-bats in order of first appearance
+    const seen = new Set();
+    const order = [];
+
+    form.liveTracking.atBats.forEach(ab => {
+      if (!seen.has(ab.jersey)) {
+        seen.add(ab.jersey);
+        order.push({ jersey: ab.jersey, name: ab.name || "" });
+      }
+    });
+
+    return order;
+  };
+
+  const openLineupEditor = () => {
+    const detected = detectBattingOrder();
+    setLineupDraft(detected);
+    setShowLineupModal(true);
+  };
+
+  const moveLineupBatter = (index, direction) => {
+    const newLineup = [...lineupDraft];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newLineup.length) return;
+
+    [newLineup[index], newLineup[targetIndex]] = [newLineup[targetIndex], newLineup[index]];
+    setLineupDraft(newLineup);
+  };
+
+  const removeFromLineup = (index) => {
+    setLineupDraft(lineupDraft.filter((_, i) => i !== index));
+  };
+
+  const confirmLineup = () => {
+    setForm({
+      ...form,
+      liveTracking: {
+        ...form.liveTracking,
+        battingOrder: lineupDraft,
+        currentBatterIndex: 0,
+        battingOrderActive: true
+      }
+    });
+    setShowLineupModal(false);
+    setLineupDraft([]);
+  };
+
+  const getNextBatter = () => {
+    if (!form.liveTracking.battingOrderActive || form.liveTracking.battingOrder.length === 0) {
+      return null;
+    }
+    const nextIndex = form.liveTracking.currentBatterIndex % form.liveTracking.battingOrder.length;
+    return form.liveTracking.battingOrder[nextIndex];
+  };
+
+  const quickSelectNextBatter = () => {
+    const nextBatter = getNextBatter();
+    if (!nextBatter) return;
+
+    setSelectedJersey(nextBatter.jersey);
+    setSelectedBatterName(nextBatter.name);
+
+    // Advance index for next time
+    setForm({
+      ...form,
+      liveTracking: {
+        ...form.liveTracking,
+        currentBatterIndex: form.liveTracking.currentBatterIndex + 1
+      }
+    });
+  };
+
+  const resetLineup = () => {
+    if (confirm("Reset batting order? This will clear the lineup and you'll need to set it again.")) {
+      setForm({
+        ...form,
+        liveTracking: {
+          ...form.liveTracking,
+          battingOrder: [],
+          currentBatterIndex: 0,
+          battingOrderActive: false
+        }
+      });
+    }
+  };
 
   // Batter selection handlers
   const selectBatterFromRoster = (player) => {
@@ -7371,27 +7465,129 @@ const Scouting = () => {
                 <Card style={{ padding: 20, background: THEME.black, marginBottom: 16 }}>
                   <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Current At-Bat</h5>
 
+                  {/* Lineup Status */}
+                  {form.liveTracking.battingOrderActive && (
+                    <div style={{
+                      marginBottom: 12,
+                      padding: 12,
+                      background: THEME.blackLight,
+                      borderRadius: 6,
+                      border: `1px solid ${THEME.gold}`
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ color: THEME.gold, fontSize: 13, fontWeight: 700 }}>
+                            🔄 Lineup Active ({form.liveTracking.battingOrder.length} batters)
+                          </div>
+                          {(() => {
+                            const nextBatter = getNextBatter();
+                            return nextBatter ? (
+                              <div style={{ color: THEME.white, fontSize: 12, marginTop: 4 }}>
+                                Next Up: #{nextBatter.jersey} {nextBatter.name}
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={openLineupEditor}
+                            style={{
+                              padding: "6px 12px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer"
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={resetLineup}
+                            style={{
+                              padding: "6px 12px",
+                              background: "none",
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.gray,
+                              fontSize: 11,
+                              cursor: "pointer"
+                            }}
+                          >
+                            ↻
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Batter Selection */}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 8, textTransform: "uppercase" }}>Current Batter</div>
                     {!selectedJersey ? (
-                      <button
-                        onClick={() => setShowBatterModal(true)}
-                        style={{
-                          width: "100%",
-                          padding: "16px",
-                          background: THEME.gold,
-                          border: "none",
-                          borderRadius: 6,
-                          color: THEME.black,
-                          fontSize: 16,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        📋 Select Batter
-                      </button>
+                      <div>
+                        {form.liveTracking.battingOrderActive && (() => {
+                          const nextBatter = getNextBatter();
+                          return nextBatter ? (
+                            <button
+                              onClick={quickSelectNextBatter}
+                              style={{
+                                width: "100%",
+                                padding: "16px",
+                                background: THEME.gold,
+                                border: "none",
+                                borderRadius: 6,
+                                color: THEME.black,
+                                fontSize: 16,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                transition: "all 0.2s",
+                                marginBottom: 8
+                              }}
+                            >
+                              ⚡ Quick Select: #{nextBatter.jersey} {nextBatter.name || "(unknown)"}
+                            </button>
+                          ) : null;
+                        })()}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => setShowBatterModal(true)}
+                            style={{
+                              flex: 1,
+                              padding: "12px",
+                              background: form.liveTracking.battingOrderActive ? THEME.blackLight : THEME.gold,
+                              border: form.liveTracking.battingOrderActive ? `2px solid ${THEME.charcoal}` : "none",
+                              borderRadius: 6,
+                              color: form.liveTracking.battingOrderActive ? THEME.white : THEME.black,
+                              fontSize: 14,
+                              fontWeight: 700,
+                              cursor: "pointer"
+                            }}
+                          >
+                            📋 Select Different
+                          </button>
+                          {!form.liveTracking.battingOrderActive && form.liveTracking.atBats.length >= 3 && (
+                            <button
+                              onClick={openLineupEditor}
+                              style={{
+                                flex: 1,
+                                padding: "12px",
+                                background: THEME.blackLight,
+                                border: `2px solid ${THEME.gold}`,
+                                borderRadius: 6,
+                                color: THEME.white,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                cursor: "pointer"
+                              }}
+                            >
+                              🔄 Set Lineup
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       <div style={{
                         padding: "12px 16px",
@@ -8060,6 +8256,168 @@ const Scouting = () => {
                   >
                     Cancel
                   </button>
+                </Card>
+              </div>
+            )}
+
+            {/* Lineup Editor Modal */}
+            {showLineupModal && (
+              <div style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(0, 0, 0, 0.8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                padding: 16
+              }}>
+                <Card style={{
+                  width: "100%",
+                  maxWidth: 500,
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                  padding: 20,
+                  background: THEME.black
+                }}>
+                  <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                    Set Batting Order
+                  </h3>
+                  <p style={{ color: THEME.gray, fontSize: 13, marginBottom: 16 }}>
+                    {lineupDraft.length > 0
+                      ? `Detected ${lineupDraft.length} batters from at-bats. Adjust order or remove players as needed.`
+                      : "No at-bats logged yet. Start tracking batters, then come back to set the lineup."}
+                  </p>
+
+                  {lineupDraft.length === 0 ? (
+                    <div style={{
+                      padding: 40,
+                      textAlign: "center",
+                      background: THEME.blackLight,
+                      borderRadius: 6,
+                      marginBottom: 16
+                    }}>
+                      <div style={{ color: THEME.gray, fontSize: 14 }}>
+                        No batters tracked yet. Log at least a few at-bats first.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: 16 }}>
+                      {lineupDraft.map((batter, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: 12,
+                            background: THEME.blackLight,
+                            borderRadius: 6,
+                            marginBottom: 8,
+                            border: `1px solid ${THEME.charcoal}`
+                          }}
+                        >
+                          <div style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, minWidth: 24 }}>
+                            {index + 1}.
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: THEME.white, fontSize: 14, fontWeight: 600 }}>
+                              #{batter.jersey} {batter.name && `- ${batter.name}`}
+                              {!batter.name && <span style={{ color: THEME.gray, fontStyle: "italic" }}> (unknown)</span>}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              onClick={() => moveLineupBatter(index, "up")}
+                              disabled={index === 0}
+                              style={{
+                                padding: "6px 10px",
+                                background: index === 0 ? THEME.charcoal : THEME.blackLight,
+                                border: `1px solid ${THEME.charcoal}`,
+                                borderRadius: 4,
+                                color: index === 0 ? THEME.gray : THEME.white,
+                                fontSize: 12,
+                                cursor: index === 0 ? "not-allowed" : "pointer"
+                              }}
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={() => moveLineupBatter(index, "down")}
+                              disabled={index === lineupDraft.length - 1}
+                              style={{
+                                padding: "6px 10px",
+                                background: index === lineupDraft.length - 1 ? THEME.charcoal : THEME.blackLight,
+                                border: `1px solid ${THEME.charcoal}`,
+                                borderRadius: 4,
+                                color: index === lineupDraft.length - 1 ? THEME.gray : THEME.white,
+                                fontSize: 12,
+                                cursor: index === lineupDraft.length - 1 ? "not-allowed" : "pointer"
+                              }}
+                            >
+                              ▼
+                            </button>
+                            <button
+                              onClick={() => removeFromLineup(index)}
+                              style={{
+                                padding: "6px 10px",
+                                background: "none",
+                                border: "none",
+                                color: THEME.red,
+                                fontSize: 16,
+                                cursor: "pointer",
+                                lineHeight: 1
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button
+                      onClick={() => {
+                        setShowLineupModal(false);
+                        setLineupDraft([]);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        background: "none",
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 6,
+                        color: THEME.gray,
+                        fontSize: 14,
+                        cursor: "pointer"
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    {lineupDraft.length > 0 && (
+                      <button
+                        onClick={confirmLineup}
+                        style={{
+                          flex: 1,
+                          padding: "12px",
+                          background: THEME.gold,
+                          border: "none",
+                          borderRadius: 6,
+                          color: THEME.black,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          cursor: "pointer"
+                        }}
+                      >
+                        ✓ Confirm Order
+                      </button>
+                    )}
+                  </div>
                 </Card>
               </div>
             )}
