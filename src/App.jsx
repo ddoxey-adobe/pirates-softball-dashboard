@@ -5677,7 +5677,8 @@ const PITCH_TYPE_TAGS = ["Fastball", "Changeup", "Drop", "Rise", "Curveball", "S
 
 const emptyScoutingReport = () => ({
   id: Date.now().toString(),
-  opponent: "",
+  opponentTeamId: "", // NEW: Reference to opponent team ID
+  opponent: "", // LEGACY: Keep for backwards compatibility with old reports
   dateScoutted: new Date().toISOString().split("T")[0],
   location: "",
   notes: "",
@@ -5695,9 +5696,9 @@ const emptyScoutingReport = () => ({
     RF: { rating: 3, notes: "" }
   },
   liveTracking: {
-    atBats: [], // [{ jersey: "", result: "1B"|"2B"|"3B"|"HR"|"K"|"GO"|"FO"|"BB"|"HBP"|"FC"|"E", rbi: 0, inning: 1, timestamp: "" }]
+    atBats: [], // [{ jersey: "", name: "", result: "1B"|"2B"|"3B"|"HR"|"K"|"GO"|"FO"|"BB"|"HBP"|"FC"|"E", rbi: 0, inning: 1, timestamp: "" }]
     pitching: [], // [{ pitcher: "", pitch: "strike"|"ball"|"hit", inning: 1, timestamp: "" }]
-    baserunning: [] // [{ jersey: "", type: "SB"|"CS", inning: 1, timestamp: "" }]
+    baserunning: [] // [{ jersey: "", name: "", type: "SB"|"CS", inning: 1, timestamp: "" }]
   },
   createdDate: new Date().toISOString()
 });
@@ -5732,8 +5733,8 @@ const Scouting = () => {
   }, [opponentTeams]);
 
   const saveReport = () => {
-    if (!form.opponent.trim()) {
-      alert("Please enter opponent name");
+    if (!form.opponentTeamId && !form.opponent.trim()) {
+      alert("Please select opponent team");
       return;
     }
 
@@ -5855,6 +5856,13 @@ const Scouting = () => {
         [position]: { ...form.defense[position], [field]: value }
       }
     });
+  };
+
+  // Get opponent roster (for live tracking player selection)
+  const getOpponentRoster = () => {
+    if (!form.opponentTeamId) return [];
+    const team = opponentTeams.find(t => t.id === form.opponentTeamId);
+    return team?.players || [];
   };
 
   // Live Tracking functions
@@ -6515,15 +6523,21 @@ const Scouting = () => {
 
       {!showForm && reports.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
-          {reports.map(report => (
-            <Card key={report.id} style={{ padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                    <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>{report.opponent}</h3>
-                    <Badge>{new Date(report.dateScoutted).toLocaleDateString()}</Badge>
-                    {report.location && <Badge color={THEME.gray} bg={`${THEME.gray}20`}>{report.location}</Badge>}
-                  </div>
+          {reports.map(report => {
+            // Get opponent name (from team ID or legacy opponent field)
+            const opponentName = report.opponentTeamId
+              ? opponentTeams.find(t => t.id === report.opponentTeamId)?.name || report.opponent
+              : report.opponent;
+
+            return (
+              <Card key={report.id} style={{ padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                      <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>{opponentName}</h3>
+                      <Badge>{new Date(report.dateScoutted).toLocaleDateString()}</Badge>
+                      {report.location && <Badge color={THEME.gray} bg={`${THEME.gray}20`}>{report.location}</Badge>}
+                    </div>
                   <div style={{ display: "flex", gap: 16, color: THEME.gray, fontSize: 13, flexWrap: "wrap" }}>
                     <div>⚾ {report.batting.length} batters</div>
                     <div>⚡ {report.pitching.length} pitchers</div>
@@ -6551,7 +6565,8 @@ const Scouting = () => {
                 </div>
               </div>
             </Card>
-          ))}
+          );
+        })}
         </div>
       )}
 
@@ -6563,23 +6578,36 @@ const Scouting = () => {
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr", gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Opponent Team Name *
+                  Opponent Team *
                 </label>
-                <input
-                  type="text"
-                  value={form.opponent}
-                  onChange={e => setForm({ ...form, opponent: e.target.value })}
-                  placeholder="e.g., Roosevelt Raiders"
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    background: THEME.blackLight,
-                    border: `1px solid ${THEME.charcoal}`,
-                    borderRadius: 6,
-                    color: THEME.white,
-                    fontSize: 13
-                  }}
-                />
+                {opponentTeams.length === 0 ? (
+                  <div style={{ padding: "10px 12px", background: THEME.blackLight, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.gray, fontSize: 13 }}>
+                    No teams yet. <button onClick={() => setShowTeamsModal(true)} style={{ color: THEME.gold, textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}>Add teams first</button>
+                  </div>
+                ) : (
+                  <select
+                    value={form.opponentTeamId}
+                    onChange={e => {
+                      const teamId = e.target.value;
+                      const team = opponentTeams.find(t => t.id === teamId);
+                      setForm({ ...form, opponentTeamId: teamId, opponent: team?.name || "" });
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: THEME.blackLight,
+                      border: `1px solid ${THEME.charcoal}`,
+                      borderRadius: 6,
+                      color: THEME.white,
+                      fontSize: 13
+                    }}
+                  >
+                    <option value="">Select opponent team...</option>
+                    {opponentTeams.map(team => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
