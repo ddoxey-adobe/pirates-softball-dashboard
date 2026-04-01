@@ -5873,10 +5873,20 @@ const Scouting = () => {
   const [currentPitchCount, setCurrentPitchCount] = useState({ strikes: 0, balls: 0 }); // Track current at-bat pitches
 
   const logPitchToCount = (pitchType) => {
-    if (pitchType === "strike") {
-      setCurrentPitchCount({ ...currentPitchCount, strikes: currentPitchCount.strikes + 1 });
-    } else if (pitchType === "ball") {
-      setCurrentPitchCount({ ...currentPitchCount, balls: currentPitchCount.balls + 1 });
+    const newCount = {
+      strikes: currentPitchCount.strikes + (pitchType === "strike" ? 1 : 0),
+      balls: currentPitchCount.balls + (pitchType === "ball" ? 1 : 0)
+    };
+
+    setCurrentPitchCount(newCount);
+
+    // Auto-complete at-bat if count reaches 3 strikes or 4 balls
+    if (newCount.strikes === 3) {
+      // Auto strikeout
+      setTimeout(() => logAtBat("K"), 100);
+    } else if (newCount.balls === 4) {
+      // Auto walk
+      setTimeout(() => logAtBat("BB"), 100);
     }
   };
 
