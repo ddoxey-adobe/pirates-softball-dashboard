@@ -7473,48 +7473,63 @@ const Scouting = () => {
                 </Card>
 
                 {/* Baseball Diamond - Baserunner Tracker */}
-                <Card style={{ padding: 20, background: THEME.black, marginBottom: 16 }}>
-                  <h5 style={{ color: THEME.gold, fontSize: 14, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Baserunners</h5>
+                <Card style={{ padding: 16, background: THEME.black, marginBottom: 16 }}>
+                  <h5 style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>Baserunners</h5>
 
                   {/* Diamond Container */}
                   <div style={{
                     position: "relative",
                     width: "100%",
-                    maxWidth: 280,
+                    maxWidth: 200,
+                    height: 180,
                     margin: "0 auto",
-                    paddingBottom: "80%",
-                    background: THEME.blackLight,
-                    borderRadius: 8
+                    background: "#4A7C59",
+                    borderRadius: 8,
+                    overflow: "hidden"
                   }}>
-                    {/* Diamond Shape (rotated square) */}
+                    {/* Infield Dirt */}
                     <div style={{
                       position: "absolute",
-                      top: "50%",
+                      bottom: 0,
                       left: "50%",
-                      width: "55%",
-                      height: "55%",
-                      transform: "translate(-50%, -50%) rotate(45deg)",
-                      border: `2px solid ${THEME.charcoal}`,
-                      background: "rgba(251, 181, 21, 0.05)"
+                      transform: "translateX(-50%)",
+                      width: "140%",
+                      height: "140%",
+                      background: "#C19A6B",
+                      borderRadius: "50% 50% 0 0",
+                      clipPath: "polygon(0 100%, 100% 100%, 100% 50%, 50% 0, 0 50%)"
+                    }} />
+
+                    {/* Diamond Shape (rotated square infield) */}
+                    <div style={{
+                      position: "absolute",
+                      bottom: "20%",
+                      left: "50%",
+                      width: "40%",
+                      height: "40%",
+                      transform: "translateX(-50%) rotate(45deg)",
+                      border: `2px solid rgba(255, 255, 255, 0.4)`,
+                      background: "rgba(74, 124, 89, 0.3)"
                     }} />
 
                     {/* Home Plate */}
                     <div style={{
                       position: "absolute",
-                      bottom: "8%",
+                      bottom: "6%",
                       left: "50%",
                       transform: "translateX(-50%)",
-                      width: 36,
-                      height: 36,
-                      background: THEME.charcoal,
-                      border: `2px solid ${THEME.gold}`,
-                      borderRadius: "50%",
+                      width: 32,
+                      height: 32,
+                      background: "white",
+                      border: `2px solid ${THEME.charcoal}`,
+                      borderRadius: 3,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: 11,
                       fontWeight: 700,
-                      color: THEME.gold
+                      color: THEME.black,
+                      zIndex: 10
                     }}>
                       H
                     </div>
@@ -7524,30 +7539,31 @@ const Scouting = () => {
                       onClick={() => baserunners.first && setSelectedRunner({ base: "first", ...baserunners.first })}
                       style={{
                         position: "absolute",
-                        right: "10%",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: baserunners.first ? 70 : 40,
-                        height: 40,
-                        background: baserunners.first ? THEME.gold : THEME.charcoal,
-                        border: `2px solid ${baserunners.first ? THEME.gold : THEME.gray}`,
-                        borderRadius: 4,
+                        right: "8%",
+                        bottom: "36%",
+                        width: baserunners.first ? 60 : 32,
+                        height: 32,
+                        background: baserunners.first ? THEME.gold : "white",
+                        border: `2px solid ${THEME.charcoal}`,
+                        borderRadius: 3,
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: baserunners.first ? 10 : 11,
+                        gap: 3,
+                        fontSize: 10,
                         fontWeight: 700,
-                        color: baserunners.first ? THEME.black : THEME.gray,
+                        color: baserunners.first ? THEME.black : THEME.black,
                         cursor: baserunners.first ? "pointer" : "default",
                         transition: "all 0.2s",
-                        boxShadow: selectedRunner?.base === "first" ? `0 0 0 3px ${THEME.blue}` : "none"
+                        boxShadow: selectedRunner?.base === "first" ? `0 0 0 3px ${THEME.blue}` : "none",
+                        zIndex: 10
                       }}
                     >
                       {baserunners.first ? (
                         <>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>#{baserunners.first.jersey}</div>
-                          {baserunners.first.name && <div style={{ fontSize: 8, marginTop: 1 }}>{baserunners.first.name.split(' ')[0]}</div>}
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>#{baserunners.first.jersey}</span>
+                          {baserunners.first.name && <span style={{ fontSize: 8 }}>({baserunners.first.name.split(' ')[0]})</span>}
                         </>
                       ) : "1B"}
                     </div>
@@ -7557,30 +7573,32 @@ const Scouting = () => {
                       onClick={() => baserunners.second && setSelectedRunner({ base: "second", ...baserunners.second })}
                       style={{
                         position: "absolute",
-                        top: "8%",
+                        top: "12%",
                         left: "50%",
                         transform: "translateX(-50%)",
-                        width: baserunners.second ? 70 : 40,
-                        height: 40,
-                        background: baserunners.second ? THEME.gold : THEME.charcoal,
-                        border: `2px solid ${baserunners.second ? THEME.gold : THEME.gray}`,
-                        borderRadius: 4,
+                        width: baserunners.second ? 60 : 32,
+                        height: 32,
+                        background: baserunners.second ? THEME.gold : "white",
+                        border: `2px solid ${THEME.charcoal}`,
+                        borderRadius: 3,
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: baserunners.second ? 10 : 11,
+                        gap: 3,
+                        fontSize: 10,
                         fontWeight: 700,
-                        color: baserunners.second ? THEME.black : THEME.gray,
+                        color: baserunners.second ? THEME.black : THEME.black,
                         cursor: baserunners.second ? "pointer" : "default",
                         transition: "all 0.2s",
-                        boxShadow: selectedRunner?.base === "second" ? `0 0 0 3px ${THEME.blue}` : "none"
+                        boxShadow: selectedRunner?.base === "second" ? `0 0 0 3px ${THEME.blue}` : "none",
+                        zIndex: 10
                       }}
                     >
                       {baserunners.second ? (
                         <>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>#{baserunners.second.jersey}</div>
-                          {baserunners.second.name && <div style={{ fontSize: 8, marginTop: 1 }}>{baserunners.second.name.split(' ')[0]}</div>}
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>#{baserunners.second.jersey}</span>
+                          {baserunners.second.name && <span style={{ fontSize: 8 }}>({baserunners.second.name.split(' ')[0]})</span>}
                         </>
                       ) : "2B"}
                     </div>
@@ -7590,30 +7608,31 @@ const Scouting = () => {
                       onClick={() => baserunners.third && setSelectedRunner({ base: "third", ...baserunners.third })}
                       style={{
                         position: "absolute",
-                        left: "10%",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: baserunners.third ? 70 : 40,
-                        height: 40,
-                        background: baserunners.third ? THEME.gold : THEME.charcoal,
-                        border: `2px solid ${baserunners.third ? THEME.gold : THEME.gray}`,
-                        borderRadius: 4,
+                        left: "8%",
+                        bottom: "36%",
+                        width: baserunners.third ? 60 : 32,
+                        height: 32,
+                        background: baserunners.third ? THEME.gold : "white",
+                        border: `2px solid ${THEME.charcoal}`,
+                        borderRadius: 3,
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: baserunners.third ? 10 : 11,
+                        gap: 3,
+                        fontSize: 10,
                         fontWeight: 700,
-                        color: baserunners.third ? THEME.black : THEME.gray,
+                        color: baserunners.third ? THEME.black : THEME.black,
                         cursor: baserunners.third ? "pointer" : "default",
                         transition: "all 0.2s",
-                        boxShadow: selectedRunner?.base === "third" ? `0 0 0 3px ${THEME.blue}` : "none"
+                        boxShadow: selectedRunner?.base === "third" ? `0 0 0 3px ${THEME.blue}` : "none",
+                        zIndex: 10
                       }}
                     >
                       {baserunners.third ? (
                         <>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>#{baserunners.third.jersey}</div>
-                          {baserunners.third.name && <div style={{ fontSize: 8, marginTop: 1 }}>{baserunners.third.name.split(' ')[0]}</div>}
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>#{baserunners.third.jersey}</span>
+                          {baserunners.third.name && <span style={{ fontSize: 8 }}>({baserunners.third.name.split(' ')[0]})</span>}
                         </>
                       ) : "3B"}
                     </div>
@@ -7621,32 +7640,32 @@ const Scouting = () => {
 
                   {/* Runner Action Menu */}
                   {selectedRunner && (
-                    <div style={{ marginTop: 16 }}>
+                    <div style={{ marginTop: 12 }}>
                       <div style={{
-                        padding: 12,
+                        padding: 8,
                         background: THEME.blackLight,
-                        borderRadius: 6,
+                        borderRadius: 4,
                         border: `2px solid ${THEME.blue}`,
-                        marginBottom: 12
+                        marginBottom: 8
                       }}>
-                        <div style={{ color: THEME.white, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                          Selected: #{selectedRunner.jersey} {selectedRunner.name && `(${selectedRunner.name})`} on {selectedRunner.base.toUpperCase()}
+                        <div style={{ color: THEME.white, fontSize: 12, fontWeight: 700, marginBottom: 2 }}>
+                          #{selectedRunner.jersey} {selectedRunner.name && `(${selectedRunner.name})`} on {selectedRunner.base.toUpperCase()}
                         </div>
-                        <div style={{ color: THEME.gray, fontSize: 11 }}>
-                          Choose an action below
+                        <div style={{ color: THEME.gray, fontSize: 10 }}>
+                          Choose an action
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                         <button
                           onClick={() => stealBase(selectedRunner.base)}
                           style={{
-                            padding: "12px",
+                            padding: "8px",
                             background: THEME.blackLight,
                             border: `2px solid ${THEME.green}`,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             color: THEME.white,
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: 600,
                             cursor: "pointer"
                           }}
@@ -7656,12 +7675,12 @@ const Scouting = () => {
                         <button
                           onClick={() => caughtStealing(selectedRunner.base)}
                           style={{
-                            padding: "12px",
+                            padding: "8px",
                             background: THEME.blackLight,
                             border: `2px solid ${THEME.red}`,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             color: THEME.white,
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: 600,
                             cursor: "pointer"
                           }}
@@ -7671,12 +7690,12 @@ const Scouting = () => {
                         <button
                           onClick={() => scoreRunner(selectedRunner.base)}
                           style={{
-                            padding: "12px",
+                            padding: "8px",
                             background: THEME.blackLight,
                             border: `2px solid ${THEME.blue}`,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             color: THEME.white,
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: 600,
                             cursor: "pointer"
                           }}
@@ -7686,17 +7705,17 @@ const Scouting = () => {
                         <button
                           onClick={() => outOnBases(selectedRunner.base)}
                           style={{
-                            padding: "12px",
+                            padding: "8px",
                             background: THEME.blackLight,
                             border: `2px solid ${THEME.red}`,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             color: THEME.white,
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: 600,
                             cursor: "pointer"
                           }}
                         >
-                          🚫 Out on Bases
+                          🚫 Out
                         </button>
                       </div>
 
@@ -7704,13 +7723,13 @@ const Scouting = () => {
                         onClick={() => setSelectedRunner(null)}
                         style={{
                           width: "100%",
-                          marginTop: 8,
-                          padding: "8px",
+                          marginTop: 6,
+                          padding: "6px",
                           background: "none",
                           border: `1px solid ${THEME.charcoal}`,
-                          borderRadius: 4,
+                          borderRadius: 3,
                           color: THEME.gray,
-                          fontSize: 12,
+                          fontSize: 11,
                           cursor: "pointer"
                         }}
                       >
@@ -7721,10 +7740,10 @@ const Scouting = () => {
 
                   {!selectedRunner && (baserunners.first || baserunners.second || baserunners.third) && (
                     <div style={{
-                      marginTop: 16,
+                      marginTop: 10,
                       textAlign: "center",
                       color: THEME.gray,
-                      fontSize: 12
+                      fontSize: 11
                     }}>
                       Click on a runner to take action
                     </div>
@@ -7732,10 +7751,10 @@ const Scouting = () => {
 
                   {!baserunners.first && !baserunners.second && !baserunners.third && (
                     <div style={{
-                      marginTop: 16,
+                      marginTop: 10,
                       textAlign: "center",
                       color: THEME.gray,
-                      fontSize: 12
+                      fontSize: 11
                     }}>
                       No runners on base
                     </div>
