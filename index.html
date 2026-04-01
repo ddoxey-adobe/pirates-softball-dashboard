@@ -41,6 +41,7 @@ const STORAGE_KEYS = {
   MESSAGES: "pirates-messages-2026v3",
   GAMELOGS: "pirates-gamelogs-2026v1",
   PRACTICELOGS: "pirates-practicelogs-2026v1",
+  SCOUTINGREPORTS: "pirates-scouting-reports-2026v1",
 };
 
 const THEME = {
@@ -5699,6 +5700,688 @@ const Comms = ({ players }) => {
   </div>;
 };
 
+// ─── SCOUTING PORTAL ────────────────────────────────────────────
+const emptyScoutingReport = () => ({
+  id: Date.now().toString(),
+  opponent: "",
+  dateScoutted: new Date().toISOString().split("T")[0],
+  location: "",
+  notes: "",
+  batting: [], // [{ jersey: "", name: "", notes: "", strengths: "", weaknesses: "" }]
+  pitching: [], // [{ name: "", speed: "", control: "", pitches: "", notes: "" }]
+  defense: { // position: { rating: 1-5, notes: "" }
+    P: { rating: 3, notes: "" },
+    C: { rating: 3, notes: "" },
+    "1B": { rating: 3, notes: "" },
+    "2B": { rating: 3, notes: "" },
+    "3B": { rating: 3, notes: "" },
+    SS: { rating: 3, notes: "" },
+    LF: { rating: 3, notes: "" },
+    CF: { rating: 3, notes: "" },
+    RF: { rating: 3, notes: "" }
+  },
+  createdDate: new Date().toISOString()
+});
+
+const Scouting = () => {
+  const [reports, setReports] = useState([]);
+  const [editing, setEditing] = useState(null); // report id
+  const [form, setForm] = useState(emptyScoutingReport());
+  const [showForm, setShowForm] = useState(false);
+  const [activeSection, setActiveSection] = useState("batting"); // "batting", "pitching", "defense", "notes"
+
+  useEffect(() => {
+    loadStore(STORAGE_KEYS.SCOUTINGREPORTS, []).then(setReports);
+  }, []);
+
+  useEffect(() => {
+    saveStore(STORAGE_KEYS.SCOUTINGREPORTS, reports);
+  }, [reports]);
+
+  const saveReport = () => {
+    if (!form.opponent.trim()) {
+      alert("Please enter opponent name");
+      return;
+    }
+
+    if (editing) {
+      setReports(reports.map(r => r.id === editing ? form : r));
+    } else {
+      setReports([...reports, form]);
+    }
+
+    setShowForm(false);
+    setEditing(null);
+    setForm(emptyScoutingReport());
+  };
+
+  const deleteReport = (id) => {
+    if (confirm("Delete this scouting report?")) {
+      setReports(reports.filter(r => r.id !== id));
+    }
+  };
+
+  const addBatter = () => {
+    setForm({
+      ...form,
+      batting: [...form.batting, { jersey: "", name: "", notes: "", strengths: "", weaknesses: "" }]
+    });
+  };
+
+  const removeBatter = (index) => {
+    setForm({
+      ...form,
+      batting: form.batting.filter((_, i) => i !== index)
+    });
+  };
+
+  const updateBatter = (index, field, value) => {
+    const newBatting = [...form.batting];
+    newBatting[index] = { ...newBatting[index], [field]: value };
+    setForm({ ...form, batting: newBatting });
+  };
+
+  const addPitcher = () => {
+    setForm({
+      ...form,
+      pitching: [...form.pitching, { name: "", speed: "", control: "", pitches: "", notes: "" }]
+    });
+  };
+
+  const removePitcher = (index) => {
+    setForm({
+      ...form,
+      pitching: form.pitching.filter((_, i) => i !== index)
+    });
+  };
+
+  const updatePitcher = (index, field, value) => {
+    const newPitching = [...form.pitching];
+    newPitching[index] = { ...newPitching[index], [field]: value };
+    setForm({ ...form, pitching: newPitching });
+  };
+
+  const updateDefense = (position, field, value) => {
+    setForm({
+      ...form,
+      defense: {
+        ...form.defense,
+        [position]: { ...form.defense[position], [field]: value }
+      }
+    });
+  };
+
+  const exportReport = (report) => {
+    const reportWindow = window.open("", "_blank");
+    if (!reportWindow) {
+      alert("Please allow popups to export the report.");
+      return;
+    }
+
+    let html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Scouting Report - ${report.opponent}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { color: #FDB515; border-bottom: 3px solid #FDB515; padding-bottom: 10px; }
+    h2 { color: #1B1B1B; margin-top: 24px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th { background: #FDB515; color: #1B1B1B; padding: 8px; text-align: left; }
+    td { padding: 8px; border-bottom: 1px solid #E0E0E0; }
+    .rating { display: inline-block; color: #FDB515; }
+    .info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0; }
+    .info-item { background: #F5F0E6; padding: 10px; border-radius: 4px; }
+    .info-label { font-weight: bold; color: #8E8E8E; font-size: 12px; }
+    @media print { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>🔍 Scouting Report: ${report.opponent}</h1>
+  <div class="info">
+    <div class="info-item"><div class="info-label">DATE SCOUTED</div>${new Date(report.dateScoutted).toLocaleDateString()}</div>
+    <div class="info-item"><div class="info-label">LOCATION</div>${report.location || "N/A"}</div>
+  </div>
+`;
+
+    if (report.batting.length > 0) {
+      html += `
+  <h2>⚾ Batting</h2>
+  <table>
+    <tr><th>#</th><th>Name</th><th>Strengths</th><th>Weaknesses</th><th>Notes</th></tr>
+`;
+      report.batting.forEach(b => {
+        html += `
+    <tr>
+      <td><strong>${b.jersey}</strong></td>
+      <td>${b.name || "Unknown"}</td>
+      <td>${b.strengths || "-"}</td>
+      <td>${b.weaknesses || "-"}</td>
+      <td>${b.notes || "-"}</td>
+    </tr>
+`;
+      });
+      html += `</table>`;
+    }
+
+    if (report.pitching.length > 0) {
+      html += `
+  <h2>⚡ Pitching</h2>
+  <table>
+    <tr><th>Name</th><th>Speed</th><th>Control</th><th>Pitches</th><th>Notes</th></tr>
+`;
+      report.pitching.forEach(p => {
+        html += `
+    <tr>
+      <td><strong>${p.name}</strong></td>
+      <td>${p.speed || "-"}</td>
+      <td>${p.control || "-"}</td>
+      <td>${p.pitches || "-"}</td>
+      <td>${p.notes || "-"}</td>
+    </tr>
+`;
+      });
+      html += `</table>`;
+    }
+
+    html += `
+  <h2>🛡️ Defense Ratings</h2>
+  <table>
+    <tr><th>Position</th><th>Rating</th><th>Notes</th></tr>
+`;
+    Object.entries(report.defense).forEach(([pos, data]) => {
+      const stars = "★".repeat(data.rating) + "☆".repeat(5 - data.rating);
+      html += `
+    <tr>
+      <td><strong>${pos}</strong></td>
+      <td><span class="rating">${stars}</span></td>
+      <td>${data.notes || "-"}</td>
+    </tr>
+`;
+    });
+    html += `</table>`;
+
+    if (report.notes) {
+      html += `
+  <h2>📝 General Notes</h2>
+  <div style="background: #F5F0E6; padding: 12px; border-radius: 4px; white-space: pre-wrap;">${report.notes}</div>
+`;
+    }
+
+    html += `
+  <div style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #FDB515; text-align: center; color: #8E8E8E; font-size: 12px;">
+    Pirates Softball 2026 • Generated ${new Date().toLocaleDateString()}
+  </div>
+</body>
+</html>
+`;
+
+    reportWindow.document.write(html);
+    reportWindow.document.close();
+    reportWindow.print();
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ color: THEME.gold, fontSize: 20, fontWeight: 700, fontFamily: "'Oswald',sans-serif", margin: 0, textTransform: "uppercase" }}>
+            🔍 Scouting Reports
+          </h2>
+          <p style={{ color: THEME.gray, margin: "4px 0 0 0", fontSize: 13 }}>
+            Track opponent tendencies and weaknesses
+          </p>
+        </div>
+        <Button onClick={() => { setForm(emptyScoutingReport()); setEditing(null); setShowForm(true); setActiveSection("batting"); }}>
+          + New Scouting Report
+        </Button>
+      </div>
+
+      {/* Reports List */}
+      {!showForm && reports.length === 0 && (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+          <p style={{ color: THEME.gray, margin: "0 0 16px 0" }}>No scouting reports yet.</p>
+          <Button onClick={() => { setForm(emptyScoutingReport()); setShowForm(true); }}>Create First Report</Button>
+        </Card>
+      )}
+
+      {!showForm && reports.length > 0 && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {reports.map(report => (
+            <Card key={report.id} style={{ padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                    <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, margin: 0 }}>{report.opponent}</h3>
+                    <Badge>{new Date(report.dateScoutted).toLocaleDateString()}</Badge>
+                    {report.location && <Badge color={THEME.gray} bg={`${THEME.gray}20`}>{report.location}</Badge>}
+                  </div>
+                  <div style={{ display: "flex", gap: 16, color: THEME.gray, fontSize: 13 }}>
+                    <div>⚾ {report.batting.length} batters</div>
+                    <div>⚡ {report.pitching.length} pitchers</div>
+                    <div>🛡️ Defense rated</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button small onClick={() => exportReport(report)}>📄 Export</Button>
+                  <Button small onClick={() => { setForm(report); setEditing(report.id); setShowForm(true); setActiveSection("batting"); }}>Edit</Button>
+                  <Button small danger onClick={() => deleteReport(report.id)}>Delete</Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Form */}
+      {showForm && (
+        <div>
+          <Card style={{ padding: 20, marginBottom: 16 }}>
+            {/* Basic Info */}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr", gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Opponent Team Name *
+                </label>
+                <input
+                  type="text"
+                  value={form.opponent}
+                  onChange={e => setForm({ ...form, opponent: e.target.value })}
+                  placeholder="e.g., Roosevelt Raiders"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: THEME.white,
+                    fontSize: 13
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Date Scouted
+                </label>
+                <input
+                  type="date"
+                  value={form.dateScoutted}
+                  onChange={e => setForm({ ...form, dateScoutted: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: THEME.white,
+                    fontSize: 13
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Location/Field
+                </label>
+                <input
+                  type="text"
+                  value={form.location}
+                  onChange={e => setForm({ ...form, location: e.target.value })}
+                  placeholder="e.g., Lincoln Park Field 3"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: THEME.white,
+                    fontSize: 13
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Section Tabs */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: `1px solid ${THEME.charcoal}`, paddingBottom: 8 }}>
+              {[
+                ["batting", "⚾ Batting"],
+                ["pitching", "⚡ Pitching"],
+                ["defense", "🛡️ Defense"],
+                ["notes", "📝 Notes"]
+              ].map(([section, label]) => (
+                <button
+                  key={section}
+                  onClick={() => setActiveSection(section)}
+                  style={{
+                    padding: "8px 16px",
+                    background: activeSection === section ? THEME.gold : "transparent",
+                    border: `1px solid ${activeSection === section ? THEME.gold : THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: activeSection === section ? THEME.black : THEME.white,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Batting Section */}
+            {activeSection === "batting" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Batting Lineup</h4>
+                  <Button small onClick={addBatter}>+ Add Batter</Button>
+                </div>
+                {form.batting.length === 0 ? (
+                  <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
+                    <p style={{ color: THEME.gray, margin: 0 }}>No batters added yet.</p>
+                  </Card>
+                ) : (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {form.batting.map((batter, idx) => (
+                      <Card key={idx} style={{ padding: 12, background: THEME.black }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 1fr 1fr 40px", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={batter.jersey}
+                            onChange={e => updateBatter(idx, "jersey", e.target.value)}
+                            placeholder="#"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13,
+                              textAlign: "center",
+                              fontWeight: 700
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={batter.name}
+                            onChange={e => updateBatter(idx, "name", e.target.value)}
+                            placeholder="Name (optional)"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={batter.strengths}
+                            onChange={e => updateBatter(idx, "strengths", e.target.value)}
+                            placeholder="Strengths"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={batter.weaknesses}
+                            onChange={e => updateBatter(idx, "weaknesses", e.target.value)}
+                            placeholder="Weaknesses"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={batter.notes}
+                            onChange={e => updateBatter(idx, "notes", e.target.value)}
+                            placeholder="Notes"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <button
+                            onClick={() => removeBatter(idx)}
+                            style={{
+                              padding: "8px",
+                              background: "none",
+                              border: "none",
+                              color: THEME.red,
+                              fontSize: 16,
+                              cursor: "pointer"
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pitching Section */}
+            {activeSection === "pitching" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Pitching Staff</h4>
+                  <Button small onClick={addPitcher}>+ Add Pitcher</Button>
+                </div>
+                {form.pitching.length === 0 ? (
+                  <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
+                    <p style={{ color: THEME.gray, margin: 0 }}>No pitchers added yet.</p>
+                  </Card>
+                ) : (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {form.pitching.map((pitcher, idx) => (
+                      <Card key={idx} style={{ padding: 12, background: THEME.black }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1.5fr 2fr 40px", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={pitcher.name}
+                            onChange={e => updatePitcher(idx, "name", e.target.value)}
+                            placeholder="Pitcher name"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={pitcher.speed}
+                            onChange={e => updatePitcher(idx, "speed", e.target.value)}
+                            placeholder="Speed"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={pitcher.control}
+                            onChange={e => updatePitcher(idx, "control", e.target.value)}
+                            placeholder="Control"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={pitcher.pitches}
+                            onChange={e => updatePitcher(idx, "pitches", e.target.value)}
+                            placeholder="Pitch types"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={pitcher.notes}
+                            onChange={e => updatePitcher(idx, "notes", e.target.value)}
+                            placeholder="Notes"
+                            style={{
+                              padding: "8px",
+                              background: THEME.blackLight,
+                              border: `1px solid ${THEME.charcoal}`,
+                              borderRadius: 4,
+                              color: THEME.white,
+                              fontSize: 13
+                            }}
+                          />
+                          <button
+                            onClick={() => removePitcher(idx)}
+                            style={{
+                              padding: "8px",
+                              background: "none",
+                              border: "none",
+                              color: THEME.red,
+                              fontSize: 16,
+                              cursor: "pointer"
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Defense Section */}
+            {activeSection === "defense" && (
+              <div>
+                <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Defense Ratings</h4>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {Object.entries(form.defense).map(([position, data]) => (
+                    <Card key={position} style={{ padding: 12, background: THEME.black }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 2fr", gap: 12, alignItems: "center" }}>
+                        <div style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, textAlign: "center" }}>
+                          {position}
+                        </div>
+                        <div>
+                          <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 4 }}>Rating</div>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            {[1, 2, 3, 4, 5].map(rating => (
+                              <button
+                                key={rating}
+                                onClick={() => updateDefense(position, "rating", rating)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: data.rating >= rating ? THEME.gold : THEME.charcoal,
+                                  fontSize: 20,
+                                  cursor: "pointer",
+                                  padding: 0
+                                }}
+                              >
+                                ★
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          value={data.notes}
+                          onChange={e => updateDefense(position, "notes", e.target.value)}
+                          placeholder="Notes about this position"
+                          style={{
+                            padding: "8px",
+                            background: THEME.blackLight,
+                            border: `1px solid ${THEME.charcoal}`,
+                            borderRadius: 4,
+                            color: THEME.white,
+                            fontSize: 13
+                          }}
+                        />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes Section */}
+            {activeSection === "notes" && (
+              <div>
+                <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, marginBottom: 12 }}>General Notes</h4>
+                <textarea
+                  value={form.notes}
+                  onChange={e => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Overall observations, game plan suggestions, key takeaways..."
+                  style={{
+                    width: "100%",
+                    minHeight: 200,
+                    padding: 12,
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: THEME.white,
+                    fontSize: 13,
+                    fontFamily: "'Source Sans 3',sans-serif",
+                    resize: "vertical",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+            )}
+          </Card>
+
+          {/* Action Buttons */}
+          <div style={{ display: "flex", gap: 12 }}>
+            <Button variant="ghost" onClick={() => { setShowForm(false); setEditing(null); setForm(emptyScoutingReport()); }}>
+              Cancel
+            </Button>
+            <Button onClick={saveReport}>
+              {editing ? "Save Changes" : "Create Report"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── COLLAPSIBLE SECTION COMPONENT ──────────────────────────────
 const CollapsibleSection = ({ id, title, icon, badge, isCollapsed, onToggle, children }) => {
   return (
@@ -9822,6 +10505,7 @@ const TABS = [
   { id: "planner", label: "Planner", icon: "💡" },
   { id: "lineup", label: "Lineup", icon: "📋" },
   { id: "gamelog", label: "Game", icon: "⚾" },
+  { id: "scouting", label: "Scouting", icon: "🔍" },
   { id: "reports", label: "Reports", icon: "📊" },
   { id: "comms", label: "Comms", icon: "✉️" },
 ];
@@ -9996,8 +10680,9 @@ function App() {
         setTab("gamelog");
       }} />}
       {tab==="lineup" && <LineupBuilder players={players} />}
-      {tab==="reports" && <Reports players={players} />}
       {tab==="gamelog" && <GameLog players={players} />}
+      {tab==="scouting" && <Scouting />}
+      {tab==="reports" && <Reports players={players} />}
       {tab==="comms" && <Comms players={players} />}
     </div>
   </div>;
