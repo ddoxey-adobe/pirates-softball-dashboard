@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   GAMELOGS: "pirates-gamelogs-2026v1",
   PRACTICELOGS: "pirates-practicelogs-2026v1",
   SCOUTINGREPORTS: "pirates-scouting-reports-2026v1",
+  OPPONENTTEAMS: "pirates-opponent-teams-2026v1",
 };
 
 const THEME = {
@@ -5708,13 +5709,27 @@ const Scouting = () => {
   const [showForm, setShowForm] = useState(false);
   const [activeSection, setActiveSection] = useState("batting"); // "batting", "pitching", "defense", "notes"
 
+  // Opponent Teams Management
+  const [opponentTeams, setOpponentTeams] = useState([]);
+  const [showTeamsModal, setShowTeamsModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null); // for editing team
+  const [teamForm, setTeamForm] = useState({ name: "", players: [] });
+  const [showPlayerForm, setShowPlayerForm] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState(null);
+  const [playerForm, setPlayerForm] = useState({ jersey: "", name: "", position: "", isPitcher: false });
+
   useEffect(() => {
     loadStore(STORAGE_KEYS.SCOUTINGREPORTS, []).then(setReports);
+    loadStore(STORAGE_KEYS.OPPONENTTEAMS, []).then(setOpponentTeams);
   }, []);
 
   useEffect(() => {
     saveStore(STORAGE_KEYS.SCOUTINGREPORTS, reports);
   }, [reports]);
+
+  useEffect(() => {
+    saveStore(STORAGE_KEYS.OPPONENTTEAMS, opponentTeams);
+  }, [opponentTeams]);
 
   const saveReport = () => {
     if (!form.opponent.trim()) {
@@ -6005,6 +6020,252 @@ const Scouting = () => {
     return { battingStats, pitchingStats, baserunning: { sbSuccess, sbCaught, sbTotal, sbPercent } };
   };
 
+  // Opponent Teams Management Functions
+  const saveTeam = () => {
+    if (!teamForm.name.trim()) {
+      alert("Please enter team name");
+      return;
+    }
+
+    if (selectedTeam) {
+      // Edit existing team
+      setOpponentTeams(opponentTeams.map(t => t.id === selectedTeam.id ? { ...teamForm, id: selectedTeam.id } : t));
+    } else {
+      // Add new team
+      setOpponentTeams([...opponentTeams, { ...teamForm, id: Date.now().toString() }]);
+    }
+
+    setTeamForm({ name: "", players: [] });
+    setSelectedTeam(null);
+  };
+
+  const deleteTeam = (teamId) => {
+    if (confirm("Delete this team and all its players?")) {
+      setOpponentTeams(opponentTeams.filter(t => t.id !== teamId));
+    }
+  };
+
+  const editTeam = (team) => {
+    setSelectedTeam(team);
+    setTeamForm({ name: team.name, players: team.players || [] });
+  };
+
+  const addPlayer = () => {
+    if (!playerForm.jersey.trim()) {
+      alert("Please enter jersey number");
+      return;
+    }
+
+    if (editingPlayer !== null) {
+      // Edit existing player
+      const newPlayers = [...teamForm.players];
+      newPlayers[editingPlayer] = playerForm;
+      setTeamForm({ ...teamForm, players: newPlayers });
+    } else {
+      // Add new player
+      setTeamForm({ ...teamForm, players: [...teamForm.players, playerForm] });
+    }
+
+    setPlayerForm({ jersey: "", name: "", position: "", isPitcher: false });
+    setEditingPlayer(null);
+    setShowPlayerForm(false);
+  };
+
+  const deletePlayer = (index) => {
+    if (confirm("Delete this player?")) {
+      setTeamForm({ ...teamForm, players: teamForm.players.filter((_, i) => i !== index) });
+    }
+  };
+
+  const editPlayer = (player, index) => {
+    setPlayerForm(player);
+    setEditingPlayer(index);
+    setShowPlayerForm(true);
+  };
+
+  const bulkImportPlayers = () => {
+    const input = prompt("Paste player data (format: jersey,name,position - one per line):");
+    if (!input) return;
+
+    const lines = input.split("\n").filter(line => line.trim());
+    const newPlayers = lines.map(line => {
+      const [jersey, name, position] = line.split(",").map(s => s.trim());
+      return {
+        jersey: jersey || "",
+        name: name || "",
+        position: position || "",
+        isPitcher: position?.toUpperCase() === "P"
+      };
+    });
+
+    setTeamForm({ ...teamForm, players: [...teamForm.players, ...newPlayers] });
+  };
+
+  const bulkImportLeagueData = () => {
+    if (!confirm("Import all 8 league teams with complete rosters? This will add 104 players across 8 teams.")) return;
+
+    const leagueData = [
+      {
+        name: "Reds",
+        players: [
+          { jersey: "", name: "KELLEY", position: "", isPitcher: false },
+          { jersey: "", name: "KELLY", position: "", isPitcher: false },
+          { jersey: "", name: "SAUER", position: "", isPitcher: false },
+          { jersey: "", name: "Daija Downs", position: "", isPitcher: false },
+          { jersey: "", name: "Samantha Ellis", position: "", isPitcher: false },
+          { jersey: "", name: "Taylor Islas", position: "", isPitcher: false },
+          { jersey: "", name: "Tess Jensen", position: "", isPitcher: false },
+          { jersey: "", name: "Grace McKay", position: "", isPitcher: false },
+          { jersey: "", name: "Alice Poore", position: "", isPitcher: false },
+          { jersey: "", name: "Londyn Valenzuela", position: "", isPitcher: false },
+          { jersey: "", name: "Blakely Walker", position: "", isPitcher: false },
+          { jersey: "", name: "Aisley Wilson", position: "", isPitcher: false },
+          { jersey: "", name: "Kambrya Yarbrough", position: "", isPitcher: false },
+          { jersey: "", name: "Tayzlie Thorpe", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "White Sox",
+        players: [
+          { jersey: "", name: "WISCOMBE", position: "", isPitcher: false },
+          { jersey: "", name: "GAIN", position: "", isPitcher: false },
+          { jersey: "", name: "GOODWIN", position: "", isPitcher: false },
+          { jersey: "", name: "MEYER", position: "", isPitcher: false },
+          { jersey: "", name: "RYKOWSKI", position: "", isPitcher: false },
+          { jersey: "", name: "WALKER", position: "", isPitcher: false },
+          { jersey: "", name: "Zoey Assmus", position: "", isPitcher: false },
+          { jersey: "", name: "Vera Davidson", position: "", isPitcher: false },
+          { jersey: "", name: "Paige Hertz", position: "", isPitcher: false },
+          { jersey: "", name: "Raegan Jones", position: "", isPitcher: false },
+          { jersey: "", name: "Savannah Sandoval", position: "", isPitcher: false },
+          { jersey: "", name: "Roxanna Schneider", position: "", isPitcher: false },
+          { jersey: "", name: "Ellie Woodbury", position: "", isPitcher: false },
+          { jersey: "", name: "Britlyn Allred", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Pirates",
+        players: [
+          { jersey: "", name: "DOXEY", position: "", isPitcher: false },
+          { jersey: "", name: "ALLEN", position: "", isPitcher: false },
+          { jersey: "", name: "ELLISON", position: "", isPitcher: false },
+          { jersey: "", name: "HALL", position: "", isPitcher: false },
+          { jersey: "", name: "KIRK", position: "", isPitcher: false },
+          { jersey: "", name: "Autumn Clucas", position: "", isPitcher: false },
+          { jersey: "", name: "Penny Mickiewicz", position: "", isPitcher: false },
+          { jersey: "", name: "Kynzlee Miller", position: "", isPitcher: false },
+          { jersey: "", name: "Lucy Norton", position: "", isPitcher: false },
+          { jersey: "", name: "Rilo Stembridge", position: "", isPitcher: false },
+          { jersey: "", name: "Evie Woffinden", position: "", isPitcher: false },
+          { jersey: "", name: "Jayden Fawson", position: "", isPitcher: false },
+          { jersey: "", name: "Kaizley Long", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Diamondbacks",
+        players: [
+          { jersey: "", name: "LEITER", position: "", isPitcher: false },
+          { jersey: "", name: "CAHOON", position: "", isPitcher: false },
+          { jersey: "", name: "CHRISTENSEN", position: "", isPitcher: false },
+          { jersey: "", name: "FAIL", position: "", isPitcher: false },
+          { jersey: "", name: "HALES", position: "", isPitcher: false },
+          { jersey: "", name: "JENSEN", position: "", isPitcher: false },
+          { jersey: "", name: "LIN", position: "", isPitcher: false },
+          { jersey: "", name: "MOORE", position: "", isPitcher: false },
+          { jersey: "", name: "NELSON", position: "", isPitcher: false },
+          { jersey: "", name: "Isabella Hertel", position: "", isPitcher: false },
+          { jersey: "", name: "Lucy Pack", position: "", isPitcher: false },
+          { jersey: "", name: "Adalynn Shurtz", position: "", isPitcher: false },
+          { jersey: "", name: "Juliet Theodore", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Giants",
+        players: [
+          { jersey: "", name: "REVILL", position: "", isPitcher: false },
+          { jersey: "", name: "ADAMSON", position: "", isPitcher: false },
+          { jersey: "", name: "BARLOW", position: "", isPitcher: false },
+          { jersey: "", name: "BARLOW", position: "", isPitcher: false },
+          { jersey: "", name: "BAXTER", position: "", isPitcher: false },
+          { jersey: "", name: "CHRISTENSEN", position: "", isPitcher: false },
+          { jersey: "", name: "DAVIS", position: "", isPitcher: false },
+          { jersey: "", name: "HERTEL-GISSENDANNER", position: "", isPitcher: false },
+          { jersey: "", name: "LARSON", position: "", isPitcher: false },
+          { jersey: "", name: "REVILL", position: "", isPitcher: false },
+          { jersey: "", name: "ROBINSON", position: "", isPitcher: false },
+          { jersey: "", name: "SCOTT", position: "", isPitcher: false },
+          { jersey: "", name: "SHEPHERD", position: "", isPitcher: false },
+          { jersey: "", name: "Emery Chamberlain", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Rockies",
+        players: [
+          { jersey: "", name: "YOUNG", position: "", isPitcher: false },
+          { jersey: "", name: "BERRY", position: "", isPitcher: false },
+          { jersey: "", name: "HOLBROOK", position: "", isPitcher: false },
+          { jersey: "", name: "HOLBROOK", position: "", isPitcher: false },
+          { jersey: "", name: "MATTSON", position: "", isPitcher: false },
+          { jersey: "", name: "MERCER", position: "", isPitcher: false },
+          { jersey: "", name: "SISOUTHAM", position: "", isPitcher: false },
+          { jersey: "", name: "THURGOOD", position: "", isPitcher: false },
+          { jersey: "", name: "THURGOOD", position: "", isPitcher: false },
+          { jersey: "", name: "YOUNG", position: "", isPitcher: false },
+          { jersey: "", name: "YOUNG", position: "", isPitcher: false },
+          { jersey: "", name: "Reagan Brewer", position: "", isPitcher: false },
+          { jersey: "", name: "Paisley Flatt", position: "", isPitcher: false },
+          { jersey: "", name: "Peach Jenkins", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Athletics",
+        players: [
+          { jersey: "", name: "OPENSHAW", position: "", isPitcher: false },
+          { jersey: "", name: "ATKINSON", position: "", isPitcher: false },
+          { jersey: "", name: "BEZZANT", position: "", isPitcher: false },
+          { jersey: "", name: "BLACK", position: "", isPitcher: false },
+          { jersey: "", name: "DENBOW", position: "", isPitcher: false },
+          { jersey: "", name: "LEATHERBERRY", position: "", isPitcher: false },
+          { jersey: "", name: "MOREHEAD", position: "", isPitcher: false },
+          { jersey: "", name: "RICHINS", position: "", isPitcher: false },
+          { jersey: "", name: "SCHLAPPI", position: "", isPitcher: false },
+          { jersey: "", name: "TAYLOR", position: "", isPitcher: false },
+          { jersey: "", name: "Sadi MacKay", position: "", isPitcher: false },
+          { jersey: "", name: "Lucy Seals", position: "", isPitcher: false },
+          { jersey: "", name: "Kiana Sikander", position: "", isPitcher: false }
+        ]
+      },
+      {
+        name: "Rangers",
+        players: [
+          { jersey: "", name: "TRULOCK", position: "", isPitcher: false },
+          { jersey: "", name: "BECK", position: "", isPitcher: false },
+          { jersey: "", name: "GARDINER", position: "", isPitcher: false },
+          { jersey: "", name: "LIDDLE", position: "", isPitcher: false },
+          { jersey: "", name: "MARTINDALE", position: "", isPitcher: false },
+          { jersey: "", name: "MCWHORTER", position: "", isPitcher: false },
+          { jersey: "", name: "OSWALD", position: "", isPitcher: false },
+          { jersey: "", name: "PETROFF", position: "", isPitcher: false },
+          { jersey: "", name: "ROSS", position: "", isPitcher: false },
+          { jersey: "", name: "VADNEY", position: "", isPitcher: false },
+          { jersey: "", name: "VADNEY", position: "", isPitcher: false },
+          { jersey: "", name: "WILLIAMS", position: "", isPitcher: false },
+          { jersey: "", name: "April Allen", position: "", isPitcher: false },
+          { jersey: "", name: "Mayzie Scott", position: "", isPitcher: false }
+        ]
+      }
+    ];
+
+    const newTeams = leagueData.map(team => ({
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      name: team.name,
+      players: team.players
+    }));
+
+    setOpponentTeams([...opponentTeams, ...newTeams]);
+    alert(`✅ Imported ${newTeams.length} teams with ${newTeams.reduce((sum, t) => sum + t.players.length, 0)} total players!`);
+  };
+
   const exportReport = (report) => {
     const reportWindow = window.open("", "_blank");
     if (!reportWindow) {
@@ -6233,9 +6494,14 @@ const Scouting = () => {
             Track opponent tendencies and weaknesses
           </p>
         </div>
-        <Button onClick={() => { setForm(emptyScoutingReport()); setEditing(null); setShowForm(true); setActiveSection("batting"); }}>
-          + New Scouting Report
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="ghost" onClick={() => setShowTeamsModal(true)}>
+            ⚙️ Manage Opponent Teams ({opponentTeams.length})
+          </Button>
+          <Button onClick={() => { setForm(emptyScoutingReport()); setEditing(null); setShowForm(true); setActiveSection("batting"); }}>
+            + New Scouting Report
+          </Button>
+        </div>
       </div>
 
       {/* Reports List */}
@@ -7263,6 +7529,188 @@ const Scouting = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Opponent Teams Management Modal */}
+      {showTeamsModal && (
+        <Modal open={showTeamsModal} onClose={() => { setShowTeamsModal(false); setSelectedTeam(null); setTeamForm({ name: "", players: [] }); }}>
+          <h3 style={{ color: THEME.white, fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+            Manage Opponent Teams
+          </h3>
+
+          {/* Team List or Team Editor */}
+          {!selectedTeam && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, gap: 8 }}>
+                <Button small onClick={bulkImportLeagueData}>📥 Import Entire League (8 teams, 104 players)</Button>
+                <Button small onClick={() => setSelectedTeam({ id: null, name: "", players: [] })}>+ Add New Team</Button>
+              </div>
+
+              {opponentTeams.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: 40, background: THEME.black }}>
+                  <p style={{ color: THEME.gray, margin: 0 }}>No opponent teams yet. Use bulk import or add your first team!</p>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gap: 8, maxHeight: 400, overflowY: "auto" }}>
+                  {opponentTeams.map(team => (
+                    <Card key={team.id} style={{ padding: 12, background: THEME.black, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ color: THEME.white, fontSize: 14, fontWeight: 700 }}>{team.name}</div>
+                        <div style={{ color: THEME.gray, fontSize: 12 }}>{team.players?.length || 0} players</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Button small onClick={() => editTeam(team)}>Edit Roster</Button>
+                        <Button small danger onClick={() => deleteTeam(team.id)}>Delete</Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Team Editor */}
+          {selectedTeam && (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", color: THEME.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Team Name *
+                </label>
+                <input
+                  type="text"
+                  value={teamForm.name}
+                  onChange={e => setTeamForm({ ...teamForm, name: e.target.value })}
+                  placeholder="e.g., Roosevelt Raiders"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    background: THEME.blackLight,
+                    border: `1px solid ${THEME.charcoal}`,
+                    borderRadius: 6,
+                    color: THEME.white,
+                    fontSize: 13
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ color: THEME.white, fontSize: 15, fontWeight: 700, margin: 0 }}>Roster ({teamForm.players.length})</h4>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button small onClick={bulkImportPlayers}>📥 Bulk Import</Button>
+                    <Button small onClick={() => setShowPlayerForm(true)}>+ Add Player</Button>
+                  </div>
+                </div>
+
+                {teamForm.players.length === 0 ? (
+                  <Card style={{ textAlign: "center", padding: 20, background: THEME.black }}>
+                    <p style={{ color: THEME.gray, margin: 0, fontSize: 13 }}>No players yet. Add players to this team.</p>
+                  </Card>
+                ) : (
+                  <div style={{ display: "grid", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+                    {teamForm.players.map((player, idx) => (
+                      <Card key={idx} style={{ padding: 8, background: THEME.black, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span style={{ color: THEME.gold, fontSize: 13, fontWeight: 700, width: 30 }}>#{player.jersey}</span>
+                          <span style={{ color: THEME.white, fontSize: 13 }}>{player.name || "—"}</span>
+                          {player.position && <Badge color={THEME.gray} bg={`${THEME.gray}20`}>{player.position}</Badge>}
+                          {player.isPitcher && <Badge color={THEME.green} bg={`${THEME.green}20`}>P</Badge>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Button small onClick={() => editPlayer(player, idx)}>Edit</Button>
+                          <Button small danger onClick={() => deletePlayer(idx)}>×</Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Player Form */}
+              {showPlayerForm && (
+                <Card style={{ padding: 16, background: THEME.black, marginBottom: 16 }}>
+                  <h5 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                    {editingPlayer !== null ? "Edit Player" : "Add Player"}
+                  </h5>
+                  <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 100px", gap: 8, marginBottom: 12 }}>
+                    <input
+                      type="text"
+                      value={playerForm.jersey}
+                      onChange={e => setPlayerForm({ ...playerForm, jersey: e.target.value })}
+                      placeholder="Jersey"
+                      style={{
+                        padding: "8px",
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 4,
+                        color: THEME.white,
+                        fontSize: 13,
+                        textAlign: "center",
+                        fontWeight: 700
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={playerForm.name}
+                      onChange={e => setPlayerForm({ ...playerForm, name: e.target.value })}
+                      placeholder="Name (optional)"
+                      style={{
+                        padding: "8px",
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 4,
+                        color: THEME.white,
+                        fontSize: 13
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={playerForm.position}
+                      onChange={e => setPlayerForm({ ...playerForm, position: e.target.value })}
+                      placeholder="Position"
+                      style={{
+                        padding: "8px",
+                        background: THEME.blackLight,
+                        border: `1px solid ${THEME.charcoal}`,
+                        borderRadius: 4,
+                        color: THEME.white,
+                        fontSize: 13
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, color: THEME.white, fontSize: 13, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={playerForm.isPitcher}
+                        onChange={e => setPlayerForm({ ...playerForm, isPitcher: e.target.checked })}
+                        style={{ width: 16, height: 16 }}
+                      />
+                      Mark as Pitcher
+                    </label>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button small variant="ghost" onClick={() => { setShowPlayerForm(false); setEditingPlayer(null); setPlayerForm({ jersey: "", name: "", position: "", isPitcher: false }); }}>
+                      Cancel
+                    </Button>
+                    <Button small onClick={addPlayer}>
+                      {editingPlayer !== null ? "Save Changes" : "Add Player"}
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <Button variant="ghost" onClick={() => { setSelectedTeam(null); setTeamForm({ name: "", players: [] }); }}>
+                  ← Back to Teams
+                </Button>
+                <Button onClick={saveTeam}>
+                  {selectedTeam.id ? "Save Team" : "Create Team"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );
