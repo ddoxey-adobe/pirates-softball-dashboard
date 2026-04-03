@@ -5659,17 +5659,100 @@ const GameLog = ({ players }) => {
 
 // ─── PRACTICE LOG ───────────────────────────────────────────────
 // ─── COMMS ──────────────────────────────────────────────────────
-const Comms = ({ players }) => {
+const Comms = ({ players, coaches }) => {
   const [sel, setSel] = useState(null); const [body, setBody] = useState(""); const [sent, setSent] = useState([]);
+  const [copiedCoaches, setCopiedCoaches] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+
   useEffect(() => { loadStore(STORAGE_KEYS.MESSAGES, []).then(setSent); }, []); useEffect(() => { saveStore(STORAGE_KEYS.MESSAGES, sent); }, [sent]);
 
-  return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <div><SL>Templates</SL>{MSG_TEMPLATES.map(t => <div key={t.id} onClick={() => { setSel(t); setBody(t.body); }} style={{ padding: "10px 14px", background: sel?.id===t.id?THEME.charcoal:THEME.black, borderRadius: 6, marginBottom: 6, cursor: "pointer", border: `1px solid ${sel?.id===t.id?THEME.gold:THEME.charcoal}` }}><div style={{ color: THEME.white, fontWeight: 600, fontSize: 14 }}>{t.name}</div></div>)}
-      {sent.length>0 && <div style={{ marginTop: 16 }}><SL>Sent</SL>{sent.slice(-5).reverse().map(m => <div key={m.id} style={{ padding: "6px 10px", background: THEME.black, borderRadius: 4, marginBottom: 4, fontSize: 12 }}><span style={{ color: THEME.gold }}>{m.template}</span><span style={{ color: THEME.gray, marginLeft: 8 }}>{new Date(m.date).toLocaleDateString()}</span></div>)}</div>}</div>
-    <div>{sel ? <div><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><SL>Edit</SL><Button small onClick={() => { navigator.clipboard?.writeText(body); setSent(p => [...p, { id: Date.now().toString(), template: sel.name, date: new Date().toISOString() }]); }}>Copy</Button></div>
-      <textarea value={body} onChange={e => setBody(e.target.value)} style={{ width: "100%", minHeight: 300, padding: 12, background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 13, fontFamily: "'Source Sans 3',sans-serif", outline: "none", resize: "vertical", lineHeight: 1.6, boxSizing: "border-box" }} />
-      {players.filter(p=>p.parentPhone).length>0 && <div style={{ marginTop: 8 }}><SL>Contacts</SL><div style={{ maxHeight: 100, overflowY: "auto", background: THEME.black, borderRadius: 6, padding: 8 }}>{players.filter(p=>p.parentPhone).map(p => <div key={p.id} style={{ fontSize: 11, color: THEME.gray, padding: "2px 0" }}><span style={{ color: THEME.white }}>{p.name}</span> — {p.parentName} {p.parentPhone}{p.parentPhone2 ? ` / ${p.parentPhone2}` : ""}</div>)}</div></div>}
-    </div> : <Card style={{ textAlign: "center", padding: 40 }}><p style={{ color: THEME.gray }}>Select a template</p></Card>}</div>
+  // Build contact lists
+  const coachPhones = coaches.filter(c => c.phone).map(c => c.phone);
+  const parentPhones = [];
+  players.forEach(p => {
+    if (p.parentPhone) parentPhones.push(p.parentPhone);
+    if (p.parentPhone2) parentPhones.push(p.parentPhone2);
+  });
+
+  const coachesOnlyList = coachPhones.join(", ");
+  const allContactsList = [...coachPhones, ...parentPhones].join(", ");
+
+  const copyToClipboard = (text, setFlag) => {
+    navigator.clipboard?.writeText(text);
+    setFlag(true);
+    setTimeout(() => setFlag(false), 2000);
+  };
+
+  return <div>
+    {/* Quick Contact Lists */}
+    <div style={{ marginBottom: 20 }}>
+      <h3 style={{ color: THEME.gold, fontSize: 16, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>📱 Quick Contact Lists</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Coaches Only */}
+        <Card style={{ padding: 16, background: THEME.black }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: 0 }}>🏃‍♂️ Coaches Only ({coachPhones.length})</h4>
+            <Button small onClick={() => copyToClipboard(coachesOnlyList, setCopiedCoaches)}>
+              {copiedCoaches ? "✓ Copied!" : "📋 Copy"}
+            </Button>
+          </div>
+          <textarea
+            value={coachesOnlyList}
+            readOnly
+            style={{
+              width: "100%",
+              minHeight: 60,
+              padding: 8,
+              background: THEME.blackLight,
+              border: `1px solid ${THEME.charcoal}`,
+              borderRadius: 4,
+              color: THEME.white,
+              fontSize: 12,
+              fontFamily: "monospace",
+              resize: "none",
+              boxSizing: "border-box"
+            }}
+          />
+        </Card>
+
+        {/* All Contacts */}
+        <Card style={{ padding: 16, background: THEME.black }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h4 style={{ color: THEME.white, fontSize: 14, fontWeight: 700, margin: 0 }}>👨‍👩‍👧‍👦 All Contacts ({coachPhones.length + parentPhones.length})</h4>
+            <Button small onClick={() => copyToClipboard(allContactsList, setCopiedAll)}>
+              {copiedAll ? "✓ Copied!" : "📋 Copy"}
+            </Button>
+          </div>
+          <textarea
+            value={allContactsList}
+            readOnly
+            style={{
+              width: "100%",
+              minHeight: 60,
+              padding: 8,
+              background: THEME.blackLight,
+              border: `1px solid ${THEME.charcoal}`,
+              borderRadius: 4,
+              color: THEME.white,
+              fontSize: 12,
+              fontFamily: "monospace",
+              resize: "none",
+              boxSizing: "border-box"
+            }}
+          />
+        </Card>
+      </div>
+    </div>
+
+    {/* Existing Templates & Message Editor */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div><SL>Templates</SL>{MSG_TEMPLATES.map(t => <div key={t.id} onClick={() => { setSel(t); setBody(t.body); }} style={{ padding: "10px 14px", background: sel?.id===t.id?THEME.charcoal:THEME.black, borderRadius: 6, marginBottom: 6, cursor: "pointer", border: `1px solid ${sel?.id===t.id?THEME.gold:THEME.charcoal}` }}><div style={{ color: THEME.white, fontWeight: 600, fontSize: 14 }}>{t.name}</div></div>)}
+        {sent.length>0 && <div style={{ marginTop: 16 }}><SL>Sent</SL>{sent.slice(-5).reverse().map(m => <div key={m.id} style={{ padding: "6px 10px", background: THEME.black, borderRadius: 4, marginBottom: 4, fontSize: 12 }}><span style={{ color: THEME.gold }}>{m.template}</span><span style={{ color: THEME.gray, marginLeft: 8 }}>{new Date(m.date).toLocaleDateString()}</span></div>)}</div>}</div>
+      <div>{sel ? <div><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><SL>Edit</SL><Button small onClick={() => { navigator.clipboard?.writeText(body); setSent(p => [...p, { id: Date.now().toString(), template: sel.name, date: new Date().toISOString() }]); }}>Copy</Button></div>
+        <textarea value={body} onChange={e => setBody(e.target.value)} style={{ width: "100%", minHeight: 300, padding: 12, background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 6, color: THEME.white, fontSize: 13, fontFamily: "'Source Sans 3',sans-serif", outline: "none", resize: "vertical", lineHeight: 1.6, boxSizing: "border-box" }} />
+        {players.filter(p=>p.parentPhone).length>0 && <div style={{ marginTop: 8 }}><SL>Contacts</SL><div style={{ maxHeight: 100, overflowY: "auto", background: THEME.black, borderRadius: 6, padding: 8 }}>{players.filter(p=>p.parentPhone).map(p => <div key={p.id} style={{ fontSize: 11, color: THEME.gray, padding: "2px 0" }}><span style={{ color: THEME.white }}>{p.name}</span> — {p.parentName} {p.parentPhone}{p.parentPhone2 ? ` / ${p.parentPhone2}` : ""}</div>)}</div></div>}
+      </div> : <Card style={{ textAlign: "center", padding: 40 }}><p style={{ color: THEME.gray }}>Select a template</p></Card>}</div>
+    </div>
   </div>;
 };
 
@@ -13166,7 +13249,7 @@ function App() {
       {tab==="gamelog" && <GameLog players={players} />}
       {tab==="scouting" && <Scouting />}
       {tab==="reports" && <Reports players={players} />}
-      {tab==="comms" && <Comms players={players} />}
+      {tab==="comms" && <Comms players={players} coaches={coaches} />}
     </div>
   </div>;
 }
