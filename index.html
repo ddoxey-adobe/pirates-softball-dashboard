@@ -13337,6 +13337,112 @@ const usePullToRefresh = (onRefresh) => {
   return { pullDistance, pulling, onTouchStart, onTouchMove, onTouchEnd };
 };
 
+const SchedulePanel = () => {
+  const [filter, setFilter] = useState("all");
+  const [expandedPhase, setExpandedPhase] = useState(null);
+  const today = new Date().toISOString().split("T")[0];
+  const filtered = filter === "all" ? SEASON_SCHEDULE : SEASON_SCHEDULE.filter(e => e.type === filter);
+  const phases = [...new Set(SEASON_SCHEDULE.map(e => e.phase))];
+  const typeColors = { game: THEME.red, practice: THEME.green, scrimmage: THEME.blue, tournament: THEME.gold };
+  const typeIcons = { game: "\u26be", practice: "\ud83d\udccb", scrimmage: "\ud83e\udd3c", tournament: "\ud83c\udfc6" };
+  const nextEvent = getNextScheduleEvent();
+  const gamesCount = SEASON_SCHEDULE.filter(e => e.type === "game").length;
+  const practicesCount = SEASON_SCHEDULE.filter(e => e.type === "practice").length;
+  const pastEvents = SEASON_SCHEDULE.filter(e => e.date < today).length;
+  const remainingEvents = SEASON_SCHEDULE.filter(e => e.date >= today).length;
+
+  return <div>
+    {nextEvent && <Card style={{ marginBottom: 20, border: "2px solid " + THEME.gold, background: "linear-gradient(135deg, " + THEME.blackLight + " 0%, " + THEME.black + " 100%)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ fontSize: 36 }}>{typeIcons[nextEvent.type] || "\ud83d\udcc5"}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: THEME.gold, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Oswald',sans-serif" }}>Next Up</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: THEME.white, fontFamily: "'Oswald',sans-serif" }}>{nextEvent.title}</div>
+          <div style={{ fontSize: 13, color: THEME.gray, marginTop: 2 }}>
+            {new Date(nextEvent.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at {nextEvent.time}
+            {nextEvent.homeAway && <span> \u2022 {nextEvent.homeAway === "home" ? "\ud83c\udfe0 Home" : "\u2708\ufe0f Away"}</span>}
+            {" \u2022 "}{nextEvent.location}
+          </div>
+        </div>
+        <Badge color={typeColors[nextEvent.type]} bg={typeColors[nextEvent.type] + "25"} style={{ fontSize: 13, padding: "4px 12px" }}>{nextEvent.type}</Badge>
+      </div>
+    </Card>}
+    <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+      {[
+        { l: "Games", v: gamesCount, c: THEME.red },
+        { l: "Practices", v: practicesCount, c: THEME.green },
+        { l: "Completed", v: pastEvents, c: THEME.gray },
+        { l: "Remaining", v: remainingEvents, c: THEME.gold },
+      ].map(s => <div key={s.l} style={{ background: THEME.blackLight, padding: "10px 16px", borderRadius: 8, border: "1px solid " + THEME.charcoal, minWidth: 70, flex: 1 }}>
+        <div style={{ color: s.c, fontSize: 22, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{s.v}</div>
+        <div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase" }}>{s.l}</div>
+      </div>)}
+    </div>
+    <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+      {[{ id: "all", label: "All" }, { id: "game", label: "\u26be Games" }, { id: "practice", label: "\ud83d\udccb Practices" }, { id: "scrimmage", label: "\ud83e\udd3c Scrimmages" }, { id: "tournament", label: "\ud83c\udfc6 Tournaments" }].map(f =>
+        <button key={f.id} onClick={() => setFilter(f.id)} style={{
+          padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 700, fontFamily: "'Oswald',sans-serif",
+          cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5, border: "none",
+          background: filter === f.id ? THEME.gold : THEME.charcoal,
+          color: filter === f.id ? THEME.black : THEME.gray,
+        }}>{f.label}</button>
+      )}
+    </div>
+    {phases.map(phase => {
+      const phaseEvents = filtered.filter(e => e.phase === phase);
+      if (phaseEvents.length === 0) return null;
+      const isExpanded = expandedPhase === null || expandedPhase === phase;
+      const phaseHasUpcoming = phaseEvents.some(e => e.date >= today);
+      return <div key={phase} style={{ marginBottom: 16 }}>
+        <button onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)} style={{
+          width: "100%", background: "none", border: "none", cursor: "pointer", padding: "8px 0",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <h3 style={{ margin: 0, color: phaseHasUpcoming ? THEME.gold : THEME.gray, fontSize: 15, fontWeight: 700, fontFamily: "'Oswald',sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+            {phase} <span style={{ fontSize: 12, color: THEME.gray, fontWeight: 400 }}>({phaseEvents.length})</span>
+          </h3>
+          <span style={{ color: THEME.gray, fontSize: 14 }}>{isExpanded ? "\u25b2" : "\u25bc"}</span>
+        </button>
+        {isExpanded && <div style={{ display: "grid", gap: 6 }}>
+          {phaseEvents.map(ev => {
+            const isPast = ev.date < today;
+            const isToday = ev.date === today;
+            return <Card key={ev.id} style={{
+              padding: "12px 16px", opacity: isPast ? 0.5 : 1,
+              border: isToday ? "2px solid " + THEME.gold : "1px solid " + THEME.charcoal,
+              background: isToday ? THEME.gold + "10" : THEME.blackLight,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ fontSize: 20 }}>{typeIcons[ev.type] || "\ud83d\udcc5"}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: THEME.white, fontSize: 14 }}>
+                      {ev.title}
+                      {ev.homeAway && <span style={{ color: THEME.gray, fontWeight: 400 }}> ({ev.homeAway === "home" ? "Home" : "Away"})</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: THEME.gray, marginTop: 2 }}>
+                      {ev.day}, {new Date(ev.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      {" \u2022 "}{ev.time}{ev.endTime ? " - " + ev.endTime : ""}
+                      {" \u2022 "}{ev.location}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  {isToday && <Badge color={THEME.gold} bg={THEME.gold + "30"}>TODAY</Badge>}
+                  {isPast && <Badge color={THEME.gray} bg="rgba(142,142,142,0.15)">Done</Badge>}
+                  <Badge color={typeColors[ev.type] || THEME.gray} bg={(typeColors[ev.type] || THEME.gray) + "20"}>{ev.type}</Badge>
+                </div>
+              </div>
+              {ev.notes && <div style={{ marginTop: 6, fontSize: 11, color: THEME.gray, fontStyle: "italic" }}>{ev.notes}</div>}
+            </Card>;
+          })}
+        </div>}
+      </div>;
+    })}
+  </div>;
+};
+
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TryoutsPanel.jsx — Pirates Softball Tryouts Evaluation Tool
 // Drop-in component for the Pirates Softball Dashboard
