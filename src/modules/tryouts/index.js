@@ -1,10 +1,9 @@
 export { default } from './TryoutsPanel';
-
-export const moduleConfig = {
+export const config = {
   id: 'tryouts',
   label: 'Tryouts',
   icon: '\uD83E\uDD4E',
   enabled: true,
-  mode: 'standalone',  // Can take over the entire UI
+  mode: 'standalone',
   permissions: ['head_coach', 'assistant', 'league_director'],
 };
