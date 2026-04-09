@@ -9736,7 +9736,7 @@ const Reports = ({ players }) => {
 
   // Calculate pitching stats
   const playerPitchingStats = players.map(player => {
-    const pitching = filteredGames.flatMap(g => (g.pitching || []).filter(p => p.playerId === player.id));
+    const pitching = filteredGames.flatMap(g => (Array.isArray(g.pitching) ? g.pitching : []).filter(p => p.playerId === player.id));
     if (pitching.length === 0) return null;
 
     const inningsPitched = pitching.reduce((sum, p) => sum + (p.innings || 0), 0);
@@ -13173,7 +13173,7 @@ const Reports = ({ players }) => {
       // Calculate player's game-by-game stats
       const playerGames = filteredGames.map(game => {
         const atBats = (game.atBats || []).filter(ab => ab.playerId === player.id);
-        const pitching = (game.pitching || []).filter(p => p.playerId === player.id);
+        const pitching = (Array.isArray(game.pitching) ? game.pitching : []).filter(p => p.playerId === player.id);
         const lineup = (game.lineup || []).find(l => l.playerId === player.id);
 
         if (atBats.length === 0 && pitching.length === 0 && !lineup) return null;
