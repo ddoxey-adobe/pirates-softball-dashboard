@@ -35,6 +35,7 @@ window.storage = {
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
+import TodayPanel from "./modules/today/TodayPanel";
 
 const STORAGE_KEYS = {
   PLAYERS: "pirates-players-2026v3",
@@ -832,14 +833,17 @@ const ASSESSMENT_TEMPLATES = [
   }
 ];
 
-const getNextScheduleEvent = (type) => {
+const SCHEDULE_STORAGE_KEY = "pirates-schedule-2026v1";
+const getNextScheduleEvent = (type, scheduleData) => {
+  const data = scheduleData || SEASON_SCHEDULE;
   const today = new Date().toISOString().split("T")[0];
-  const upcoming = SEASON_SCHEDULE.filter(e => e.date >= today && (!type || e.type === type));
+  const upcoming = data.filter(e => e.date >= today && (!type || e.type === type));
   return upcoming.length > 0 ? upcoming[0] : null;
 };
-const getUpcomingScheduleEvents = (count = 5) => {
+const getUpcomingScheduleEvents = (count = 5, scheduleData) => {
+  const data = scheduleData || SEASON_SCHEDULE;
   const today = new Date().toISOString().split("T")[0];
-  return SEASON_SCHEDULE.filter(e => e.date >= today).slice(0, count);
+  return data.filter(e => e.date >= today).slice(0, count);
 };
 
 
@@ -13488,19 +13492,75 @@ const usePullToRefresh = (onRefresh) => {
   return { pullDistance, pulling, onTouchStart, onTouchMove, onTouchEnd };
 };
 
-const SchedulePanel = () => {
+const SchedulePanel = ({ schedule, setSchedule }) => {
   const [filter, setFilter] = useState("all");
   const [expandedPhase, setExpandedPhase] = useState(null);
+  const [editModal, setEditModal] = useState(null); // null = closed, "new" or event object
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const today = new Date().toISOString().split("T")[0];
-  const filtered = filter === "all" ? SEASON_SCHEDULE : SEASON_SCHEDULE.filter(e => e.type === filter);
-  const phases = [...new Set(SEASON_SCHEDULE.map(e => e.phase))];
+  const filtered = filter === "all" ? schedule : schedule.filter(e => e.type === filter);
+  const phases = [...new Set(schedule.map(e => e.phase))];
   const typeColors = { game: THEME.red, practice: THEME.green, scrimmage: THEME.blue, tournament: THEME.gold };
   const typeIcons = { game: "\u26be", practice: "\ud83d\udccb", scrimmage: "\ud83e\udd3c", tournament: "\ud83c\udfc6" };
-  const nextEvent = getNextScheduleEvent();
-  const gamesCount = SEASON_SCHEDULE.filter(e => e.type === "game").length;
-  const practicesCount = SEASON_SCHEDULE.filter(e => e.type === "practice").length;
-  const pastEvents = SEASON_SCHEDULE.filter(e => e.date < today).length;
-  const remainingEvents = SEASON_SCHEDULE.filter(e => e.date >= today).length;
+  const nextEvent = getNextScheduleEvent(undefined, schedule);
+  const gamesCount = schedule.filter(e => e.type === "game").length;
+  const practicesCount = schedule.filter(e => e.type === "practice").length;
+  const pastEvents = schedule.filter(e => e.date < today).length;
+  const remainingEvents = schedule.filter(e => e.date >= today).length;
+
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const getDayAbbr = (dateStr) => { const d = new Date(dateStr + "T12:00:00"); return DAYS[d.getDay()]; };
+  const defaultTitle = (type) => ({ practice: "Practice", game: "Game vs ___", scrimmage: "Scrimmage", tournament: "Tournament" }[type] || "Event");
+
+  const emptyEvent = () => ({
+    id: "s" + Date.now(), date: today, day: getDayAbbr(today), type: "practice",
+    title: "Practice", time: "4:45 PM", endTime: "7:00 PM",
+    location: "Sports Complex", phase: "Week 1", homeAway: "", opponent: "", notes: ""
+  });
+
+  const [form, setForm] = useState(emptyEvent());
+
+  const openNewModal = () => { setForm(emptyEvent()); setEditModal("new"); setDeleteConfirm(false); };
+  const openEditModal = (ev) => { setForm({ ...emptyEvent(), ...ev }); setEditModal(ev); setDeleteConfirm(false); };
+  const closeModal = () => { setEditModal(null); setDeleteConfirm(false); };
+
+  const handleFormChange = (field, value) => {
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === "date") next.day = getDayAbbr(value);
+      if (field === "type" && prev.title === defaultTitle(prev.type)) next.title = defaultTitle(value);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    const ev = { ...form };
+    if (!ev.date || !ev.title) return;
+    if (ev.type !== "game") { delete ev.opponent; delete ev.homeAway; }
+    if (!ev.endTime) delete ev.endTime;
+    if (!ev.notes) delete ev.notes;
+    if (editModal === "new") {
+      const updated = [...schedule, ev].sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""));
+      setSchedule(updated);
+    } else {
+      setSchedule(schedule.map(e => e.id === ev.id ? ev : e));
+    }
+    closeModal();
+  };
+
+  const handleDelete = () => {
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    setSchedule(schedule.filter(e => e.id !== form.id));
+    closeModal();
+  };
+
+  const handleResetDefault = () => {
+    if (confirm("Reset schedule to the original default? All custom changes will be lost.")) {
+      setSchedule(SEASON_SCHEDULE);
+    }
+  };
+
+  const existingPhases = [...new Set([...schedule.map(e => e.phase), "Pre-Season", "Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6", "City Tournament", "State Tournament"])];
 
   return <div>
     {nextEvent && <Card style={{ marginBottom: 20, border: "2px solid " + THEME.gold, background: "linear-gradient(135deg, " + THEME.blackLight + " 0%, " + THEME.black + " 100%)" }}>
@@ -13511,13 +13571,17 @@ const SchedulePanel = () => {
           <div style={{ fontSize: 18, fontWeight: 700, color: THEME.white, fontFamily: "'Oswald',sans-serif" }}>{nextEvent.title}</div>
           <div style={{ fontSize: 13, color: THEME.gray, marginTop: 2 }}>
             {new Date(nextEvent.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at {nextEvent.time}
-            {nextEvent.homeAway && <span> \u2022 {nextEvent.homeAway === "home" ? "\ud83c\udfe0 Home" : "\u2708\ufe0f Away"}</span>}
+            {nextEvent.homeAway && <span> {"\u2022"} {nextEvent.homeAway === "home" ? "\ud83c\udfe0 Home" : "\u2708\ufe0f Away"}</span>}
             {" \u2022 "}{nextEvent.location}
           </div>
         </div>
         <Badge color={typeColors[nextEvent.type]} bg={typeColors[nextEvent.type] + "25"} style={{ fontSize: 13, padding: "4px 12px" }}>{nextEvent.type}</Badge>
       </div>
     </Card>}
+    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+      <Button onClick={openNewModal} small style={{ whiteSpace: "nowrap" }}>+ Add Event</Button>
+      <Button onClick={handleResetDefault} variant="ghost" small style={{ whiteSpace: "nowrap", fontSize: 11, padding: "5px 10px" }}>Reset to Default</Button>
+    </div>
     <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
       {[
         { l: "Games", v: gamesCount, c: THEME.red },
@@ -13558,8 +13622,8 @@ const SchedulePanel = () => {
           {phaseEvents.map(ev => {
             const isPast = ev.date < today;
             const isToday = ev.date === today;
-            return <Card key={ev.id} style={{
-              padding: "12px 16px", opacity: isPast ? 0.5 : 1,
+            return <Card key={ev.id} onClick={() => openEditModal(ev)} style={{
+              padding: "12px 16px", opacity: isPast ? 0.5 : 1, cursor: "pointer", transition: "border-color 0.2s",
               border: isToday ? "2px solid " + THEME.gold : "1px solid " + THEME.charcoal,
               background: isToday ? THEME.gold + "10" : THEME.blackLight,
             }}>
@@ -13590,6 +13654,45 @@ const SchedulePanel = () => {
         </div>}
       </div>;
     })}
+
+    <Modal open={editModal !== null} onClose={closeModal} title={editModal === "new" ? "Add Event" : "Edit Event"}>
+      <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Input label="Date" type="date" value={form.date} onChange={e => handleFormChange("date", e.target.value)} />
+          <Input label="Time" type="text" placeholder="e.g. 4:45 PM" value={form.time} onChange={e => handleFormChange("time", e.target.value)} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Input label="End Time (optional)" type="text" placeholder="e.g. 7:00 PM" value={form.endTime || ""} onChange={e => handleFormChange("endTime", e.target.value)} />
+          <Select label="Event Type" value={form.type} onChange={e => handleFormChange("type", e.target.value)}>
+            <option value="practice">Practice</option>
+            <option value="game">Game</option>
+            <option value="scrimmage">Scrimmage</option>
+            <option value="tournament">Tournament</option>
+          </Select>
+        </div>
+        <Input label="Title" type="text" value={form.title} onChange={e => handleFormChange("title", e.target.value)} />
+        {form.type === "game" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Input label="Opponent" type="text" placeholder="e.g. Rockies" value={form.opponent || ""} onChange={e => handleFormChange("opponent", e.target.value)} />
+          <Select label="Home / Away" value={form.homeAway || ""} onChange={e => handleFormChange("homeAway", e.target.value)}>
+            <option value="">-- Select --</option>
+            <option value="home">Home</option>
+            <option value="away">Away</option>
+          </Select>
+        </div>}
+        <Input label="Location" type="text" value={form.location} onChange={e => handleFormChange("location", e.target.value)} />
+        <Select label="Phase / Week" value={form.phase} onChange={e => handleFormChange("phase", e.target.value)}>
+          {existingPhases.map(p => <option key={p} value={p}>{p}</option>)}
+        </Select>
+        <TextArea label="Notes (optional)" value={form.notes || ""} onChange={e => handleFormChange("notes", e.target.value)} rows={3} />
+        <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button onClick={handleSave}>{editModal === "new" ? "Add Event" : "Save Changes"}</Button>
+            <Button onClick={closeModal} variant="secondary">Cancel</Button>
+          </div>
+          {editModal !== "new" && <Button onClick={handleDelete} variant="danger">{deleteConfirm ? "Confirm Delete" : "Delete Event"}</Button>}
+        </div>
+      </div>
+    </Modal>
   </div>;
 };
 
@@ -16147,6 +16250,7 @@ const TryoutsPanel = () => {
 
 
 const TABS = [
+  { id: "today", label: "Today", icon: "\u{1F3E0}" },
   { id: "roster", label: "Roster", icon: "👥" },
   { id: "schedule", label: "Schedule", icon: "📅" },
   { id: "scouting", label: "Scouting", icon: "🔍" },
@@ -16228,7 +16332,7 @@ const TeamSettingsModal = ({ config, onSave, onClose }) => {
   );
 };
 function App() {
-  const [tab, setTab] = useState("roster");
+  const [tab, setTab] = useState("today");
   const [players, setPlayers] = useState(SEED_PLAYERS);
   const [coaches, setCoaches] = useState(SEED_COACHES);
   const [loaded, setLoaded] = useState(false);
@@ -16236,6 +16340,15 @@ function App() {
   const [swipeDirection, setSwipeDirection] = useState(null);
   const [teamConfig, setTeamConfig] = useState(() => loadTeamConfig());
   const [showTeamSettings, setShowTeamSettings] = useState(false);
+  const [schedule, setSchedule] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SCHEDULE_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : SEASON_SCHEDULE;
+    } catch { return SEASON_SCHEDULE; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule)); } catch {}
+  }, [schedule]);
 
   const updateTeamConfig = (newConfig) => {
     const merged = { ...teamConfig, ...newConfig };
@@ -16398,12 +16511,13 @@ function App() {
       <div style={{ display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         {[{ l: "Roster", v: players.length }, { l: "Returning", v: players.filter(p=>p.returning).length }, { l: "New", v: players.filter(p=>!p.returning).length }, { l: "Pitchers", v: players.filter(p=>p.isPitcher).length }].map(s => <div key={s.l} style={{ background: THEME.blackLight, padding: "10px 16px", borderRadius: 8, border: `1px solid ${THEME.charcoal}`, minWidth: 80 }}><div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{s.v}</div><div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase" }}>{s.l}</div></div>)}
       </div>
-      {(() => { const nxt = getNextScheduleEvent(); if (!nxt) return null; const nxtGame = getNextScheduleEvent("game"); const typeIcons = { game: "\u26be", practice: "\ud83d\udccb", scrimmage: "\ud83e\udd3c", tournament: "\ud83c\udfc6" }; return <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}><div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.gold + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{typeIcons[nxt.type]}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Up</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxt.title} - {nxt.day} {new Date(nxt.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxt.time}</div></div></div>{nxtGame && nxtGame.id !== nxt.id && <div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.red + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{"\u26be"}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Game</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxtGame.title} - {nxtGame.day} {new Date(nxtGame.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxtGame.time}{nxtGame.homeAway === "home" ? " (Home)" : " (Away)"}</div></div></div>}</div>; })()}
+      {(() => { const nxt = getNextScheduleEvent(undefined, schedule); if (!nxt) return null; const nxtGame = getNextScheduleEvent("game", schedule); const typeIcons = { game: "\u26be", practice: "\ud83d\udccb", scrimmage: "\ud83e\udd3c", tournament: "\ud83c\udfc6" }; return <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}><div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.gold + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{typeIcons[nxt.type]}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Up</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxt.title} - {nxt.day} {new Date(nxt.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxt.time}</div></div></div>{nxtGame && nxtGame.id !== nxt.id && <div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.red + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{"\u26be"}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Game</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxtGame.title} - {nxtGame.day} {new Date(nxtGame.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxtGame.time}{nxtGame.homeAway === "home" ? " (Home)" : " (Away)"}</div></div></div>}</div>; })()}
     </div>
     <div style={{ padding: "0 24px", marginTop: 16 }}>
       <Tabs tabs={TABS} active={tab} onSelect={setTab} />
+      {tab==="today" && <TodayPanel players={players} onNavigate={setTab} />}
       {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} coaches={coaches} setCoaches={setCoaches} />}
-      {tab==="schedule" && <SchedulePanel />}
+      {tab==="schedule" && <SchedulePanel schedule={schedule} setSchedule={setSchedule} />}
       {tab==="practicelog" && <PracticeLog players={players} coaches={coaches} />}
       {tab==="planner" && <LineupPlanner players={players} onCreateGame={(template) => {
         // TODO: Pass template to GameLog and show game creation form

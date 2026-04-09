@@ -16,3 +16,13 @@ npm-debug.log*
 # Temporary files
 .tmp/
 temp/
+
+# Dependencies
+node_modules/
+.npm
+
+# Build output
+dist/
+
+# Vite
+*.local
