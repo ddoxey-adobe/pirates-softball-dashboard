@@ -11,6 +11,40 @@ const STORAGE_KEYS = {
   OPPONENTTEAMS: "pirates-opponent-teams-2026v1",
 };
 
+// --- TEAM CONFIGURATION ---------------------------------------------------
+// Edit these defaults or use the in-app Team Settings panel to customize.
+const DEFAULT_TEAM_CONFIG = {
+  name: "Pirates",
+  mascot: "\U0001F3F4\u200D\u2620\uFE0F",
+  season: "2026",
+  league: "Lehi Rec Softball",
+  ageGroup: "12U-14U",
+  primaryColor: "#FDB515",
+  secondaryColor: "#1B1B1B",
+  accentColor: "#FAF9F6",
+};
+
+const TEAM_CONFIG_STORAGE_KEY = "team-config-v1";
+
+function loadTeamConfig() {
+  try {
+    const saved = localStorage.getItem(TEAM_CONFIG_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_TEAM_CONFIG, ...parsed };
+    }
+  } catch {}
+  return { ...DEFAULT_TEAM_CONFIG };
+}
+
+function saveTeamConfig(config) {
+  try {
+    localStorage.setItem(TEAM_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch {}
+}
+
+let TEAM_CONFIG = loadTeamConfig();
+
 const THEME = {
   gold: "#FDB515", goldLight: "#FDCF58", goldDim: "#C89A12",
   black: "#1B1B1B", blackLight: "#27251F", charcoal: "#3A3A3A",
@@ -426,11 +460,11 @@ const PRACTICE_TEMPLATES = [
 ];
 
 const MSG_TEMPLATES = [
-  { id: "t1", name: "Season Welcome", body: `Hi Pirates Families!\n\nWelcome to the 2026 season!\n\n🥎 Coaches: Devin Doxey (Head), Ken (Assistant), Shari (Pitching)\n\n🥎 Philosophy: Development + love of the game. Every girl gets time and tries positions.\n\n🥎 Bring: Glove, bat, helmet, water, cleats, positive attitude!\n\nI'll send updates through [METHOD]. Questions? Reach out anytime.\n\nGo Pirates! 🏴‍☠️` },
-  { id: "t2", name: "Practice Reminder", body: `Hi Pirates Families!\n\nPractice: [DAY] at [TIME] at [LOCATION]\n\nWorking on: [FOCUS]\n\n10 min early please. Let me know if she can't make it.\n\nGo Pirates! 🏴‍☠️` },
-  { id: "t3", name: "Game Day Info", body: `Hi Pirates Families!\n\n📍 [LOCATION]\n⏰ Arrive: [TIME] (game at [GAME TIME])\n🆚 [OPPONENT]\n\nFull uniform. Early for warm-ups.\n\nGo Pirates! 🏴‍☠️` },
-  { id: "t4", name: "Schedule Change", body: `Hi Pirates Families!\n\n⚠️ [CHANGE DETAILS]\n\nNew plan: [DETAILS]\n\nSorry for the inconvenience.\n\nGo Pirates! 🏴‍☠️` },
-  { id: "t5", name: "Weekly Recap", body: `Hi Pirates Families!\n\nGreat week!\n\n✅ Worked on: [TOPICS]\n⭐ Shoutouts: [PLAYER — REASON]\n📅 Next: [EVENT]\n\nGo Pirates! 🏴‍☠️` },
+  { id: "t1", name: "Season Welcome", body: `Hi ${TEAM_CONFIG.name} Families!\n\nWelcome to the 2026 season!\n\n🥎 Coaches: Devin Doxey (Head), Ken (Assistant), Shari (Pitching)\n\n🥎 Philosophy: Development + love of the game. Every girl gets time and tries positions.\n\n🥎 Bring: Glove, bat, helmet, water, cleats, positive attitude!\n\nI'll send updates through [METHOD]. Questions? Reach out anytime.\n\nGo ${TEAM_CONFIG.name}! 🏴‍☠️` },
+  { id: "t2", name: "Practice Reminder", body: `Hi ${TEAM_CONFIG.name} Families!\n\nPractice: [DAY] at [TIME] at [LOCATION]\n\nWorking on: [FOCUS]\n\n10 min early please. Let me know if she can't make it.\n\nGo ${TEAM_CONFIG.name}! 🏴‍☠️` },
+  { id: "t3", name: "Game Day Info", body: `Hi ${TEAM_CONFIG.name} Families!\n\n📍 [LOCATION]\n⏰ Arrive: [TIME] (game at [GAME TIME])\n🆚 [OPPONENT]\n\nFull uniform. Early for warm-ups.\n\nGo ${TEAM_CONFIG.name}! 🏴‍☠️` },
+  { id: "t4", name: "Schedule Change", body: `Hi ${TEAM_CONFIG.name} Families!\n\n⚠️ [CHANGE DETAILS]\n\nNew plan: [DETAILS]\n\nSorry for the inconvenience.\n\nGo ${TEAM_CONFIG.name}! 🏴‍☠️` },
+  { id: "t5", name: "Weekly Recap", body: `Hi ${TEAM_CONFIG.name} Families!\n\nGreat week!\n\n✅ Worked on: [TOPICS]\n⭐ Shoutouts: [PLAYER — REASON]\n📅 Next: [EVENT]\n\nGo ${TEAM_CONFIG.name}! 🏴‍☠️` },
 ];
 
 const SEED_PLAYERS = [
@@ -517,6 +551,7 @@ const SEED_PRACTICES = [
   }
 ];
 
+// Game types: "league", "scrimmage", "internal", "tournament", "exhibition"
 const SEED_GAMELOGS = [
   {
     id: "test-game-1",
@@ -565,9 +600,143 @@ const SEED_GAMELOGS = [
   }
 ];
 
+// --- 2026 Season Schedule ---
+const SEASON_SCHEDULE = [
+  // PRE-SEASON
+  { id: "s01", date: "2026-04-09", day: "Thu", type: "practice", title: "Assessment Practice 1", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Pre-Season" },
+  { id: "s02", date: "2026-04-11", day: "Sat", type: "practice", title: "Assessment Practice 2", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Pre-Season" },
+  { id: "s03", date: "2026-04-14", day: "Tue", type: "scrimmage", title: "Scrimmage", time: "6:00 PM", endTime: "8:00 PM", location: "Sports Complex", phase: "Pre-Season" },
+  { id: "s04", date: "2026-04-16", day: "Thu", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Pre-Season" },
+  { id: "s05", date: "2026-04-18", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Pre-Season" },
+  // WEEK 1
+  { id: "s06", date: "2026-04-20", day: "Mon", type: "game", title: "vs Rockies", time: "6:30 PM", location: "Sports Complex North", homeAway: "away", opponent: "Rockies", phase: "Week 1" },
+  { id: "s07", date: "2026-04-21", day: "Tue", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Week 1" },
+  { id: "s08", date: "2026-04-23", day: "Thu", type: "game", title: "vs Reds", time: "5:00 PM", location: "Sports Complex North", homeAway: "home", opponent: "Reds", phase: "Week 1" },
+  { id: "s09", date: "2026-04-25", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 1" },
+  // WEEK 2
+  { id: "s10", date: "2026-04-27", day: "Mon", type: "game", title: "vs Rangers", time: "6:30 PM", location: "Sports Complex North", homeAway: "home", opponent: "Rangers", phase: "Week 2" },
+  { id: "s11", date: "2026-04-28", day: "Tue", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Week 2" },
+  { id: "s12", date: "2026-04-30", day: "Thu", type: "game", title: "vs White Sox", time: "6:30 PM", location: "Sports Complex North", homeAway: "away", opponent: "White Sox", phase: "Week 2" },
+  { id: "s13", date: "2026-05-02", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 2" },
+  // WEEK 3
+  { id: "s14", date: "2026-05-04", day: "Mon", type: "game", title: "vs Giants", time: "8:00 PM", location: "Sports Complex North", homeAway: "home", opponent: "Giants", phase: "Week 3" },
+  { id: "s15", date: "2026-05-05", day: "Tue", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Week 3" },
+  { id: "s16", date: "2026-05-07", day: "Thu", type: "game", title: "vs Athletics", time: "8:00 PM", location: "Sports Complex North", homeAway: "home", opponent: "Athletics", phase: "Week 3" },
+  { id: "s17", date: "2026-05-09", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 3" },
+  // WEEK 4
+  { id: "s18", date: "2026-05-11", day: "Mon", type: "game", title: "vs Diamondbacks", time: "8:00 PM", location: "Sports Complex North", homeAway: "away", opponent: "Diamondbacks", phase: "Week 4" },
+  { id: "s19", date: "2026-05-13", day: "Wed", type: "game", title: "vs Reds", time: "8:00 PM", location: "Sports Complex North", homeAway: "away", opponent: "Reds", phase: "Week 4" },
+  { id: "s20", date: "2026-05-16", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 4" },
+  // WEEK 5
+  { id: "s21", date: "2026-05-19", day: "Tue", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Week 5" },
+  { id: "s22", date: "2026-05-21", day: "Thu", type: "game", title: "vs Rockies", time: "8:00 PM", location: "Sports Complex North", homeAway: "home", opponent: "Rockies", phase: "Week 5" },
+  { id: "s23", date: "2026-05-23", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 5" },
+  // WEEK 6
+  { id: "s24", date: "2026-05-26", day: "Tue", type: "practice", title: "Practice", time: "4:45 PM", endTime: "7:00 PM", location: "Sports Complex", phase: "Week 6" },
+  { id: "s25", date: "2026-05-27", day: "Wed", type: "game", title: "vs Rangers", time: "8:00 PM", location: "Sports Complex North", homeAway: "away", opponent: "Rangers", phase: "Week 6" },
+  { id: "s26", date: "2026-05-30", day: "Sat", type: "practice", title: "Practice", time: "7:45 AM", endTime: "10:00 AM", location: "Sports Complex", phase: "Week 6" },
+  // TOURNAMENTS
+  { id: "s27", date: "2026-06-01", day: "Mon", type: "tournament", title: "City Tournament - Day 1", time: "TBD", location: "Sports Complex", phase: "City Tournament" },
+  { id: "s28", date: "2026-06-04", day: "Thu", type: "tournament", title: "City Tournament - Day 2", time: "TBD", location: "Sports Complex", phase: "City Tournament" },
+  { id: "s29", date: "2026-06-05", day: "Fri", type: "tournament", title: "City Tournament - Day 3", time: "TBD", location: "Sports Complex", phase: "City Tournament" },
+  { id: "s30", date: "2026-06-06", day: "Sat", type: "tournament", title: "City Tournament - Day 4", time: "TBD", location: "Sports Complex", phase: "City Tournament" },
+  { id: "s31", date: "2026-07-06", day: "Mon", type: "tournament", title: "State Tournament - Day 1", time: "TBD", location: "TBD", phase: "State Tournament", notes: "Top 4 from city qualify" },
+  { id: "s32", date: "2026-07-07", day: "Tue", type: "tournament", title: "State Tournament - Day 2", time: "TBD", location: "TBD", phase: "State Tournament", notes: "Top 4 from city qualify" },
+  { id: "s33", date: "2026-07-08", day: "Wed", type: "tournament", title: "State Tournament - Day 3", time: "TBD", location: "TBD", phase: "State Tournament", notes: "Top 4 from city qualify" },
+];
+
+const getNextScheduleEvent = (type) => {
+  const today = new Date().toISOString().split("T")[0];
+  const upcoming = SEASON_SCHEDULE.filter(e => e.date >= today && (!type || e.type === type));
+  return upcoming.length > 0 ? upcoming[0] : null;
+};
+const getUpcomingScheduleEvents = (count = 5) => {
+  const today = new Date().toISOString().split("T")[0];
+  return SEASON_SCHEDULE.filter(e => e.date >= today).slice(0, count);
+};
+
+
 // ─── Storage ────────────────────────────────────────────────────
 const loadStore = async (key, fb) => { try { const r = await window.storage.get(key); return r?.value ? JSON.parse(r.value) : fb; } catch { return fb; } };
 const saveStore = async (key, d) => { try { await window.storage.set(key, JSON.stringify(d)); } catch {} };
+// --- Data Backup: Export / Import ---
+const ALL_BACKUP_KEYS = [
+  ...Object.values(STORAGE_KEYS),
+  "pirates-practices-unified-2026v1",
+  "pirates-lineup-templates-2026v2",
+  "pirates-lineups-2026v1",
+  "pirates-goals-2026v1",
+  "pirates-alignment-library-2026v2",
+  "pirates-stats-sidebar-open",
+  "pirates-reports-collapsed",
+];
+
+const handleExportData = async () => {
+  try {
+    const data = {};
+    for (const key of ALL_BACKUP_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) data[key] = raw;
+    }
+    const payload = {
+      _meta: {
+        exportDate: new Date().toISOString(),
+        appVersion: "2026-season",
+        teamName: TEAM_CONFIG.name + " Softball",
+        keyCount: Object.keys(data).length,
+      },
+      data,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = TEAM_CONFIG.name.toLowerCase() + "-backup-" + dateStr + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Export failed: " + e.message);
+  }
+};
+
+const handleImportData = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        if (!parsed._meta || !parsed.data || typeof parsed.data !== "object") {
+          alert("Invalid backup file. Expected a " + TEAM_CONFIG.name + " Softball backup JSON file.");
+          return;
+        }
+        if (!confirm(
+          "This will replace all current data with the backup from " +
+          (parsed._meta.exportDate || "unknown date") +
+          " (" + (parsed._meta.keyCount || Object.keys(parsed.data).length) +
+          " data keys).\n\nThis will replace all current data. Are you sure?"
+        )) return;
+        for (const [key, value] of Object.entries(parsed.data)) {
+          localStorage.setItem(key, value);
+        }
+        alert("Data imported successfully! The page will now reload.");
+        window.location.reload();
+      } catch (err) {
+        alert("Failed to import: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+
 
 // ─── UI Components ──────────────────────────────────────────────
 const StarRating = ({ value, onChange, size = 18 }) => <div style={{ display: "flex", gap: 2 }}>{[1,2,3,4,5].map(s => <button key={s} onClick={() => onChange(s)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: size, lineHeight: 1, color: s <= value ? THEME.gold : THEME.grayLight }}>★</button>)}</div>;
@@ -5022,6 +5191,47 @@ const LineupBuilder = ({ players }) => {
   </div>;
 };
 
+
+// --- PRINT LINEUP CARD ---
+const printLineupCard = (teamName, date, opponent, homeAway, battingOrder) => {
+  const rows = battingOrder.map((b, i) => `<tr><td>${i + 1}</td><td>${b.name}</td><td>${b.position}</td><td></td></tr>`).join("\n");
+  const pitcherRows = [1, 2, 3].map(n => `<tr><td style="height:28px;">P${n}</td>${[1,2,3,4,5,6].map(() => "<td></td>").join("")}</tr>`).join("\n");
+  const html = `<!DOCTYPE html>
+<html><head><title>Lineup Card - ${teamName}</title>
+<style>
+  @page { size: landscape; margin: 0.4in; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+  body { color: #000; background: #fff; padding: 16px; }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 2px; }
+  .meta { text-align: center; font-size: 14px; margin-bottom: 12px; color: #333; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  th, td { border: 1px solid #000; padding: 4px 8px; font-size: 13px; text-align: left; }
+  th { background: #eee; font-weight: 700; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 10px 0 4px 0; }
+  .notes-box { border: 1px solid #000; width: 100%; height: 80px; margin-top: 4px; }
+</style></head><body>
+<h1>${teamName}</h1>
+<div class="meta">${opponent ? "vs " + opponent : ""} &bull; ${date || "TBD"} &bull; ${(homeAway || "home").toUpperCase()}</div>
+
+<div class="section-title">Batting Order</div>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Position</th><th>Sub</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="section-title">Pitcher Tracking</div>
+<table>
+  <thead><tr><th>Pitcher</th><th>Inn 1</th><th>Inn 2</th><th>Inn 3</th><th>Inn 4</th><th>Inn 5</th><th>Inn 6</th></tr></thead>
+  <tbody>${pitcherRows}</tbody>
+</table>
+
+<div class="section-title">Notes</div>
+<div class="notes-box"></div>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
+};
+
 // ─── GAME LOG ───────────────────────────────────────────────────
 const OUT_CODES = ["K", "GO", "FO", "SAC"];
 
@@ -5037,7 +5247,7 @@ const GameLog = ({ players }) => {
   const [inningPitchers, setInningPitchers] = useState({}); // { inning: [{ playerId, pitches, strikes, balls }] }
 
   const empty = () => ({
-    id: Date.now().toString(), date: "", opponent: "", result: "", homeAway: "home",
+    id: Date.now().toString(), date: "", opponent: "", result: "", homeAway: "home", gameType: "league",
     ourScore: "", theirScore: "",
     battingOrder: players.map(p => p.id),
     attendance: players.reduce((a, p) => ({ ...a, [p.id]: true }), {}),
@@ -5202,7 +5412,25 @@ const GameLog = ({ players }) => {
         <div>
           <div style={{ fontWeight: 700, color: THEME.white, fontSize: 15 }}>{l.date ? new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "No date"} {l.opponent && `vs ${l.opponent}`}</div>
           <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            {l.homeAway && <Badge color={THEME.gray} bg="rgba(142,142,142,0.15)">{l.homeAway === "home" ? "Home" : "Away"}</Badge>}
+            
+                    {l.homeAway && <Badge color={THEME.gray} bg="rgba(142,142,142,0.15)">{l.homeAway === "home" ? "Home" : "Away"}</Badge>}
+                    {l.gameType && l.gameType !== "league" && <Badge color={
+                      l.gameType === "scrimmage" ? "#3498DB" :
+                      l.gameType === "internal" ? "#9B59B6" :
+                      l.gameType === "tournament" ? THEME.gold :
+                      THEME.gray
+                    } bg={
+                      l.gameType === "scrimmage" ? "rgba(52,152,219,0.15)" :
+                      l.gameType === "internal" ? "rgba(155,89,182,0.15)" :
+                      l.gameType === "tournament" ? "rgba(253,181,21,0.15)" :
+                      "rgba(142,142,142,0.15)"
+                    }>{
+                      l.gameType === "scrimmage" ? "Scrimmage" :
+                      l.gameType === "internal" ? "Internal" :
+                      l.gameType === "tournament" ? "Tournament" :
+                      l.gameType === "exhibition" ? "Exhibition" :
+                      l.gameType
+                    }</Badge>}
             {l.result && <Badge color={l.result === "W" ? THEME.green : l.result === "L" ? THEME.red : THEME.gray} bg={l.result === "W" ? "rgba(46,204,113,0.15)" : l.result === "L" ? "rgba(231,76,60,0.15)" : "rgba(142,142,142,0.15)"}>{l.result}</Badge>}
             {(l.ourScore || l.theirScore) && <Badge>{l.ourScore || "?"}-{l.theirScore || "?"}</Badge>}
           </div>
@@ -5255,6 +5483,7 @@ const GameLog = ({ players }) => {
           <Input label="Date" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
           <Input label="Opponent" value={form.opponent} onChange={e => setForm({ ...form, opponent: e.target.value })} placeholder="Team name" />
           <Select label="Home / Away" value={form.homeAway || "home"} onChange={e => setForm({ ...form, homeAway: e.target.value })}><option value="home">Home</option><option value="away">Away</option></Select>
+          <Select label="Game Type" value={form.gameType || "league"} onChange={e => setForm({ ...form, gameType: e.target.value })}><option value="league">League Game</option><option value="scrimmage">Scrimmage (vs Other Team)</option><option value="internal">Internal Scrimmage</option><option value="tournament">Tournament</option><option value="exhibition">Exhibition</option></Select>
           <Select label="Result" value={form.result} onChange={e => setForm({ ...form, result: e.target.value })}><option value="">—</option><option value="W">Win</option><option value="L">Loss</option><option value="T">Tie</option></Select>
           <Input label="Our Score" type="number" value={form.ourScore} onChange={e => setForm({ ...form, ourScore: e.target.value })} />
           <Input label="Their Score" type="number" value={form.theirScore} onChange={e => setForm({ ...form, theirScore: e.target.value })} />
@@ -5336,6 +5565,13 @@ const GameLog = ({ players }) => {
             })}
           </div>
         </div>
+        <button onClick={() => {
+          const bo = activeBattingOrder.map((pid, i) => {
+            const p = getPlayer(pid);
+            return { name: p ? p.name : "Unknown", position: p && p.positions && p.positions.length > 0 ? p.positions[0] : "" };
+          });
+          printLineupCard(TEAM_CONFIG.name, form.date, form.opponent, form.homeAway || "home", bo);
+        }} style={{ marginTop: 16, width: "100%", padding: "12px 0", background: THEME.charcoal, color: THEME.white, border: `1px solid ${THEME.gold}`, borderRadius: 6, fontFamily: "'Oswald',sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: 1 }}>Print Lineup Card</button>
       </div>}
 
       {/* LIVE SCORER */}
@@ -6951,7 +7187,7 @@ const Scouting = () => {
 
     html += `
   <div style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #FDB515; text-align: center; color: #8E8E8E; font-size: 12px;">
-    Pirates Softball 2026 • Generated ${new Date().toLocaleDateString()}
+    ${TEAM_CONFIG.name} Softball ${TEAM_CONFIG.season} • Generated ${new Date().toLocaleDateString()}
   </div>
 </body>
 </html>
@@ -11926,7 +12162,7 @@ const Reports = ({ players }) => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Pirates Softball - 2026 Season Report</title>
+  <title>${TEAM_CONFIG.name} Softball - ${TEAM_CONFIG.season} Season Report</title>
   <style>
     @media print {
       body { margin: 0; padding: 20px; }
@@ -11957,8 +12193,8 @@ const Reports = ({ players }) => {
 </head>
 <body>
   <div class="header">
-    <h1>🏴‍☠️ Pirates Softball</h1>
-    <div style="font-size: 18px; color: #8E8E8E;">2026 Season Report</div>
+    <h1>${TEAM_CONFIG.mascot} ${TEAM_CONFIG.name} Softball</h1>
+    <div style="font-size: 18px; color: #8E8E8E;">${TEAM_CONFIG.season} Season Report</div>
     <div style="font-size: 14px; color: #8E8E8E; margin-top: 8px;">Generated ${new Date().toLocaleDateString()}</div>
   </div>
 `;
@@ -12094,7 +12330,7 @@ const Reports = ({ players }) => {
 
                 reportHTML += `
   <div class="footer">
-    <div>Pirates Softball 2026 Season</div>
+    <div>${TEAM_CONFIG.name} Softball ${TEAM_CONFIG.season} Season</div>
     <div>Generated with Claude Code by Anthropic</div>
   </div>
 </body>
@@ -12632,7 +12868,7 @@ const Reports = ({ players }) => {
         <Card style={{ padding: 20, marginBottom: 16, textAlign: "center", background: `linear-gradient(135deg, ${THEME.blackLight} 0%, ${THEME.black} 100%)` }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 24 }}>
             <div>
-              <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 4 }}>Pirates</div>
+              <div style={{ color: THEME.gray, fontSize: 12, marginBottom: 4 }}>{TEAM_CONFIG.name}</div>
               <div style={{
                 color: selectedGame.result === "W" ? THEME.green : selectedGame.result === "L" ? THEME.red : THEME.gray,
                 fontSize: 48,
@@ -13205,6 +13441,14 @@ const TryoutsPanel = () => {
   // Rubric anchor expansion
   const [openAnchor, setOpenAnchor] = useState(null);
 
+  // ─── NEW STATE: Check-In (Feature 2) ───────────────────────────
+  const [checkedIn, setCheckedIn] = useState({});
+
+  // ─── NEW STATE: Draft Pick System (Feature 4) ──────────────────
+  const [draftTeamNames, setDraftTeamNames] = useState("Pirates, Rockies, Rangers, Reds");
+  const [draftPicks, setDraftPicks] = useState([]);
+  const [draftStarted, setDraftStarted] = useState(false);
+
   const dbRef = useRef(null);
   const fbAppRef = useRef(null);
   const toastTimer = useRef(null);
@@ -13303,8 +13547,8 @@ const TryoutsPanel = () => {
   // Save whenever state changes (after initial load)
   useEffect(() => {
     if (!loaded) return;
-    saveToFirebase({ players, scores, needs, evaluator });
-  }, [players, scores, needs, evaluator, loaded, saveToFirebase]);
+    saveToFirebase({ players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted });
+  }, [players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted, loaded, saveToFirebase]);
 
   // Firebase initialization
   useEffect(() => {
@@ -13321,6 +13565,10 @@ const TryoutsPanel = () => {
           setScores(data.scores || {});
           if (data.needs) setNeeds(data.needs);
           if (data.evaluator) setEvaluator(data.evaluator);
+          if (data.checkedIn) setCheckedIn(data.checkedIn);
+          if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
+          if (data.draftPicks) setDraftPicks(data.draftPicks);
+          if (data.draftStarted != null) setDraftStarted(data.draftStarted);
         } else {
           setPlayers(DEFAULT_PLAYERS);
         }
@@ -13359,6 +13607,10 @@ const TryoutsPanel = () => {
               setScores(data.scores || {});
               if (data.needs) setNeeds(data.needs);
               if (data.evaluator) setEvaluator(data.evaluator);
+              if (data.checkedIn) setCheckedIn(data.checkedIn);
+              if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
+              if (data.draftPicks) setDraftPicks(data.draftPicks);
+              if (data.draftStarted != null) setDraftStarted(data.draftStarted);
             } catch (e) {
               console.error("Parse error:", e);
               setPlayers(DEFAULT_PLAYERS);
@@ -13385,6 +13637,10 @@ const TryoutsPanel = () => {
               if (data.players && data.players.length > 0) setPlayers(data.players);
               setScores(prev => data.scores || prev);
               if (data.needs) setNeeds(data.needs);
+              if (data.checkedIn) setCheckedIn(data.checkedIn);
+              if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
+              if (data.draftPicks) setDraftPicks(data.draftPicks);
+              if (data.draftStarted != null) setDraftStarted(data.draftStarted);
             } catch (e) { console.error("FB parse error:", e); }
           }
         });
@@ -13514,11 +13770,12 @@ const TryoutsPanel = () => {
 
   // ─── SUB-TABS CONFIG ───────────────────────────────────────────
   const SUB_TABS = [
-    { id: "rubric",   label: "Rubric",   icon: "📏" },
-    { id: "players",  label: "Players",  icon: "👥" },
-    { id: "score",    label: "Score",    icon: "✏️" },
-    { id: "rankings", label: "Rankings", icon: "📊" },
-    { id: "draft",    label: "Draft",    icon: "🏆" },
+    { id: "rubric",   label: "Rubric",    icon: "📏" },
+    { id: "players",  label: "Players",   icon: "👥" },
+    { id: "checkin",  label: "Check-In",  icon: "✅" },
+    { id: "score",    label: "Score",     icon: "✏️" },
+    { id: "rankings", label: "Rankings",  icon: "📊" },
+    { id: "draft",    label: "Draft",     icon: "🏆" },
   ];
 
   // ─── STYLES (matching dashboard patterns) ──────────────────────
@@ -13645,10 +13902,138 @@ const TryoutsPanel = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // RUBRIC SUB-TAB
+  // HELPER: Per-evaluator score breakdown for a player (Feature 1)
+  // ═══════════════════════════════════════════════════════════════
+  const getEvaluatorBreakdown = (playerNum) => {
+    const cats = ["hitting","gloveWork","throwing","hustle","attitude","coachability","pitching"];
+    const catMax = { hitting:5, gloveWork:5, throwing:5, hustle:3, attitude:5, coachability:5, pitching:5 };
+    const breakdown = [];
+    for (const ev in scores) {
+      if (!scores[ev][playerNum]) continue;
+      const s = scores[ev][playerNum];
+      const scoredCats = [];
+      cats.forEach(function(c) {
+        if (s[c] != null && s[c] !== "" && !isNaN(s[c])) {
+          scoredCats.push({ key: c, val: parseFloat(s[c]), max: catMax[c] });
+        }
+      });
+      if (scoredCats.length === 0) continue;
+      const earned = scoredCats.reduce(function(sum, x) { return sum + x.val; }, 0);
+      const possible = scoredCats.reduce(function(sum, x) { return sum + x.max; }, 0);
+      const pct = Math.round(earned / possible * 1000) / 10;
+      breakdown.push({ evaluator: ev, scores: s, pct: pct });
+    }
+    return breakdown;
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // HELPER: Print Scorecards (Feature 3)
+  // ═══════════════════════════════════════════════════════════════
+  const printScorecards = () => {
+    const sorted = players.slice().sort(function(a,b) { return a.n - b.n; });
+
+    var html = '<!DOCTYPE html><html><head><title>Tryout Scorecards - Pirates Softball 2026</title>';
+    html += '<style>';
+    html += 'body { font-family: Arial, Helvetica, sans-serif; color: #000; margin: 0; padding: 10px; }';
+    html += '.page-break { page-break-after: always; }';
+    html += '.anchor-ref { border: 1px solid #999; padding: 8px 12px; margin-bottom: 12px; font-size: 10px; }';
+    html += '.anchor-ref h3 { margin: 0 0 4px 0; font-size: 12px; }';
+    html += '.anchor-ref table { width: 100%; border-collapse: collapse; }';
+    html += '.anchor-ref td { padding: 1px 4px; font-size: 9px; vertical-align: top; }';
+    html += '.anchor-ref td:first-child { font-weight: bold; white-space: nowrap; width: 110px; }';
+    html += '.card { border: 2px solid #000; padding: 12px 16px; margin-bottom: 14px; page-break-inside: avoid; }';
+    html += '.card h2 { margin: 0 0 8px 0; font-size: 16px; border-bottom: 1px solid #000; padding-bottom: 4px; }';
+    html += '.score-row { display: flex; align-items: center; border-bottom: 1px solid #ccc; padding: 5px 0; }';
+    html += '.score-label { width: 180px; font-size: 12px; font-weight: bold; }';
+    html += '.score-boxes { display: flex; gap: 6px; }';
+    html += '.score-box { width: 28px; height: 28px; border: 1.5px solid #000; text-align: center; line-height: 28px; font-size: 11px; font-weight: bold; color: #999; }';
+    html += '.notes-area { margin-top: 6px; }';
+    html += '.notes-area label { font-size: 11px; font-weight: bold; }';
+    html += '.notes-line { border-bottom: 1px solid #ccc; height: 20px; margin-top: 2px; }';
+    html += '@media print { body { padding: 0; } }';
+    html += '</style></head><body>';
+
+    // Build anchor reference HTML once
+    var anchorHtml = '<div class="anchor-ref">';
+    anchorHtml += '<h3>Scoring Anchor Reference (1-5 scale, Hustle 1-3)</h3>';
+    anchorHtml += '<table>';
+    for (var aKey in ANCHORS) {
+      var a = ANCHORS[aKey];
+      anchorHtml += '<tr><td>' + a.label + '</td><td>';
+      a.anchors.forEach(function(pair) {
+        anchorHtml += '<strong>' + pair[0] + '</strong>=' + pair[1] + '&nbsp;&nbsp; ';
+      });
+      anchorHtml += '</td></tr>';
+    }
+    anchorHtml += '</table></div>';
+
+    var catLabels = [
+      { key: "hitting", label: "Hitting (1-5)", max: 5 },
+      { key: "gloveWork", label: "Glove Work (1-5)", max: 5 },
+      { key: "throwing", label: "Throwing (1-5)", max: 5 },
+      { key: "hustle", label: "Hustle (1-3)", max: 3 },
+      { key: "attitude", label: "Attitude (1-5)", max: 5 },
+      { key: "coachability", label: "Coachability (1-5)", max: 5 },
+      { key: "pitching", label: "Pitching (1-5, opt-in)", max: 5 },
+    ];
+
+    // Print anchor reference at top of first page
+    html += anchorHtml;
+
+    sorted.forEach(function(p, idx) {
+      html += '<div class="card">';
+      html += '<h2>#' + p.n + ' &mdash; ' + p.nm;
+      if (p.pr) html += ' <span style="font-size:11px;color:#666;">(' + p.pr + ')</span>';
+      html += '</h2>';
+      html += '<div style="font-size:10px;color:#555;margin-bottom:6px;">Evaluator: ______________ &nbsp;&nbsp; Date: ______________</div>';
+
+      catLabels.forEach(function(cat) {
+        html += '<div class="score-row">';
+        html += '<div class="score-label">' + cat.label + '</div>';
+        html += '<div class="score-boxes">';
+        for (var v = 1; v <= cat.max; v++) {
+          html += '<div class="score-box">' + v + '</div>';
+        }
+        html += '</div></div>';
+      });
+
+      html += '<div class="notes-area"><label>Notes:</label>';
+      html += '<div class="notes-line"></div><div class="notes-line"></div>';
+      html += '</div></div>';
+
+      // Page break after every 3 players (not after the last one)
+      if ((idx + 1) % 3 === 0 && idx < sorted.length - 1) {
+        html += '<div class="page-break"></div>';
+        html += anchorHtml;
+      }
+    });
+
+    html += '</body></html>';
+
+    var w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    setTimeout(function() { w.print(); }, 400);
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RUBRIC SUB-TAB (with Print Scorecards button - Feature 3)
   // ═══════════════════════════════════════════════════════════════
   const renderRubric = () => (
     <div>
+      {/* Print Scorecards Button */}
+      <div style={Object.assign({}, cardStyle, { display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 })}>
+        <div>
+          <div style={sectionTitleStyle}>Printable Scorecards</div>
+          <div style={{ fontSize:11, color:THEME.gray, marginTop:-8, marginBottom:0 }}>
+            Generate B&W scorecards for all {players.length} players (3 per page with anchor reference)
+          </div>
+        </div>
+        <button style={Object.assign({}, btnPrimary, { fontSize:13, padding:"10px 20px" })} onClick={printScorecards}>
+          Print Scorecards
+        </button>
+      </div>
+
       {/* Tryout Stations */}
       <div style={cardStyle}>
         <div style={sectionTitleStyle}>Tryout Stations</div>
@@ -13848,6 +14233,114 @@ const TryoutsPanel = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
+  // CHECK-IN SUB-TAB (Feature 2)
+  // ═══════════════════════════════════════════════════════════════
+  const renderCheckIn = () => {
+    const sorted = players.slice().sort(function(a,b) { return a.n - b.n; });
+    const presentCount = sorted.filter(function(p) { return !!checkedIn[p.n]; }).length;
+    const totalCount = sorted.length;
+
+    const toggleCheckIn = (num) => {
+      setCheckedIn(function(prev) {
+        const next = Object.assign({}, prev);
+        next[num] = !prev[num];
+        return next;
+      });
+    };
+
+    const checkInAll = () => {
+      const next = {};
+      sorted.forEach(function(p) { next[p.n] = true; });
+      setCheckedIn(next);
+      showToast("All checked in");
+    };
+
+    const clearAllCheckIn = () => {
+      setCheckedIn({});
+      showToast("Check-in cleared");
+    };
+
+    return (
+      <div>
+        {/* Counter Card */}
+        <div style={Object.assign({}, cardStyle, { display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 })}>
+          <div>
+            <div style={sectionTitleStyle}>Tryout Day Check-In</div>
+            <div style={{ fontSize:24, fontWeight:800, color: presentCount === totalCount && totalCount > 0 ? THEME.green : THEME.gold, fontFamily:"'Oswald',sans-serif" }}>
+              {presentCount} / {totalCount}{" "}
+              <span style={{ fontSize:13, color:THEME.gray, fontWeight:500 }}>checked in</span>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            <button style={btnGreen} onClick={checkInAll}>Check In All</button>
+            <button style={btnSecondary} onClick={clearAllCheckIn}>Clear All</button>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div style={Object.assign({}, cardStyle, { padding:"12px 20px" })}>
+          <div style={{ height:8, borderRadius:4, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
+            <div style={{
+              height:"100%", borderRadius:4, transition:"width 0.3s ease",
+              width: (totalCount > 0 ? (presentCount / totalCount * 100) : 0) + "%",
+              background: presentCount === totalCount && totalCount > 0 ? THEME.green : THEME.gold,
+            }} />
+          </div>
+        </div>
+
+        {/* Player List */}
+        <div style={cardStyle}>
+          {sorted.map(function(p, i) {
+            const isPresent = !!checkedIn[p.n];
+            return (
+              <div
+                key={p.n}
+                onClick={function() { toggleCheckIn(p.n); }}
+                style={{
+                  display:"flex", alignItems:"center", justifyContent:"space-between",
+                  padding:"10px 12px", borderRadius:6, marginBottom:3, cursor:"pointer",
+                  background: isPresent ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.01)",
+                  border: "1px solid " + (isPresent ? THEME.green + "40" : THEME.charcoal),
+                  transition: "all 0.15s",
+                }}
+              >
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{
+                    width:28, height:28, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:12, fontWeight:800,
+                    background: isPresent ? THEME.green : THEME.black,
+                    color: isPresent ? THEME.white : THEME.gray,
+                    border: "1px solid " + (isPresent ? THEME.green : THEME.charcoal),
+                  }}>
+                    {isPresent ? "✓" : p.n}
+                  </span>
+                  <div>
+                    <div style={{ fontWeight:600, fontSize:13, color: isPresent ? THEME.white : THEME.gray }}>
+                      #{p.n} {p.nm}
+                    </div>
+                    {p.pr && <span style={pillStyle("#E67E22")}>{p.pr}</span>}
+                  </div>
+                </div>
+                <div style={{
+                  padding:"4px 12px", borderRadius:5, fontSize:11, fontWeight:700,
+                  fontFamily:"'Oswald',sans-serif", textTransform:"uppercase",
+                  background: isPresent ? THEME.green : THEME.charcoal,
+                  color: isPresent ? THEME.white : THEME.gray,
+                }}>
+                  {isPresent ? "Present" : "Absent"}
+                </div>
+              </div>
+            );
+          })}
+          {sorted.length === 0 && (
+            <div style={{ color:THEME.gray, padding:16, textAlign:"center", fontSize:12 }}>No players registered yet.</div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
   // SCORE SUB-TAB
   // ═══════════════════════════════════════════════════════════════
   const renderScore = () => {
@@ -13944,7 +14437,7 @@ const TryoutsPanel = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // RANKINGS SUB-TAB
+  // RANKINGS SUB-TAB (with per-evaluator breakdown - Feature 1)
   // ═══════════════════════════════════════════════════════════════
   const renderRankings = () => {
     var allData = players.map(p => {
@@ -13986,6 +14479,17 @@ const TryoutsPanel = () => {
       { k:"top15",  l:"Top 15", c:Math.min(15,scored.length) },
       { k:"pitch",  l:"Pitchers", c:allData.filter(x => x.avg && x.avg.pitching != null).length },
       { k:"all",    l:"All",    c:allData.length },
+    ];
+
+    // Short labels for evaluator breakdown columns
+    var catShort = [
+      { key:"hitting", label:"Hit", max:5 },
+      { key:"gloveWork", label:"Glove", max:5 },
+      { key:"throwing", label:"Throw", max:5 },
+      { key:"hustle", label:"Hustle", max:3 },
+      { key:"attitude", label:"Att", max:5 },
+      { key:"coachability", label:"Coach", max:5 },
+      { key:"pitching", label:"Pitch", max:5 },
     ];
 
     return (
@@ -14061,7 +14565,7 @@ const TryoutsPanel = () => {
                   return (
                     <React.Fragment key={p.n}>
                       <tr
-                        style={{ background: i%2===0 ? "rgba(255,255,255,0.008)" : "transparent", cursor: p.fit.length ? "pointer" : "default" }}
+                        style={{ background: i%2===0 ? "rgba(255,255,255,0.008)" : "transparent", cursor: "pointer" }}
                         onClick={() => setExpandedPlayer(expandedPlayer === p.n ? null : p.n)}
                       >
                         <td style={Object.assign({}, tdBaseStyle, { color:THEME.gray, fontWeight:600 })}>{p.n}</td>
@@ -14086,23 +14590,110 @@ const TryoutsPanel = () => {
                           {topFit ? topFit.pos : "-"}
                         </td>
                       </tr>
-                      {expandedPlayer === p.n && p.fit.length > 0 && (
+                      {expandedPlayer === p.n && (
                         <tr>
                           <td colSpan={12} style={{ padding:"3px 6px 8px 36px", background:"rgba(253,181,21,0.05)" }}>
-                            <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
-                              {p.fit.map((r, j) => {
-                                var c = r.score >= 75 ? THEME.green : r.score >= 60 ? THEME.blue : r.score >= 45 ? "#F1C40F" : THEME.red;
-                                return (
-                                  <div key={j} style={{
-                                    padding:"3px 8px", borderRadius:4, fontSize:9,
-                                    background:THEME.black, border:"1px solid " + THEME.charcoal,
+                            {/* Position Fit Pills */}
+                            {p.fit.length > 0 && (
+                              <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:8 }}>
+                                {p.fit.map((r, j) => {
+                                  var c = r.score >= 75 ? THEME.green : r.score >= 60 ? THEME.blue : r.score >= 45 ? "#F1C40F" : THEME.red;
+                                  return (
+                                    <div key={j} style={{
+                                      padding:"3px 8px", borderRadius:4, fontSize:9,
+                                      background:THEME.black, border:"1px solid " + THEME.charcoal,
+                                    }}>
+                                      <span style={{ color:THEME.white }}>{r.pos}</span>{" "}
+                                      <span style={{ fontWeight:700, color:c }}>{r.score}%</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* ── FEATURE 1: Per-Evaluator Breakdown ── */}
+                            {(function() {
+                              var breakdown = getEvaluatorBreakdown(p.n);
+                              if (breakdown.length === 0) return null;
+                              return (
+                                <div style={{
+                                  marginBottom:8, padding:"8px 10px", borderRadius:6,
+                                  background:THEME.black, border:"1px solid " + THEME.charcoal,
+                                }}>
+                                  <div style={{
+                                    fontSize:10, fontWeight:700, color:THEME.gold,
+                                    textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:6,
+                                    fontFamily:"'Oswald',sans-serif",
                                   }}>
-                                    <span style={{ color:THEME.white }}>{r.pos}</span>{" "}
-                                    <span style={{ fontWeight:700, color:c }}>{r.score}%</span>
+                                    Per-Evaluator Breakdown
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  {/* Header row */}
+                                  <div style={{ display:"flex", gap:0, marginBottom:2 }}>
+                                    <span style={{ minWidth:64, fontSize:9, fontWeight:700, color:THEME.gray }}>Evaluator</span>
+                                    {catShort.map(function(cs) {
+                                      return (
+                                        <span key={cs.key} style={{ minWidth:42, fontSize:8, fontWeight:700, color:THEME.gray, textAlign:"center" }}>{cs.label}</span>
+                                      );
+                                    })}
+                                    <span style={{ minWidth:48, fontSize:9, fontWeight:700, color:THEME.gray, textAlign:"right" }}>Total</span>
+                                  </div>
+                                  {/* Each evaluator row */}
+                                  {breakdown.map(function(bd) {
+                                    var pctColor = bd.pct >= 80 ? THEME.green : bd.pct >= 65 ? THEME.blue : bd.pct >= 50 ? "#F1C40F" : bd.pct >= 35 ? "#E67E22" : THEME.red;
+                                    return (
+                                      <div key={bd.evaluator} style={{
+                                        display:"flex", gap:0, alignItems:"center", padding:"3px 0",
+                                        borderBottom:"1px solid rgba(255,255,255,0.03)",
+                                      }}>
+                                        <span style={{ minWidth:64, fontSize:10, fontWeight:600, color:THEME.gold }}>{bd.evaluator}</span>
+                                        {catShort.map(function(cs) {
+                                          var v = bd.scores[cs.key];
+                                          var hasVal = v != null && v !== "" && !isNaN(v);
+                                          var valColor = THEME.gray;
+                                          if (hasVal) {
+                                            var vPct = parseFloat(v) / cs.max * 100;
+                                            valColor = vPct >= 80 ? THEME.green : vPct >= 60 ? THEME.blue : vPct >= 40 ? "#F1C40F" : THEME.red;
+                                          }
+                                          return (
+                                            <span key={cs.key} style={{ minWidth:42, fontSize:10, fontWeight:600, color:valColor, textAlign:"center" }}>
+                                              {hasVal ? v : "-"}
+                                            </span>
+                                          );
+                                        })}
+                                        <span style={{ minWidth:48, fontSize:11, fontWeight:700, color:pctColor, textAlign:"right" }}>
+                                          {bd.pct}%
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                  {/* Combined average row */}
+                                  {breakdown.length > 1 && (
+                                    <div style={{
+                                      display:"flex", gap:0, alignItems:"center", padding:"5px 0 2px",
+                                      borderTop:"1px solid " + THEME.charcoal, marginTop:2,
+                                    }}>
+                                      <span style={{ minWidth:64, fontSize:10, fontWeight:700, color:THEME.white }}>Average</span>
+                                      {catShort.map(function(cs) {
+                                        var vals = [];
+                                        breakdown.forEach(function(bd) {
+                                          var v = bd.scores[cs.key];
+                                          if (v != null && v !== "" && !isNaN(v)) vals.push(parseFloat(v));
+                                        });
+                                        if (vals.length === 0) return <span key={cs.key} style={{ minWidth:42, fontSize:10, color:THEME.gray, textAlign:"center" }}>-</span>;
+                                        var avg = Math.round(vals.reduce(function(s,v){ return s+v; },0) / vals.length * 100) / 100;
+                                        var vPct = avg / cs.max * 100;
+                                        var c = vPct >= 80 ? THEME.green : vPct >= 60 ? THEME.blue : vPct >= 40 ? "#F1C40F" : THEME.red;
+                                        return <span key={cs.key} style={{ minWidth:42, fontSize:10, fontWeight:700, color:c, textAlign:"center" }}>{avg}</span>;
+                                      })}
+                                      <span style={{ minWidth:48, fontSize:11, fontWeight:800, color:tierColor(p.total), textAlign:"right" }}>
+                                        {p.total != null ? p.total + "%" : "-"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                             {/* Show notes from each evaluator */}
                             {(function() {
                               var noteEntries = [];
@@ -14143,32 +14734,291 @@ const TryoutsPanel = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // DRAFT BOARD SUB-TAB
+  // DRAFT SUB-TAB (Feature 4: Snake Draft Pick System)
   // ═══════════════════════════════════════════════════════════════
   const renderDraft = () => {
-    var data = players.map(p => {
-      var avg = getAvg(p.n);
-      return { n: p.n, nm: p.nm, avg: avg, total: calcTotal(avg), fit: calcFit(avg) };
-    }).filter(x => x.total != null);
+    // Parse team names
+    var teamNames = draftTeamNames.split(",").map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+    var numTeams = teamNames.length;
 
+    // Build all-player data with scores
+    var allData = players.map(function(p) {
+      var avg = getAvg(p.n);
+      return { n: p.n, nm: p.nm, pr: p.pr, avg: avg, total: calcTotal(avg), fit: calcFit(avg) };
+    });
+
+    // Drafted player nums
+    var draftedNums = {};
+    draftPicks.forEach(function(dp) { draftedNums[dp.playerNum] = true; });
+
+    // Available players (scored, not yet drafted), sorted by total desc
+    var available = allData.filter(function(p) { return p.total != null && !draftedNums[p.n]; });
+    available.sort(function(a,b) { return b.total - a.total; });
+
+    // Figure out whose turn it is (snake draft)
+    var totalPickCount = draftPicks.length;
+    var currentRound, currentPickInRound, currentTeamIdx;
+    if (numTeams > 0) {
+      currentRound = Math.floor(totalPickCount / numTeams) + 1;
+      currentPickInRound = totalPickCount % numTeams;
+      // Snake: odd rounds go forward, even rounds go backward
+      if (currentRound % 2 === 1) {
+        currentTeamIdx = currentPickInRound;
+      } else {
+        currentTeamIdx = numTeams - 1 - currentPickInRound;
+      }
+    } else {
+      currentRound = 1;
+      currentTeamIdx = 0;
+    }
+
+    // Build rosters per team
+    var teamRosters = {};
+    teamNames.forEach(function(tn, idx) { teamRosters[idx] = []; });
+    draftPicks.forEach(function(dp) {
+      if (teamRosters[dp.teamIndex] != null) {
+        var pd = allData.find(function(x) { return x.n === dp.playerNum; });
+        teamRosters[dp.teamIndex].push({
+          playerNum: dp.playerNum,
+          nm: pd ? pd.nm : "#" + dp.playerNum,
+          total: pd ? pd.total : null,
+          round: dp.round,
+          pick: dp.pick,
+        });
+      }
+    });
+
+    // Team average scores
+    var teamAvgs = {};
+    teamNames.forEach(function(tn, idx) {
+      var roster = teamRosters[idx];
+      var scoredRoster = roster.filter(function(r) { return r.total != null; });
+      teamAvgs[idx] = scoredRoster.length > 0 ? Math.round(scoredRoster.reduce(function(s,r) { return s + r.total; }, 0) / scoredRoster.length * 10) / 10 : null;
+    });
+
+    var draftPlayer = function(playerNum) {
+      if (!draftStarted) return;
+      if (numTeams === 0) { showToast("Define teams first", "err"); return; }
+      var newPick = {
+        playerNum: playerNum,
+        teamIndex: currentTeamIdx,
+        round: currentRound,
+        pick: totalPickCount + 1,
+      };
+      setDraftPicks(function(prev) { return prev.concat([newPick]); });
+      var pd = players.find(function(p) { return p.n === playerNum; });
+      showToast(teamNames[currentTeamIdx] + " draft " + (pd ? pd.nm : "#" + playerNum));
+    };
+
+    var undoLastPick = function() {
+      if (draftPicks.length === 0) { showToast("No picks to undo", "err"); return; }
+      setDraftPicks(function(prev) { return prev.slice(0, -1); });
+      showToast("Last pick undone");
+    };
+
+    var resetDraft = function() {
+      setDraftPicks([]);
+      setDraftStarted(false);
+      showToast("Draft reset");
+    };
+
+    // Positions for the position-fit board at the bottom
     var positions = ["Pitcher","Catcher","Shortstop","Third Base","First Base","Second Base","Outfield","Utility"];
+    var posData = allData.filter(function(x) { return x.total != null; });
 
     return (
       <div>
+        {/* Draft Setup Card */}
         <div style={cardStyle}>
-          <div style={sectionTitleStyle}>Draft Board</div>
+          <div style={sectionTitleStyle}>Draft Setup</div>
+          <div style={{ marginBottom:10 }}>
+            <label style={labelStyle}>Team Names (comma-separated)</label>
+            <input
+              style={Object.assign({}, inputStyle, { marginTop:4 })}
+              value={draftTeamNames}
+              onChange={function(e) { setDraftTeamNames(e.target.value); }}
+              placeholder="Pirates, Rockies, Rangers, Reds"
+              disabled={draftStarted}
+            />
+          </div>
+          <div style={{ fontSize:11, color:THEME.gray, marginBottom:10 }}>
+            {numTeams > 0 ? numTeams + " teams: " + teamNames.join(", ") : "Enter team names above"}
+            {" | Snake draft (Round 1 forward, Round 2 reverse, etc.)"}
+          </div>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            {!draftStarted ? (
+              <button
+                style={Object.assign({}, btnGreen, { minWidth:120 })}
+                onClick={function() {
+                  if (numTeams < 2) { showToast("Need at least 2 teams", "err"); return; }
+                  setDraftStarted(true);
+                  showToast("Draft started!");
+                }}
+              >
+                Start Draft
+              </button>
+            ) : (
+              <button style={Object.assign({}, btnSecondary, { minWidth:120 })} onClick={function() { setDraftStarted(false); }}>
+                Pause Draft
+              </button>
+            )}
+            <button style={btnSecondary} onClick={undoLastPick}>
+              Undo Last Pick
+            </button>
+            <button style={btnDanger} onClick={resetDraft}>
+              Reset Draft
+            </button>
+          </div>
+        </div>
+
+        {/* Current Pick Banner */}
+        {draftStarted && numTeams > 0 && available.length > 0 && (
+          <div style={Object.assign({}, cardStyle, {
+            borderColor: THEME.gold + "60",
+            background: "rgba(253,181,21,0.06)",
+            textAlign:"center", padding:"14px 20px",
+          })}>
+            <div style={{ fontSize:10, color:THEME.gray, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2 }}>
+              Round {currentRound} — Pick {totalPickCount + 1}
+            </div>
+            <div style={{ fontSize:22, fontWeight:800, color:THEME.gold, fontFamily:"'Oswald',sans-serif" }}>
+              {teamNames[currentTeamIdx] || "?"} on the clock
+            </div>
+          </div>
+        )}
+
+        {draftStarted && available.length === 0 && (
+          <div style={Object.assign({}, cardStyle, { textAlign:"center" })}>
+            <div style={{ fontSize:18, fontWeight:800, color:THEME.green, fontFamily:"'Oswald',sans-serif" }}>
+              Draft Complete!
+            </div>
+          </div>
+        )}
+
+        {/* Available Players + Team Rosters side by side */}
+        <div style={{ display:"grid", gridTemplateColumns: numTeams > 0 ? "1fr 1fr" : "1fr", gap:12 }}>
+          {/* Available Players */}
+          <div style={cardStyle}>
+            <div style={Object.assign({}, sectionTitleStyle, { marginBottom:8 })}>
+              Available Players ({available.length})
+            </div>
+            {available.length === 0 && !draftStarted && (
+              <div style={{ fontSize:11, color:THEME.gray }}>Score players and start the draft to see available players here.</div>
+            )}
+            <div style={{ maxHeight:480, overflowY:"auto" }}>
+              {available.map(function(p, i) {
+                var topFit = p.fit[0];
+                return (
+                  <div
+                    key={p.n}
+                    onClick={function() { draftPlayer(p.n); }}
+                    style={{
+                      display:"flex", justifyContent:"space-between", alignItems:"center",
+                      padding:"7px 10px", borderRadius:6, marginBottom:2,
+                      cursor: draftStarted ? "pointer" : "default",
+                      background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent",
+                      border: "1px solid " + THEME.charcoal,
+                      opacity: draftStarted ? 1 : 0.6,
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={function(e) { if (draftStarted) e.currentTarget.style.borderColor = THEME.gold + "60"; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.borderColor = THEME.charcoal; }}
+                  >
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{
+                        width:22, height:22, borderRadius:4, display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:9, fontWeight:800, color:THEME.gray,
+                        background:THEME.black, border:"1px solid " + THEME.charcoal,
+                      }}>{i + 1}</span>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:600, color:THEME.white }}>
+                          #{p.n} {p.nm}
+                          {p.pr ? <span style={Object.assign({}, pillStyle("#E67E22"), { marginLeft:4 })}>{p.pr}</span> : null}
+                        </div>
+                        <div style={{ fontSize:9, color:THEME.blue }}>
+                          {topFit ? topFit.pos + " " + topFit.score + "%" : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:tierColor(p.total) }}>{p.total}%</span>
+                      <div><span style={pillStyle(tierColor(p.total))}>{tierLabel(p.total)}</span></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Team Rosters */}
+          {numTeams > 0 && (
+            <div>
+              {teamNames.map(function(tn, idx) {
+                var roster = teamRosters[idx] || [];
+                var avgScoreVal = teamAvgs[idx];
+                var isOnClock = draftStarted && currentTeamIdx === idx && available.length > 0;
+                return (
+                  <div key={idx} style={Object.assign({}, cardStyle, {
+                    borderColor: isOnClock ? THEME.gold + "60" : THEME.charcoal,
+                    background: isOnClock ? "rgba(253,181,21,0.04)" : THEME.blackLight,
+                  })}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <span style={{ fontWeight:700, color:THEME.white, fontSize:14, fontFamily:"'Oswald',sans-serif", textTransform:"uppercase" }}>
+                          {tn}
+                        </span>
+                        <span style={pillStyle(THEME.blue)}>{roster.length} players</span>
+                        {isOnClock && <span style={pillStyle(THEME.gold)}>On Clock</span>}
+                      </div>
+                      {avgScoreVal != null && (
+                        <span style={{ fontSize:12, fontWeight:700, color:tierColor(avgScoreVal) }}>
+                          Avg: {avgScoreVal}%
+                        </span>
+                      )}
+                    </div>
+                    {roster.length === 0 ? (
+                      <div style={{ fontSize:10, color:THEME.gray, padding:"4px 0" }}>No picks yet</div>
+                    ) : (
+                      roster.map(function(r, ri) {
+                        return (
+                          <div key={ri} style={{
+                            display:"flex", justifyContent:"space-between", alignItems:"center",
+                            padding:"4px 8px", borderRadius:4, marginBottom:1,
+                            background: ri % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent",
+                          }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                              <span style={{ fontSize:8, fontWeight:700, color:THEME.gray, minWidth:14 }}>R{r.round}</span>
+                              <span style={{ fontSize:11, fontWeight:600, color:THEME.white }}>{r.nm}</span>
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:700, color:tierColor(r.total) }}>
+                              {r.total != null ? r.total + "%" : "-"}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Position Fit Board (original draft board preserved below) */}
+        <div style={Object.assign({}, cardStyle, { marginTop:12 })}>
+          <div style={sectionTitleStyle}>Position Fit Board</div>
           <p style={{ fontSize:11, color:THEME.gray, marginBottom:4 }}>Weighted by position importance. Top 5 per position.</p>
         </div>
 
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:8 }}>
-          {positions.map(pos => {
-            var candidates = data
-              .filter(p => p.fit.some(f => f.pos === pos))
-              .map(p => {
-                var f = p.fit.find(f => f.pos === pos);
-                return { nm: p.nm, total: p.total, fitScore: f ? f.score : 0 };
+          {positions.map(function(pos) {
+            var candidates = posData
+              .filter(function(p) { return p.fit.some(function(f) { return f.pos === pos; }); })
+              .map(function(p) {
+                var f = p.fit.find(function(f) { return f.pos === pos; });
+                return { nm: p.nm, total: p.total, fitScore: f ? f.score : 0, drafted: !!draftedNums[p.n] };
               })
-              .sort((a,b) => b.fitScore - a.fitScore)
+              .sort(function(a,b) { return b.fitScore - a.fitScore; })
               .slice(0, 5);
 
             var urg = POSITION_URGENCY[pos];
@@ -14182,7 +15032,7 @@ const TryoutsPanel = () => {
                 {candidates.length === 0 ? (
                   <div style={{ fontSize:10, color:THEME.gray }}>No candidates</div>
                 ) : (
-                  candidates.map((p, i) => {
+                  candidates.map(function(p, i) {
                     var c = p.fitScore >= 75 ? THEME.green : p.fitScore >= 60 ? THEME.blue : p.fitScore >= 45 ? "#F1C40F" : THEME.red;
                     return (
                       <div key={i} style={{
@@ -14190,6 +15040,7 @@ const TryoutsPanel = () => {
                         padding:"5px 7px", borderRadius:5, marginBottom:2,
                         background: i === 0 ? "rgba(253,181,21,0.06)" : "transparent",
                         border: i === 0 ? "1px solid " + THEME.gold + "30" : "1px solid transparent",
+                        opacity: p.drafted ? 0.4 : 1,
                       }}>
                         <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                           <span style={{
@@ -14198,7 +15049,10 @@ const TryoutsPanel = () => {
                             background: THEME.black, border:"1px solid " + THEME.charcoal,
                           }}>{i+1}</span>
                           <div>
-                            <div style={{ fontSize:11, fontWeight:600, color: THEME.white }}>{p.nm}</div>
+                            <div style={{ fontSize:11, fontWeight:600, color: THEME.white }}>
+                              {p.nm}
+                              {p.drafted && <span style={Object.assign({}, pillStyle(THEME.gray), { marginLeft:4 })}>Drafted</span>}
+                            </div>
                             <div style={{ fontSize:8, color:THEME.gray }}>{p.total}%</div>
                           </div>
                         </div>
@@ -14212,7 +15066,7 @@ const TryoutsPanel = () => {
           })}
         </div>
 
-        {data.length === 0 && (
+        {posData.length === 0 && (
           <div style={Object.assign({}, cardStyle, { textAlign:"center" })}>
             <div style={{ color:THEME.gray, fontSize:12 }}>No scored players yet. Score players first to populate the draft board.</div>
           </div>
@@ -14286,6 +15140,7 @@ const TryoutsPanel = () => {
       {/* Content */}
       {subTab === "rubric" && renderRubric()}
       {subTab === "players" && renderPlayers()}
+      {subTab === "checkin" && renderCheckIn()}
       {subTab === "score" && renderScore()}
       {subTab === "rankings" && renderRankings()}
       {subTab === "draft" && renderDraft()}
@@ -14308,6 +15163,7 @@ const TryoutsPanel = () => {
 
 const TABS = [
   { id: "roster", label: "Roster", icon: "👥" },
+  { id: "schedule", label: "Schedule", icon: "📅" },
   { id: "scouting", label: "Scouting", icon: "🔍" },
   { id: "practicelog", label: "Practice", icon: "📋" },
   { id: "planner", label: "Planner", icon: "💡" },
@@ -14318,6 +15174,74 @@ const TABS = [
   { id: "tryouts", label: "Tryouts", icon: "🥎" },
 ];
 
+
+// TeamSettingsModal - Edit team name, season, league, age group, colors
+const TeamSettingsModal = ({ config, onSave, onClose }) => {
+  const [form, setForm] = useState({ ...config });
+  const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+  const handleSave = () => { onSave(form); onClose(); };
+  const handleReset = () => { if (confirm("Reset team settings to defaults?")) { onSave({ ...DEFAULT_TEAM_CONFIG }); onClose(); } };
+  const fieldStyle = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${THEME.charcoal}`, background: THEME.blackLight, color: THEME.white, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" };
+  const labelStyle = { display: "block", color: THEME.gray, fontSize: 12, textTransform: "uppercase", marginBottom: 4, fontWeight: 600 };
+  const rowStyle = { marginBottom: 14 };
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div style={{ background: THEME.black, border: `2px solid ${THEME.gold}`, borderRadius: 16, padding: 28, width: "90%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: `0 8px 32px rgba(0,0,0,0.6)` }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ margin: 0, color: THEME.gold, fontFamily: "Oswald,sans-serif", fontSize: 22, textTransform: "uppercase" }}>Team Settings</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: THEME.gray, fontSize: 24, cursor: "pointer", lineHeight: 1 }}>&times;</button>
+        </div>
+        <div style={rowStyle}>
+          <label style={labelStyle}>Team Name</label>
+          <input style={fieldStyle} value={form.name} onChange={e => update("name", e.target.value)} placeholder="e.g. Pirates" />
+        </div>
+        <div style={rowStyle}>
+          <label style={labelStyle}>Mascot Emoji</label>
+          <input style={fieldStyle} value={form.mascot} onChange={e => update("mascot", e.target.value)} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={labelStyle}>Season Year</label>
+            <input style={fieldStyle} value={form.season} onChange={e => update("season", e.target.value)} placeholder="e.g. 2026" />
+          </div>
+          <div>
+            <label style={labelStyle}>Age Group</label>
+            <input style={fieldStyle} value={form.ageGroup} onChange={e => update("ageGroup", e.target.value)} placeholder="e.g. 12U-14U" />
+          </div>
+        </div>
+        <div style={rowStyle}>
+          <label style={labelStyle}>League</label>
+          <input style={fieldStyle} value={form.league} onChange={e => update("league", e.target.value)} placeholder="e.g. Lehi Rec Softball" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={labelStyle}>Primary Color</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="color" value={form.primaryColor} onChange={e => update("primaryColor", e.target.value)} style={{ width: 40, height: 36, border: "none", borderRadius: 6, cursor: "pointer", background: "none" }} />
+              <input style={{ ...fieldStyle, flex: 1 }} value={form.primaryColor} onChange={e => update("primaryColor", e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Secondary Color</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="color" value={form.secondaryColor} onChange={e => update("secondaryColor", e.target.value)} style={{ width: 40, height: 36, border: "none", borderRadius: 6, cursor: "pointer", background: "none" }} />
+              <input style={{ ...fieldStyle, flex: 1 }} value={form.secondaryColor} onChange={e => update("secondaryColor", e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+          <button onClick={handleSave} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: THEME.gold, color: THEME.black, fontSize: 14, fontWeight: 700, fontFamily: "Oswald,sans-serif", textTransform: "uppercase", cursor: "pointer", letterSpacing: 1 }}>Save Settings</button>
+          <button onClick={handleReset} style={{ padding: "12px 16px", borderRadius: 8, border: `1px solid ${THEME.charcoal}`, background: "none", color: THEME.gray, fontSize: 12, cursor: "pointer", fontFamily: "Oswald,sans-serif", textTransform: "uppercase" }}>Reset</button>
+        </div>
+        <div style={{ marginTop: 16, padding: 12, background: THEME.blackLight, borderRadius: 8, border: `1px solid ${THEME.charcoal}` }}>
+          <div style={{ color: THEME.gray, fontSize: 11, lineHeight: 1.5 }}>
+            <strong style={{ color: THEME.gold }}>Note:</strong> Colors are saved for future theming support. Currently the app uses the default gold/black theme. Player data and storage keys are not affected by these settings.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 function App() {
   const [tab, setTab] = useState("roster");
   const [players, setPlayers] = useState(SEED_PLAYERS);
@@ -14325,6 +15249,15 @@ function App() {
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState(null);
+  const [teamConfig, setTeamConfig] = useState(() => loadTeamConfig());
+  const [showTeamSettings, setShowTeamSettings] = useState(false);
+
+  const updateTeamConfig = (newConfig) => {
+    const merged = { ...teamConfig, ...newConfig };
+    TEAM_CONFIG = merged;
+    setTeamConfig(merged);
+    saveTeamConfig(merged);
+  };
 
   // Swipe navigation for tabs
   const handleSwipeLeft = () => {
@@ -14466,21 +15399,26 @@ function App() {
     <div style={{ background: `linear-gradient(135deg, ${THEME.black} 0%, ${THEME.blackLight} 100%)`, borderBottom: `3px solid ${THEME.gold}`, padding: "20px 24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: THEME.black, border: `3px solid ${THEME.gold}`, display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxShadow: `0 0 20px ${THEME.gold}40` }}>
-          <img src="assets/pirates-logo.svg" alt="Pittsburgh Pirates" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <img src="assets/pirates-logo.svg" alt={`${TEAM_CONFIG.name} Logo`} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
-        <div><h1 style={{ margin: 0, fontFamily: "'Oswald',sans-serif", fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: THEME.gold }}>Pirates Softball</h1><p style={{ margin: 0, color: THEME.gray, fontSize: 13 }}>2026 Season Dashboard</p></div>
+        <div><h1 style={{ margin: 0, fontFamily: "'Oswald',sans-serif", fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: THEME.gold }}>{teamConfig.name} Softball</h1><p style={{ margin: 0, color: THEME.gray, fontSize: 13 }}>{teamConfig.season} Season Dashboard</p></div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button onClick={() => setShowTeamSettings(true)} title="Team Settings" style={{ background: "none", border: `1px solid ${THEME.charcoal}`, color: THEME.gray, padding: "6px 10px", borderRadius: 6, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>{"\u2699\uFE0F"}</button>
           <button onClick={() => { if (confirm("Load test practice and game data?")) { try { window.storage.set("pirates-practices-unified-2026v1", JSON.stringify(SEED_PRACTICES)); window.storage.set(STORAGE_KEYS.GAMELOGS, JSON.stringify(SEED_GAMELOGS)); alert("Test data loaded! Page will reload."); window.location.reload(); } catch{} } }} style={{ background: THEME.gold, border: "none", color: THEME.black, padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase", fontWeight: 700 }}>Load Test Data</button>
           <button onClick={() => { if (confirm("Reset roster to original 13 players?")) { setPlayers(SEED_PLAYERS); try { window.storage.set(STORAGE_KEYS.PLAYERS, JSON.stringify(SEED_PLAYERS)); } catch{} } }} style={{ background: "none", border: `1px solid ${THEME.charcoal}`, color: THEME.gray, padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>Reset Roster</button>
+          <button onClick={handleExportData} style={{ background: "none", border: `1px solid ${THEME.gold}`, color: THEME.gold, padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase", fontWeight: 700 }}>Export Data</button>
+          <button onClick={handleImportData} style={{ background: "none", border: `1px solid ${THEME.gold}`, color: THEME.gold, padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'Oswald',sans-serif", textTransform: "uppercase", fontWeight: 700 }}>Import Data</button>
         </div>
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         {[{ l: "Roster", v: players.length }, { l: "Returning", v: players.filter(p=>p.returning).length }, { l: "New", v: players.filter(p=>!p.returning).length }, { l: "Pitchers", v: players.filter(p=>p.isPitcher).length }].map(s => <div key={s.l} style={{ background: THEME.blackLight, padding: "10px 16px", borderRadius: 8, border: `1px solid ${THEME.charcoal}`, minWidth: 80 }}><div style={{ color: THEME.gold, fontSize: 24, fontWeight: 700, fontFamily: "'Oswald',sans-serif" }}>{s.v}</div><div style={{ color: THEME.gray, fontSize: 11, textTransform: "uppercase" }}>{s.l}</div></div>)}
       </div>
+      {(() => { const nxt = getNextScheduleEvent(); if (!nxt) return null; const nxtGame = getNextScheduleEvent("game"); const typeIcons = { game: "\u26be", practice: "\ud83d\udccb", scrimmage: "\ud83e\udd3c", tournament: "\ud83c\udfc6" }; return <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}><div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.gold + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{typeIcons[nxt.type]}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Up</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxt.title} - {nxt.day} {new Date(nxt.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxt.time}</div></div></div>{nxtGame && nxtGame.id !== nxt.id && <div onClick={() => setTab("schedule")} style={{ cursor: "pointer", flex: 1, minWidth: 200, background: THEME.blackLight, padding: "10px 14px", borderRadius: 8, border: "1px solid " + THEME.red + "40", display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 20 }}>{"\u26be"}</span><div><div style={{ color: THEME.gray, fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.8 }}>Next Game</div><div style={{ color: THEME.white, fontSize: 13, fontWeight: 700 }}>{nxtGame.title} - {nxtGame.day} {new Date(nxtGame.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {nxtGame.time}{nxtGame.homeAway === "home" ? " (Home)" : " (Away)"}</div></div></div>}</div>; })()}
     </div>
     <div style={{ padding: "0 24px", marginTop: 16 }}>
       <Tabs tabs={TABS} active={tab} onSelect={setTab} />
       {tab==="roster" && <RosterPanel players={players} setPlayers={setPlayers} coaches={coaches} setCoaches={setCoaches} />}
+      {tab==="schedule" && <SchedulePanel />}
       {tab==="practicelog" && <PracticeLog players={players} coaches={coaches} />}
       {tab==="planner" && <LineupPlanner players={players} onCreateGame={(template) => {
         // TODO: Pass template to GameLog and show game creation form
@@ -14494,5 +15432,6 @@ function App() {
       {tab==="comms" && <Comms players={players} coaches={coaches} />}
       {tab==="tryouts" && <TryoutsPanel />}
     </div>
+    {showTeamSettings && <TeamSettingsModal config={teamConfig} onSave={updateTeamConfig} onClose={() => setShowTeamSettings(false)} />}
   </div>;
 }
