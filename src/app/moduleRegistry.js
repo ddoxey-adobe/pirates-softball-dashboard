@@ -9,15 +9,26 @@ import { lazy } from 'react';
  *   - icon:      emoji shown next to the label
  *   - enabled:   whether the tab shows by default
  *   - tier:      feature tier (core | advanced) for future gating
+ *   - status:    'ready' | 'placeholder' | 'building' — tracks extraction progress
  *   - component: React.lazy dynamic import of the module's default export
  */
 const MODULE_REGISTRY = [
+  {
+    id: 'today',
+    label: 'Today',
+    icon: '\u2600\uFE0F',
+    enabled: true,
+    tier: 'core',
+    status: 'ready',
+    component: lazy(() => import('../modules/today')),
+  },
   {
     id: 'roster',
     label: 'Roster',
     icon: '\uD83D\uDC65',
     enabled: true,
     tier: 'core',
+    status: 'ready',
     component: lazy(() => import('../modules/roster')),
   },
   {
@@ -26,6 +37,7 @@ const MODULE_REGISTRY = [
     icon: '\uD83D\uDCC5',
     enabled: true,
     tier: 'core',
+    status: 'placeholder',
     component: lazy(() => import('../modules/schedule')),
   },
   {
@@ -34,6 +46,7 @@ const MODULE_REGISTRY = [
     icon: '\uD83E\uDD4E',
     enabled: true,
     tier: 'core',
+    status: 'building',
     component: lazy(() => import('../modules/practice')),
   },
   {
@@ -42,6 +55,7 @@ const MODULE_REGISTRY = [
     icon: '\u26BE',
     enabled: true,
     tier: 'core',
+    status: 'building',
     component: lazy(() => import('../modules/gameday')),
   },
   {
@@ -50,6 +64,7 @@ const MODULE_REGISTRY = [
     icon: '\uD83D\uDCCA',
     enabled: true,
     tier: 'core',
+    status: 'building',
     component: lazy(() => import('../modules/reports')),
   },
   {
@@ -58,6 +73,7 @@ const MODULE_REGISTRY = [
     icon: '\uD83D\uDCE3',
     enabled: true,
     tier: 'core',
+    status: 'ready',
     component: lazy(() => import('../modules/comms')),
   },
   {
@@ -66,14 +82,16 @@ const MODULE_REGISTRY = [
     icon: '\uD83D\uDD0D',
     enabled: false,
     tier: 'advanced',
+    status: 'building',
     component: lazy(() => import('../modules/scouting')),
   },
   {
     id: 'tryouts',
     label: 'Tryouts',
     icon: '\uD83C\uDFC6',
-    enabled: true,
+    enabled: false,
     tier: 'core',
+    status: 'building',
     component: lazy(() => import('../modules/tryouts')),
   },
 ];
