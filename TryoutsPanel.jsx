@@ -146,6 +146,18 @@ const TryoutsPanel = () => {
   const [draftPicks, setDraftPicks] = useState([]);
   const [draftStarted, setDraftStarted] = useState(false);
 
+  // ─── NEW STATE: Registration (Feature 5) ──────────────────────
+  const [registrationMode, setRegistrationMode] = useState(false);
+  const [regForm, setRegForm] = useState({ playerName:"", grade:"7", school:"", parentName:"", parentPhone:"", positionPref:[], yearsExp:"0", notes:"" });
+  const [regCount, setRegCount] = useState(0);
+
+  // ─── NEW STATE: Roster Import Modal (Draft tab) ───────────────
+  const [showRosterImportModal, setShowRosterImportModal] = useState(false);
+  const [rosterImportSelected, setRosterImportSelected] = useState({});
+  const [rosterImportCopied, setRosterImportCopied] = useState(false);
+
+  const POSITIONS_LIST = ["Pitcher","Catcher","Shortstop","Third Base","First Base","Second Base","Outfield","Utility"];
+
   const dbRef = useRef(null);
   const fbAppRef = useRef(null);
   const toastTimer = useRef(null);
@@ -244,8 +256,8 @@ const TryoutsPanel = () => {
   // Save whenever state changes (after initial load)
   useEffect(() => {
     if (!loaded) return;
-    saveToFirebase({ players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted });
-  }, [players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted, loaded, saveToFirebase]);
+    saveToFirebase({ players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted, regCount });
+  }, [players, scores, needs, evaluator, checkedIn, draftTeamNames, draftPicks, draftStarted, regCount, loaded, saveToFirebase]);
 
   // Firebase initialization
   useEffect(() => {
@@ -266,6 +278,7 @@ const TryoutsPanel = () => {
           if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
           if (data.draftPicks) setDraftPicks(data.draftPicks);
           if (data.draftStarted != null) setDraftStarted(data.draftStarted);
+          if (data.regCount != null) setRegCount(data.regCount);
         } else {
           setPlayers(DEFAULT_PLAYERS);
         }
@@ -308,6 +321,7 @@ const TryoutsPanel = () => {
               if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
               if (data.draftPicks) setDraftPicks(data.draftPicks);
               if (data.draftStarted != null) setDraftStarted(data.draftStarted);
+              if (data.regCount != null) setRegCount(data.regCount);
             } catch (e) {
               console.error("Parse error:", e);
               setPlayers(DEFAULT_PLAYERS);
@@ -338,6 +352,7 @@ const TryoutsPanel = () => {
               if (data.draftTeamNames) setDraftTeamNames(data.draftTeamNames);
               if (data.draftPicks) setDraftPicks(data.draftPicks);
               if (data.draftStarted != null) setDraftStarted(data.draftStarted);
+              if (data.regCount != null) setRegCount(data.regCount);
             } catch (e) { console.error("FB parse error:", e); }
           }
         });
@@ -363,6 +378,27 @@ const TryoutsPanel = () => {
       }
     };
   }, []);
+
+  // ─── REGISTRATION MODE: URL hash handling ──────────────────────
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === "#register") {
+        setRegistrationMode(true);
+        setSubTab("register");
+      }
+    };
+    checkHash();
+    window.addEventListener("hashchange", checkHash);
+    return () => window.removeEventListener("hashchange", checkHash);
+  }, []);
+
+  useEffect(() => {
+    if (registrationMode) {
+      if (window.location.hash !== "#register") window.location.hash = "#register";
+    } else {
+      if (window.location.hash === "#register") history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [registrationMode]);
 
   // ─── PLAYER MANAGEMENT ─────────────────────────────────────────
   const addPlayer = () => {
@@ -473,6 +509,7 @@ const TryoutsPanel = () => {
     { id: "score",    label: "Score",     icon: "✏️" },
     { id: "rankings", label: "Rankings",  icon: "📊" },
     { id: "draft",    label: "Draft",     icon: "🏆" },
+    { id: "register", label: "Registration", icon: "📝" },
   ];
 
   // ─── STYLES (matching dashboard patterns) ──────────────────────
@@ -1565,6 +1602,9 @@ const TryoutsPanel = () => {
             <button style={btnDanger} onClick={resetDraft}>
               Reset Draft
             </button>
+            <button style={Object.assign({}, btnPrimary, { background:THEME.blue, color:THEME.white })} onClick={function() { setShowRosterImportModal(true); setRosterImportSelected({}); setRosterImportCopied(false); }}>
+              Roster Import
+            </button>
           </div>
         </div>
 
@@ -1701,6 +1741,238 @@ const TryoutsPanel = () => {
           )}
         </div>
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* TEAM BALANCE VIEW — appears after draft started with 2+ picks */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {draftStarted && draftPicks.length >= 2 && numTeams > 0 && (function() {
+          // Compute team stats for balance view
+          var balancePositions = ["Pitcher","Catcher","Shortstop","Third Base","First Base","Second Base","Outfield","Utility"];
+          var criticalPositions = ["Pitcher", "Catcher"];
+
+          // Build team data: avg score, position coverage
+          var teamBalanceData = teamNames.map(function(tn, idx) {
+            var roster = teamRosters[idx] || [];
+            var scoredRoster = roster.filter(function(r) { return r.total != null; });
+            var avgScoreB = scoredRoster.length > 0
+              ? Math.round(scoredRoster.reduce(function(s, r) { return s + r.total; }, 0) / scoredRoster.length * 10) / 10
+              : null;
+
+            // Position coverage: check each drafted player's top position fit
+            var coveredPositions = {};
+            roster.forEach(function(r) {
+              var pd = allData.find(function(x) { return x.n === r.playerNum; });
+              if (pd && pd.fit && pd.fit.length > 0) {
+                var topPos = pd.fit[0].pos;
+                if (!coveredPositions[topPos]) {
+                  coveredPositions[topPos] = { playerName: pd.nm, score: pd.fit[0].score };
+                }
+              }
+            });
+
+            return {
+              name: tn,
+              idx: idx,
+              avgScore: avgScoreB,
+              rosterSize: roster.length,
+              coveredPositions: coveredPositions,
+            };
+          });
+
+          // Calculate overall average across teams (for balance check)
+          var teamsWithScores = teamBalanceData.filter(function(t) { return t.avgScore != null; });
+          var overallAvg = teamsWithScores.length > 0
+            ? Math.round(teamsWithScores.reduce(function(s, t) { return s + t.avgScore; }, 0) / teamsWithScores.length * 10) / 10
+            : null;
+
+          // Find max team avg for bar scaling
+          var maxTeamAvg = teamsWithScores.length > 0
+            ? Math.max.apply(null, teamsWithScores.map(function(t) { return t.avgScore; }))
+            : 100;
+
+          // Balance warnings
+          var balanceWarnings = [];
+          if (overallAvg != null) {
+            teamsWithScores.forEach(function(t) {
+              var pctDiff = Math.round((overallAvg - t.avgScore) / overallAvg * 1000) / 10;
+              if (pctDiff > 5) {
+                balanceWarnings.push({ team: t.name, pctBelow: pctDiff });
+              }
+            });
+          }
+          var isBalanced = overallAvg != null && balanceWarnings.length === 0 && teamsWithScores.length > 1;
+
+          // Bar color based on strength percentage
+          var getBarColor = function(score) {
+            if (score == null) return THEME.gray;
+            if (score >= 70) return THEME.green;
+            if (score >= 50) return "#F1C40F";
+            return THEME.red;
+          };
+
+          return (
+            <div style={Object.assign({}, cardStyle, { marginTop: 12, border: "1px solid " + THEME.charcoal })}>
+              <div style={sectionTitleStyle}>Team Balance</div>
+
+              {/* 1. Team Comparison Bars */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.gray, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8, fontFamily: "'Oswald',sans-serif" }}>
+                  Average Score Comparison
+                </div>
+                {teamBalanceData.map(function(t) {
+                  var barPct = t.avgScore != null && maxTeamAvg > 0 ? Math.round(t.avgScore / maxTeamAvg * 100) : 0;
+                  var barColor = getBarColor(t.avgScore);
+                  return (
+                    <div key={t.idx} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                      <span style={{ minWidth: 80, fontSize: 12, fontWeight: 700, color: THEME.white, fontFamily: "'Oswald',sans-serif", textTransform: "uppercase" }}>
+                        {t.name}
+                      </span>
+                      <div style={{ flex: 1, height: 18, borderRadius: 4, background: "rgba(255,255,255,0.04)", overflow: "hidden", position: "relative" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 4, transition: "width 0.4s ease",
+                          width: barPct + "%",
+                          background: barColor,
+                          opacity: 0.85,
+                        }} />
+                      </div>
+                      <span style={{ minWidth: 50, textAlign: "right", fontSize: 13, fontWeight: 700, color: barColor }}>
+                        {t.avgScore != null ? t.avgScore + "%" : "-"}
+                      </span>
+                      <span style={{ fontSize: 9, color: THEME.gray, minWidth: 20 }}>
+                        ({t.rosterSize})
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 2. Position Coverage Grid */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.gray, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8, fontFamily: "'Oswald',sans-serif" }}>
+                  Position Coverage
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 11 }}>
+                    <thead>
+                      <tr>
+                        <th style={Object.assign({}, thStyle, { cursor: "default" })}>Team</th>
+                        {balancePositions.map(function(pos) {
+                          var isCritical = criticalPositions.indexOf(pos) !== -1;
+                          return (
+                            <th key={pos} style={Object.assign({}, thStyle, { cursor: "default", textAlign: "center", color: isCritical ? THEME.gold : THEME.gray })}>
+                              {pos.length > 8 ? pos.substring(0, 6) + "." : pos}
+                              {isCritical ? " *" : ""}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamBalanceData.map(function(t, ti) {
+                        return (
+                          <tr key={t.idx} style={{ background: ti % 2 === 0 ? "rgba(255,255,255,0.008)" : "transparent" }}>
+                            <td style={Object.assign({}, tdBaseStyle, { fontWeight: 700, color: THEME.white, fontSize: 11, fontFamily: "'Oswald',sans-serif", textTransform: "uppercase", whiteSpace: "nowrap" })}>
+                              {t.name}
+                            </td>
+                            {balancePositions.map(function(pos) {
+                              var covered = !!t.coveredPositions[pos];
+                              var isCritical = criticalPositions.indexOf(pos) !== -1;
+                              var missingCritical = !covered && isCritical;
+                              return (
+                                <td key={pos} style={Object.assign({}, tdBaseStyle, {
+                                  textAlign: "center",
+                                  background: missingCritical ? "rgba(231,76,60,0.08)" : "transparent",
+                                })}>
+                                  {covered ? (
+                                    <span style={{ fontSize: 12 }} title={t.coveredPositions[pos].playerName + " (" + t.coveredPositions[pos].score + "%)"}>
+                                      {"\u2705"}
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 12, color: missingCritical ? THEME.red : THEME.gray }} title={"Missing: " + pos}>
+                                      {"\u274C"}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 9, color: THEME.gray }}>
+                  <span style={{ color: THEME.gold }}>*</span> = Critical position.{" "}
+                  {"\u2705"} = Covered by top position fit.{" "}
+                  <span style={{ color: THEME.red }}>{"\u274C"} = Not covered.</span>
+                  {" "}Hover for player details.
+                </div>
+              </div>
+
+              {/* 3. Balance Summary */}
+              <div style={{
+                padding: "10px 14px", borderRadius: 6,
+                background: isBalanced ? "rgba(46,204,113,0.08)" : "rgba(231,76,60,0.08)",
+                border: "1px solid " + (isBalanced ? THEME.green + "40" : THEME.red + "40"),
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.gray, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4, fontFamily: "'Oswald',sans-serif" }}>
+                  Balance Summary
+                </div>
+                {isBalanced ? (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: THEME.green }}>
+                    {"\u2705"} Teams are balanced (all within 5% of {overallAvg}% avg)
+                  </div>
+                ) : overallAvg == null ? (
+                  <div style={{ fontSize: 12, color: THEME.gray }}>
+                    Not enough data to assess balance.
+                  </div>
+                ) : teamsWithScores.length <= 1 ? (
+                  <div style={{ fontSize: 12, color: THEME.gray }}>
+                    Need at least 2 teams with picks to assess balance.
+                  </div>
+                ) : (
+                  <div>
+                    {balanceWarnings.map(function(w, wi) {
+                      return (
+                        <div key={wi} style={{ fontSize: 12, fontWeight: 600, color: THEME.red, marginBottom: 2 }}>
+                          {"\u26A0\uFE0F"} Warning: {w.team} is {w.pctBelow}% below average
+                        </div>
+                      );
+                    })}
+                    {balanceWarnings.length === 0 && (
+                      <div style={{ fontSize: 13, fontWeight: 700, color: THEME.green }}>
+                        {"\u2705"} Teams are balanced (all within 5% of {overallAvg}% avg)
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Flag teams missing critical positions */}
+                {(function() {
+                  var critWarnings = [];
+                  teamBalanceData.forEach(function(t) {
+                    criticalPositions.forEach(function(pos) {
+                      if (!t.coveredPositions[pos] && t.rosterSize > 0) {
+                        critWarnings.push({ team: t.name, pos: pos });
+                      }
+                    });
+                  });
+                  if (critWarnings.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      {critWarnings.map(function(cw, ci) {
+                        return (
+                          <div key={ci} style={{ fontSize: 11, color: THEME.red, fontWeight: 600, marginBottom: 1 }}>
+                            {"\u274C"} {cw.team} missing {cw.pos}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Position Fit Board (original draft board preserved below) */}
         <div style={Object.assign({}, cardStyle, { marginTop:12 })}>
           <div style={sectionTitleStyle}>Position Fit Board</div>
@@ -1773,8 +2045,424 @@ const TryoutsPanel = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
+  // REGISTRATION SUB-TAB (Feature 5)
+  // ═══════════════════════════════════════════════════════════════
+  const submitRegistration = () => {
+    if (!regForm.playerName.trim()) { showToast("Player name is required", "err"); return; }
+    if (!regForm.parentName.trim()) { showToast("Parent name is required", "err"); return; }
+    const maxNum = players.length > 0 ? Math.max(...players.map(p => p.n)) : 0;
+    const num = maxNum + 1;
+    const newPlayer = {
+      n: num,
+      nm: regForm.playerName.trim(),
+      pr: "",
+      g: parseInt(regForm.grade) || 7,
+      s: regForm.school.trim(),
+      parentName: regForm.parentName.trim(),
+      parentPhone: regForm.parentPhone.trim(),
+      positionPref: regForm.positionPref,
+      yearsExp: parseInt(regForm.yearsExp) || 0,
+      regNotes: regForm.notes.trim(),
+      registeredAt: new Date().toISOString(),
+    };
+    setPlayers(prev => [...prev, newPlayer]);
+    setRegCount(prev => prev + 1);
+    setRegForm({ playerName:"", grade:"7", school:"", parentName:"", parentPhone:"", positionPref:[], yearsExp:"0", notes:"" });
+    showToast("Registered #" + num + " " + newPlayer.nm);
+  };
+
+  const togglePosPref = (pos) => {
+    setRegForm(prev => {
+      const arr = prev.positionPref || [];
+      if (arr.includes(pos)) return Object.assign({}, prev, { positionPref: arr.filter(p => p !== pos) });
+      return Object.assign({}, prev, { positionPref: arr.concat([pos]) });
+    });
+  };
+
+  const renderRegistration = () => {
+    return (
+      <div>
+        {/* Registration Counter */}
+        <div style={Object.assign({}, cardStyle, { display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 })}>
+          <div>
+            <div style={sectionTitleStyle}>Player Registration</div>
+            <div style={{ fontSize:22, fontWeight:800, color:THEME.gold, fontFamily:"'Oswald',sans-serif" }}>
+              {regCount} <span style={{ fontSize:13, color:THEME.gray, fontWeight:500 }}>players registered</span>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            <label style={{ fontSize:11, color:THEME.gray, fontWeight:600 }}>Registration Mode</label>
+            <button
+              onClick={() => setRegistrationMode(!registrationMode)}
+              style={{
+                padding:"6px 14px", borderRadius:6, fontSize:12, fontWeight:700, cursor:"pointer",
+                fontFamily:"'Oswald',sans-serif", textTransform:"uppercase",
+                border: "1px solid " + (registrationMode ? THEME.green : THEME.charcoal),
+                background: registrationMode ? THEME.green : "transparent",
+                color: registrationMode ? THEME.white : THEME.gray,
+                transition: "all 0.2s",
+              }}
+            >
+              {registrationMode ? "ON" : "OFF"}
+            </button>
+          </div>
+        </div>
+
+        {registrationMode && (
+          <div style={Object.assign({}, cardStyle, { background:"rgba(46,204,113,0.06)", borderColor:THEME.green + "40" })}>
+            <div style={{ fontSize:11, color:THEME.green, fontWeight:600 }}>
+              Registration Mode is ON -- Only this form is visible. Share this link with parents: {window.location.href.split("#")[0]}#register
+            </div>
+          </div>
+        )}
+
+        {/* Registration Form */}
+        <div style={cardStyle}>
+          <div style={Object.assign({}, sectionTitleStyle, { marginBottom:16 })}>Register for Tryouts</div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            {/* Player Name */}
+            <div>
+              <label style={labelStyle}>Player Name *</label>
+              <input
+                style={Object.assign({}, inputStyle, { marginTop:4 })}
+                placeholder="Full Name"
+                value={regForm.playerName}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { playerName: e.target.value }))}
+              />
+            </div>
+
+            {/* Grade */}
+            <div>
+              <label style={labelStyle}>Grade *</label>
+              <select
+                style={Object.assign({}, inputStyle, { marginTop:4, cursor:"pointer" })}
+                value={regForm.grade}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { grade: e.target.value }))}
+              >
+                <option value="7">7th Grade</option>
+                <option value="8">8th Grade</option>
+                <option value="9">9th Grade</option>
+              </select>
+            </div>
+
+            {/* School */}
+            <div>
+              <label style={labelStyle}>School</label>
+              <input
+                style={Object.assign({}, inputStyle, { marginTop:4 })}
+                placeholder="School Name"
+                value={regForm.school}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { school: e.target.value }))}
+              />
+            </div>
+
+            {/* Years of Experience */}
+            <div>
+              <label style={labelStyle}>Years of Experience</label>
+              <select
+                style={Object.assign({}, inputStyle, { marginTop:4, cursor:"pointer" })}
+                value={regForm.yearsExp}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { yearsExp: e.target.value }))}
+              >
+                {[0,1,2,3,4,5].map(y => (
+                  <option key={y} value={y}>{y} year{y !== 1 ? "s" : ""}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Parent Name */}
+            <div>
+              <label style={labelStyle}>Parent/Guardian Name *</label>
+              <input
+                style={Object.assign({}, inputStyle, { marginTop:4 })}
+                placeholder="Parent Full Name"
+                value={regForm.parentName}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { parentName: e.target.value }))}
+              />
+            </div>
+
+            {/* Parent Phone */}
+            <div>
+              <label style={labelStyle}>Parent/Guardian Phone</label>
+              <input
+                style={Object.assign({}, inputStyle, { marginTop:4 })}
+                placeholder="(555) 123-4567"
+                value={regForm.parentPhone}
+                onChange={e => setRegForm(prev => Object.assign({}, prev, { parentPhone: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Position Preference (multi-select) */}
+          <div style={{ marginTop:14 }}>
+            <label style={labelStyle}>Position Preference (select all that apply)</label>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
+              {POSITIONS_LIST.map(pos => {
+                const selected = (regForm.positionPref || []).includes(pos);
+                return (
+                  <button
+                    key={pos}
+                    onClick={() => togglePosPref(pos)}
+                    style={{
+                      padding:"6px 12px", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer",
+                      fontFamily:"'Source Sans 3',sans-serif",
+                      border: "1px solid " + (selected ? THEME.gold + "60" : THEME.charcoal),
+                      background: selected ? "rgba(253,181,21,0.12)" : THEME.black,
+                      color: selected ? THEME.gold : THEME.gray,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {selected ? "\u2713 " : ""}{pos}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginTop:14 }}>
+            <label style={labelStyle}>Notes / Additional Info</label>
+            <textarea
+              style={Object.assign({}, inputStyle, { marginTop:4, minHeight:70, resize:"vertical" })}
+              placeholder="Allergies, injuries, previous team experience, etc."
+              value={regForm.notes}
+              onChange={e => setRegForm(prev => Object.assign({}, prev, { notes: e.target.value }))}
+            />
+          </div>
+
+          {/* Submit */}
+          <div style={{ marginTop:16 }}>
+            <button
+              style={Object.assign({}, btnGreen, { width:"100%", minHeight:48, fontSize:14 })}
+              onClick={submitRegistration}
+            >
+              Register Player
+            </button>
+          </div>
+        </div>
+
+        {/* Recently Registered */}
+        {(function() {
+          var registered = players.filter(function(p) { return !!p.registeredAt; });
+          registered.sort(function(a,b) { return (b.registeredAt || "").localeCompare(a.registeredAt || ""); });
+          if (registered.length === 0) return null;
+          return (
+            <div style={cardStyle}>
+              <div style={sectionTitleStyle}>Recently Registered ({registered.length})</div>
+              {registered.map(function(p, i) {
+                return (
+                  <div key={p.n} style={{
+                    display:"flex", justifyContent:"space-between", alignItems:"center",
+                    padding:"8px 10px", borderRadius:6, marginBottom:2,
+                    background: i % 2 === 0 ? "rgba(46,204,113,0.04)" : "transparent",
+                    border: "1px solid " + THEME.charcoal,
+                  }}>
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:600, color:THEME.white }}>
+                        #{p.n} {p.nm}
+                        <span style={Object.assign({}, pillStyle(THEME.blue), { marginLeft:6 })}>Grade {p.g}</span>
+                        {p.s && <span style={Object.assign({}, pillStyle(THEME.gray), { marginLeft:4 })}>{p.s}</span>}
+                      </div>
+                      <div style={{ fontSize:10, color:THEME.gray, marginTop:2 }}>
+                        {p.parentName && <span>Parent: {p.parentName}</span>}
+                        {p.parentPhone && <span style={{ marginLeft:8 }}>Phone: {p.parentPhone}</span>}
+                        {p.positionPref && p.positionPref.length > 0 && (
+                          <span style={{ marginLeft:8 }}>Positions: {p.positionPref.join(", ")}</span>
+                        )}
+                        {p.yearsExp != null && p.yearsExp > 0 && <span style={{ marginLeft:8 }}>{p.yearsExp}yr exp</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize:9, color:THEME.gray, whiteSpace:"nowrap" }}>
+                      {p.registeredAt ? new Date(p.registeredAt).toLocaleDateString() : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // ROSTER IMPORT MODAL (for Draft tab)
+  // ═══════════════════════════════════════════════════════════════
+  const renderRosterImportModal = () => {
+    var allDataRI = players.map(function(p) {
+      var avg = getAvg(p.n);
+      return { n: p.n, nm: p.nm, pr: p.pr, g: p.g, s: p.s, avg: avg, total: calcTotal(avg), fit: calcFit(avg) };
+    });
+    var ranked = allDataRI.filter(function(x) { return x.total != null; });
+    ranked.sort(function(a,b) { return b.total - a.total; });
+
+    var selectedCount = Object.keys(rosterImportSelected).filter(function(k) { return rosterImportSelected[k]; }).length;
+
+    var doExport = function() {
+      var exported = ranked.filter(function(p) { return rosterImportSelected[p.n]; }).map(function(p) {
+        var topFit = p.fit[0];
+        return {
+          name: p.nm,
+          number: p.n,
+          grade: p.g || null,
+          school: p.s || null,
+          position: topFit ? topFit.pos : "Utility",
+          overallScore: p.total,
+          scores: p.avg,
+          protectedPlayer: p.pr || null,
+        };
+      });
+      var json = JSON.stringify(exported, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json).then(function() {
+          setRosterImportCopied(true);
+          showToast(selectedCount + " players ready to import -- copied to clipboard");
+          setTimeout(function() { setRosterImportCopied(false); }, 3000);
+        });
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = json;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setRosterImportCopied(true);
+        showToast(selectedCount + " players ready to import -- copied to clipboard");
+        setTimeout(function() { setRosterImportCopied(false); }, 3000);
+      }
+    };
+
+    return (
+      <TModal open={showRosterImportModal} onClose={() => { setShowRosterImportModal(false); setRosterImportCopied(false); }} title="Roster Import">
+        <div style={{ fontSize:11, color:THEME.gray, marginBottom:10 }}>
+          Select top-ranked players to export as JSON for the main dashboard. Players are ranked by overall score.
+        </div>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+          <span style={{ fontSize:12, fontWeight:700, color:THEME.gold }}>{selectedCount} selected</span>
+          <div style={{ display:"flex", gap:4 }}>
+            <button style={Object.assign({}, btnSecondary, { fontSize:10, padding:"4px 8px" })} onClick={function() {
+              var next = {};
+              ranked.forEach(function(p) { next[p.n] = true; });
+              setRosterImportSelected(next);
+            }}>Select All</button>
+            <button style={Object.assign({}, btnSecondary, { fontSize:10, padding:"4px 8px" })} onClick={function() { setRosterImportSelected({}); }}>Clear</button>
+          </div>
+        </div>
+
+        <div style={{ maxHeight:360, overflowY:"auto", marginBottom:12 }}>
+          {ranked.map(function(p, i) {
+            var checked = !!rosterImportSelected[p.n];
+            var topFit = p.fit[0];
+            return (
+              <div
+                key={p.n}
+                onClick={function() {
+                  setRosterImportSelected(function(prev) {
+                    var next = Object.assign({}, prev);
+                    next[p.n] = !prev[p.n];
+                    return next;
+                  });
+                }}
+                style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding:"7px 10px", borderRadius:6, marginBottom:2, cursor:"pointer",
+                  background: checked ? "rgba(253,181,21,0.08)" : (i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent"),
+                  border: "1px solid " + (checked ? THEME.gold + "40" : THEME.charcoal),
+                  transition: "all 0.15s",
+                }}
+              >
+                <div style={{
+                  width:20, height:20, borderRadius:4, display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:10, fontWeight:800,
+                  background: checked ? THEME.gold : THEME.black,
+                  color: checked ? THEME.black : THEME.gray,
+                  border: "1px solid " + (checked ? THEME.gold : THEME.charcoal),
+                }}>
+                  {checked ? "\u2713" : ""}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:THEME.white }}>
+                    #{p.n} {p.nm}
+                    {p.pr ? <span style={Object.assign({}, pillStyle("#E67E22"), { marginLeft:4 })}>{p.pr}</span> : null}
+                  </div>
+                  <div style={{ fontSize:9, color:THEME.blue }}>
+                    {topFit ? topFit.pos + " " + topFit.score + "%" : "Unranked fit"}
+                  </div>
+                </div>
+                <span style={{ fontSize:13, fontWeight:700, color:tierColor(p.total) }}>{p.total}%</span>
+              </div>
+            );
+          })}
+          {ranked.length === 0 && (
+            <div style={{ fontSize:11, color:THEME.gray, textAlign:"center", padding:16 }}>No scored players to export.</div>
+          )}
+        </div>
+
+        <div style={{ display:"flex", gap:6 }}>
+          <button
+            style={Object.assign({}, rosterImportCopied ? btnGreen : btnPrimary, { flex:1 })}
+            onClick={doExport}
+            disabled={selectedCount === 0}
+          >
+            {rosterImportCopied ? selectedCount + " players ready to import -- copied to clipboard" : "Copy " + selectedCount + " Players as JSON"}
+          </button>
+          <button style={btnSecondary} onClick={() => { setShowRosterImportModal(false); setRosterImportCopied(false); }}>Close</button>
+        </div>
+      </TModal>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════
+
+  // Registration mode: show only the registration form
+  if (registrationMode) {
+    return (
+      <div>
+        {/* Minimal header for registration mode */}
+        <div style={Object.assign({}, cardStyle, {
+          display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10,
+          borderColor: THEME.green + "30",
+        })}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontFamily:"'Oswald',sans-serif", fontSize:16, fontWeight:700, color:THEME.gold, textTransform:"uppercase" }}>
+              Pirates Softball Tryouts 2026
+            </span>
+            <span style={pillStyle(THEME.green)}>Registration Open</span>
+          </div>
+          <button
+            onClick={() => { setRegistrationMode(false); setSubTab("register"); }}
+            style={{
+              padding:"6px 14px", borderRadius:6, fontSize:11, fontWeight:700, cursor:"pointer",
+              fontFamily:"'Oswald',sans-serif", textTransform:"uppercase",
+              border: "1px solid " + THEME.charcoal,
+              background: "transparent", color: THEME.gray,
+            }}
+          >
+            Exit Registration Mode
+          </button>
+        </div>
+
+        {renderRegistration()}
+
+        {/* Toast */}
+        {toastMsg && (
+          <div style={{
+            position:"fixed", bottom:16, left:"50%", transform:"translateX(-50%)",
+            padding:"8px 18px", borderRadius:8, fontSize:12, fontWeight:600, zIndex:300,
+            background: toastMsg.type === "ok" ? "rgba(46,204,113,0.9)" : "rgba(231,76,60,0.9)",
+            color:"#fff",
+          }}>
+            {toastMsg.msg}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header with Evaluator + Sync Status */}
@@ -1841,6 +2529,10 @@ const TryoutsPanel = () => {
       {subTab === "score" && renderScore()}
       {subTab === "rankings" && renderRankings()}
       {subTab === "draft" && renderDraft()}
+      {subTab === "register" && renderRegistration()}
+
+      {/* Roster Import Modal (rendered globally so it works from Draft tab) */}
+      {renderRosterImportModal()}
 
       {/* Toast */}
       {toastMsg && (
