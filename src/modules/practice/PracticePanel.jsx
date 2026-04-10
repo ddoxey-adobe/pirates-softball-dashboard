@@ -25,14 +25,27 @@ const OLD_KEYS = {
 };
 
 const loadStore = async (key, fb) => {
-  try { const r = await window.storage.get(key); return r?.value ? JSON.parse(r.value) : fb; } catch { return fb; }
+  try {
+    if (window.storage) {
+      const r = await window.storage.get(key);
+      return r?.value ? JSON.parse(r.value) : fb;
+    }
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fb;
+  } catch { return fb; }
 };
 const saveStore = async (key, d) => {
-  try { await window.storage.set(key, JSON.stringify(d)); } catch {}
+  try {
+    if (window.storage) {
+      await window.storage.set(key, JSON.stringify(d));
+    } else {
+      localStorage.setItem(key, JSON.stringify(d));
+    }
+  } catch {}
 };
 
 // ── PracticePanel Component ─────────────────────────────────────
-const PracticePanel = ({ players, coaches }) => {
+const PracticePanel = ({ players = [], coaches = [] }) => {
   const [list, setList] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [show, setShow] = useState(false);

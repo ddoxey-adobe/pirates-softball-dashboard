@@ -1,4 +1,4 @@
-export default function SchedulePanel() {
+export default function SchedulePanel({ players = [], coaches = [] } = {}) {
   return (
     <div className="p-6">
       <div className="bg-[#27251F] border border-[#3A3A3A] rounded-xl p-8 text-center">

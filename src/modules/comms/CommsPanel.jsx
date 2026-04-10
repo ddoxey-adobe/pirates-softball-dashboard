@@ -13,12 +13,22 @@ const STORAGE_KEY = "pirates-messages-2026v3";
 // ─── Storage helpers ──────────────────────────────────────────
 const loadStore = async (key, fb) => {
   try {
-    const r = await window.storage.get(key);
-    return r?.value ? JSON.parse(r.value) : fb;
+    if (window.storage) {
+      const r = await window.storage.get(key);
+      return r?.value ? JSON.parse(r.value) : fb;
+    }
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fb;
   } catch { return fb; }
 };
 const saveStore = async (key, d) => {
-  try { await window.storage.set(key, JSON.stringify(d)); } catch {}
+  try {
+    if (window.storage) {
+      await window.storage.set(key, JSON.stringify(d));
+    } else {
+      localStorage.setItem(key, JSON.stringify(d));
+    }
+  } catch {}
 };
 
 // ─── Fallback schedule if none passed via props ───────────────

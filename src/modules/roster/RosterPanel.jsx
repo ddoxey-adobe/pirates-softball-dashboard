@@ -336,7 +336,7 @@ const COACH_SPECIALTIES = [
 
 // ─── RosterPanel ───────────────────────────────────────────────────
 
-const RosterPanel = ({ players, setPlayers, coaches, setCoaches }) => {
+const RosterPanel = ({ players = [], setPlayers, coaches = [], setCoaches }) => {
   const [editing, setEditing] = useState(null);
   const [show, setShow] = useState(false);
   const [form, setForm] = useState(emptyPlayer());

@@ -3,13 +3,14 @@
 // Module-compatible version for the Pirates Softball Dashboard
 // ═══════════════════════════════════════════════════════════════════════════
 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
 // ─── MODULE WRAPPER ──────────────────────────────────────────────────────
 // Checks URL hash for #tryouts or #register so the module can be activated
 // via direct link. Exports as default for the module loader.
 // ─────────────────────────────────────────────────────────────────────────
 
 const TryoutsPanel = () => {
-  const { useState, useEffect, useRef, useCallback } = React;
 
   // ─── HASH-BASED ACTIVATION ──────────────────────────────────────
   // If the URL hash is #tryouts or #register, this module should be active.

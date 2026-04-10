@@ -19,6 +19,7 @@ export default defineConfig({
     open: '/vite-index.html',
   },
   resolve: {
+    extensions: ['.js', '.jsx', '.ts', '.tsx'],
     alias: {
       '@': resolve(__dirname, 'src'),
       '@app': resolve(__dirname, 'src/app'),

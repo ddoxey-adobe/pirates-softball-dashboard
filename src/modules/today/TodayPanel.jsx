@@ -399,7 +399,7 @@ const getAlerts = (players, gameLogs) => {
 // ═══════════════════════════════════════════════════════════════
 //  TODAY PANEL
 // ═══════════════════════════════════════════════════════════════
-const TodayPanel = ({ players: propPlayers, onNavigate }) => {
+const TodayPanel = ({ players: propPlayers = [], onNavigate }) => {
   const [players, setPlayers] = useState(propPlayers || []);
   const [gameLogs, setGameLogs] = useState([]);
   const [now, setNow] = useState(new Date());

@@ -17,8 +17,12 @@ const STORAGE_KEYS = {
 
 const loadStore = async (key, fb) => {
   try {
-    const r = await window.storage.get(key);
-    return r?.value ? JSON.parse(r.value) : fb;
+    if (window.storage) {
+      const r = await window.storage.get(key);
+      return r?.value ? JSON.parse(r.value) : fb;
+    }
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fb;
   } catch {
     return fb;
   }
@@ -73,7 +77,7 @@ const TABS = [
 ];
 
 // ─── Main Reports Panel ────────────────────────────────────────
-export default function ReportsPanel({ players }) {
+export default function ReportsPanel({ players = [] }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [games, setGames] = useState([]);
   const [practices, setPractices] = useState([]);

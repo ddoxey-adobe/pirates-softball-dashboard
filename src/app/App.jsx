@@ -218,7 +218,9 @@ export default function App() {
         return { players };
       case 'schedule':
       case 'practice':
+        return { players, coaches };
       case 'gameday':
+        return { players };
       case 'scouting':
       case 'tryouts':
       default:
