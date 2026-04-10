@@ -37,7 +37,7 @@ window.storage = {
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
 HTMLHEAD
 

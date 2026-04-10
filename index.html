@@ -33,7 +33,7 @@ window.storage = {
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
 import TodayPanel from "./modules/today/TodayPanel";
 
@@ -1402,7 +1402,8 @@ const PracticeLog = ({ players, coaches }) => {
       observations: players.reduce((a, p) => ({ ...a, [p.id]: "" }), {}),
       groups: practice.groups || {}, // Carry over groups from plan, or initialize empty
       stationRotation: practice.stationRotation || stationRotation,
-      highlights: [] // Quick notes/highlights during practice
+      highlights: [], // Quick notes/highlights during practice
+      absentReasons: practice.absentReasons || {} // { playerId: "reason" }
     };
   };
 
@@ -1457,6 +1458,48 @@ const PracticeLog = ({ players, coaches }) => {
       setStopwatchTime(0);
     }
   }, [show, stopwatchRunning]);
+
+  // ─── AUTO-SAVE: persist active practice form to list on every change ───
+  const autoSaveTimer = useRef(null);
+  const autoSaveToList = useCallback((formData) => {
+    if (!ed) return;
+    setList(prev => prev.map(x => x.id === ed ? { ...formData } : x));
+  }, [ed]);
+
+  useEffect(() => {
+    if (mode !== "active" || !ed || !show) return;
+    // Debounce auto-save by 1 second (covers observation typing)
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveToList(form);
+    }, 1000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [form, mode, ed, show, autoSaveToList]);
+
+  // ─── IMMEDIATE AUTO-SAVE for drill tracking values (no debounce) ───
+  const prevDrillTracking = useRef(null);
+  useEffect(() => {
+    if (mode !== "active" || !ed || !show) return;
+    const currentTracking = JSON.stringify(form.drillTracking || {});
+    if (prevDrillTracking.current !== null && prevDrillTracking.current !== currentTracking) {
+      // Drill tracking changed — save immediately
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      autoSaveToList(form);
+    }
+    prevDrillTracking.current = currentTracking;
+  }, [form.drillTracking, mode, ed, show, form, autoSaveToList]);
+
+  // ─── NAVIGATION WARNING for unsaved active practice ───
+  useEffect(() => {
+    if (mode !== "active" || !show) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = "You have unsaved practice data. Are you sure you want to leave?";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [mode, show]);
 
   const cats = ["all", ...new Set(DRILL_LIBRARY.map(d => d.category))];
   const fd = df === "all" ? DRILL_LIBRARY : DRILL_LIBRARY.filter(d => d.category === df);
@@ -1726,6 +1769,20 @@ const PracticeLog = ({ players, coaches }) => {
                         </div>
                       )}
 
+                      {/* Absent reasons */}
+                      {l.absentReasons && Object.keys(l.absentReasons).filter(id => l.absentReasons[id]).length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <span style={{ color: THEME.gray, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Absent: </span>
+                          {Object.entries(l.absentReasons).filter(([, reason]) => reason).map(([playerId, reason]) => {
+                            const player = players.find(p => p.id === playerId);
+                            return player ? (
+                              <span key={playerId} style={{ color: THEME.gray, fontSize: 11, marginRight: 8 }}>
+                                {player.name.split(" ")[0]} ({reason})
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                       {l.coachNotes && <p style={{ color: THEME.gray, fontSize: 12, marginTop: 8, fontStyle: "italic" }}>Coach: {l.coachNotes}</p>}
                     </div>
                   )}
@@ -2113,6 +2170,37 @@ const PracticeLog = ({ players, coaches }) => {
               selected={form.attendance || {}}
               onToggle={id => setForm({ ...form, attendance: { ...(form.attendance || {}), [id]: !(form.attendance || {})[id] } })}
             />
+            {/* Absent player reasons */}
+            {players.filter(p => !(form.attendance || {})[p.id]).length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ color: THEME.gray, fontSize: 11, marginBottom: 6, fontWeight: 600, textTransform: "uppercase", fontFamily: "'Oswald',sans-serif" }}>Absent — Reason (optional)</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {players.filter(p => !(form.attendance || {})[p.id]).map(p => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: THEME.gray, fontSize: 12, fontWeight: 600, minWidth: 90, flexShrink: 0 }}>{p.name.split(" ")[0]}</span>
+                      <select
+                        value={(form.absentReasons || {})[p.id] || ""}
+                        onChange={e => setForm({ ...form, absentReasons: { ...(form.absentReasons || {}), [p.id]: e.target.value } })}
+                        style={{ padding: "4px 8px", background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 11, outline: "none", minWidth: 120 }}
+                      >
+                        <option value="">—</option>
+                        <option value="Sick">Sick</option>
+                        <option value="Conflict">Conflict</option>
+                        <option value="Spring Break">Spring Break</option>
+                        <option value="Injury">Injury</option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
+                      <input
+                        value={(form.absentReasons || {})[p.id] && !["Sick","Conflict","Spring Break","Injury","Unknown",""].includes((form.absentReasons || {})[p.id]) ? (form.absentReasons || {})[p.id] : ""}
+                        onChange={e => setForm({ ...form, absentReasons: { ...(form.absentReasons || {}), [p.id]: e.target.value } })}
+                        placeholder="Or type custom reason..."
+                        style={{ flex: 1, padding: "4px 8px", background: THEME.black, border: `1px solid ${THEME.charcoal}`, borderRadius: 4, color: THEME.white, fontSize: 11, outline: "none" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 16 }}>
@@ -3173,7 +3261,7 @@ const PracticeLog = ({ players, coaches }) => {
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-        <Button variant="ghost" onClick={() => { setShow(false); setEd(null); setMode("plan"); }}>
+        <Button variant="ghost" onClick={() => { if (mode === "active") { save(); } else { setShow(false); setEd(null); setMode("plan"); } }}>
           {mode === "active" ? "Save & Close" : "Cancel"}
         </Button>
         <Button onClick={save}>
